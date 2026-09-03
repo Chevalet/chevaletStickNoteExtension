@@ -1,0 +1,673 @@
+/**
+ * One sticky note. Plan section 6.
+ *
+ * The hot path is deliberately imperative. `pointermove` sets spring *targets* and touches no
+ * DOM at all; the shared loop reads those targets and writes exactly six values per frame --
+ * four transforms and two opacities, every one of them a compositor property. Nothing in
+ * `step()` reads layout, so a drag cannot trigger a forced synchronous reflow no matter what
+ * the host page is doing.
+ */
+
+import { tapeStrip, tornRectPath } from '~/cs/art/paper.ts';
+import { leverFrom, TUNING as POSE, poseFromVelocity, smoothing } from '~/cs/physics/pose.ts';
+import {
+  type Animatable,
+  type Loop,
+  retune,
+  type Spring,
+  snap,
+  spring,
+  step,
+} from '~/cs/physics/spring.ts';
+import {
+  fontById,
+  isDarkPaper,
+  type NoteStyle,
+  paletteById,
+  resolveStyle,
+  styleVars,
+} from './theme.ts';
+
+declare const __DEV__: boolean;
+
+// Spring frequencies, hand-tuned in spikes/paper. The velocity -> pose mapping lives in
+// physics/pose.ts, where it can be unit-tested without a DOM.
+const TUNING = {
+  pos: { w: 34, z: 1.0 },
+  lift: { w: 28, z: 1.0 },
+  rz: { w: 16, z: 0.58 },
+  tilt: { w: 18, z: 0.55 },
+  skew: { w: 20, z: 0.62 },
+  curl: { w: 14, z: 0.7 },
+} as const;
+
+const CURL_LEVELS = 5;
+const MIN_W = 140;
+const MIN_H = 90;
+
+/**
+ * Upper bound on a note's size, from the viewport.
+ *
+ * `window.innerWidth` is legitimately 0 while a document is still loading and in some
+ * background/hidden tabs. Clamping against a zero viewport silently squashes every note to
+ * the minimum size -- which is exactly what happened the first time this ran in a preview
+ * pane. So the cap only applies when the viewport reports a believable size.
+ */
+function viewportCap(): [number, number] {
+  const w = window.innerWidth || document.documentElement.clientWidth || 0;
+  const h = window.innerHeight || document.documentElement.clientHeight || 0;
+  return [
+    w > MIN_W ? w * 0.9 : Number.POSITIVE_INFINITY,
+    h > MIN_H ? h * 0.9 : Number.POSITIVE_INFINITY,
+  ];
+}
+
+export interface NoteInit {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  z: number;
+  text: string;
+  style?: Partial<NoteStyle>;
+  collapsed?: boolean;
+  locked?: boolean;
+}
+
+export interface NoteHost {
+  loop: Loop;
+  layer: HTMLElement;
+  defaults?: NoteStyle;
+  /** Bring this note to the front; returns the new z. */
+  raise(note: NoteView): number;
+  onChange?(note: NoteView): void;
+}
+
+const NS = 'http://www.w3.org/2000/svg';
+const svg = <K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameMap[K] =>
+  document.createElementNS(NS, tag);
+
+export class NoteView implements Animatable {
+  readonly id: string;
+  readonly el: HTMLDivElement;
+
+  private readonly host: NoteHost;
+  private readonly shadowEl: SVGSVGElement;
+  private readonly shadowPath: SVGPathElement;
+  private readonly cardEl: HTMLDivElement;
+  private readonly faceEl: HTMLDivElement;
+  private readonly bodyEl: HTMLDivElement;
+  private readonly grainEl: HTMLCanvasElement;
+  private readonly paperPath: SVGPathElement;
+  private readonly tapeG: SVGGElement;
+  private readonly curlPaths: SVGPathElement[] = [];
+  private readonly sheenEl: HTMLDivElement;
+
+  private style: NoteStyle;
+  private w: number;
+  private h: number;
+  private zIndex: number;
+  private collapsed: boolean;
+  private locked: boolean;
+
+  // springs
+  private readonly px: Spring;
+  private readonly py: Spring;
+  private readonly lz: Spring;
+  private readonly rz: Spring;
+  private readonly rx: Spring;
+  private readonly ry: Spring;
+  private readonly sk: Spring;
+  private readonly curl: Spring;
+
+  // drag state
+  private grabbed = false;
+  private pointerId: number | null = null;
+  private grabDx = 0;
+  private grabDy = 0;
+  private lever = 0;
+  private vx = 0;
+  private vy = 0;
+  private lastX = 0;
+  private lastY = 0;
+  private lastT = 0;
+  private promoted = false;
+
+  constructor(init: NoteInit, host: NoteHost) {
+    this.id = init.id;
+    this.host = host;
+    this.style = resolveStyle(init.style, host.defaults);
+    this.w = init.w;
+    this.h = init.h;
+    this.zIndex = init.z;
+    this.collapsed = init.collapsed ?? false;
+    this.locked = init.locked ?? false;
+
+    const eps = 0.05;
+    this.px = spring(TUNING.pos.w, TUNING.pos.z, eps, init.x);
+    this.py = spring(TUNING.pos.w, TUNING.pos.z, eps, init.y);
+    this.lz = spring(TUNING.lift.w, TUNING.lift.z, 0.002, 0);
+    this.rz = spring(TUNING.rz.w, TUNING.rz.z, 0.01, 0);
+    this.rx = spring(TUNING.tilt.w, TUNING.tilt.z, 0.01, 0);
+    this.ry = spring(TUNING.tilt.w, TUNING.tilt.z, 0.01, 0);
+    this.sk = spring(TUNING.skew.w, TUNING.skew.z, 0.01, 0);
+    this.curl = spring(TUNING.curl.w, TUNING.curl.z, 0.002, 0);
+
+    // ---- structure -------------------------------------------------------
+    const note = document.createElement('div');
+    note.className = 'note';
+    note.dataset.id = init.id;
+    note.tabIndex = -1;
+    note.setAttribute('role', 'group');
+
+    // The drop shadow is the SAME torn path, not a rectangle behind it -- a rectangular
+    // shadow peeks out past every tear and instantly reads as a bug.
+    this.shadowEl = svg('svg');
+    this.shadowEl.setAttribute('class', 'shadow');
+    this.shadowEl.setAttribute('aria-hidden', 'true');
+    this.shadowEl.setAttribute('preserveAspectRatio', 'none');
+    this.shadowPath = svg('path');
+    this.shadowEl.append(this.shadowPath);
+
+    const tilt = div('tilt');
+    this.cardEl = div('card');
+    this.faceEl = div('face');
+
+    this.grainEl = document.createElement('canvas');
+    this.grainEl.className = 'grain';
+    this.grainEl.setAttribute('aria-hidden', 'true');
+
+    const art = svg('svg');
+    art.setAttribute('class', 'paper');
+    art.setAttribute('aria-hidden', 'true');
+    art.setAttribute('preserveAspectRatio', 'none');
+    this.paperPath = svg('path');
+    this.paperPath.setAttribute('class', 'paper-fill');
+    const halftone = svg('path');
+    halftone.setAttribute('class', 'paper-halftone');
+    this.tapeG = svg('g');
+    this.tapeG.setAttribute('class', 'tape');
+    art.append(this.paperPath, halftone, this.tapeG);
+    this.halftonePath = halftone;
+
+    const curlWrap = svg('svg');
+    curlWrap.setAttribute('class', 'curl');
+    curlWrap.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < CURL_LEVELS; i++) {
+      const p = svg('path');
+      p.setAttribute('class', 'curl-level');
+      p.style.opacity = '0';
+      curlWrap.append(p);
+      this.curlPaths.push(p);
+    }
+    this.curlEl = curlWrap;
+
+    this.sheenEl = div('sheen');
+
+    const header = document.createElement('header');
+    header.className = 'handle';
+    header.append(div('grip-dots'));
+    const actions = div('actions');
+    for (const [name, glyph, label] of [
+      ['collapse', '–', 'Collapse'],
+      ['delete', '×', 'Delete'],
+    ] as const) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `act act-${name}`;
+      b.tabIndex = -1;
+      b.textContent = glyph;
+      b.setAttribute('aria-label', label);
+      actions.append(b);
+    }
+    header.append(actions);
+
+    this.bodyEl = div('body');
+    this.bodyEl.setAttribute('role', 'textbox');
+    this.bodyEl.setAttribute('aria-multiline', 'true');
+    this.bodyEl.tabIndex = -1;
+    this.bodyEl.textContent = init.text;
+    this.applyEditable();
+
+    const grips = div('grips');
+    for (const g of ['se', 's', 'e'] as const) {
+      const el = div(`grip grip-${g}`);
+      el.dataset.grip = g;
+      grips.append(el);
+    }
+
+    this.faceEl.append(this.grainEl, art, this.sheenEl, header, this.bodyEl, curlWrap, grips);
+    this.cardEl.append(this.faceEl);
+    tilt.append(this.cardEl);
+    note.append(this.shadowEl, tilt);
+    this.el = note;
+
+    this.applyStyle();
+    this.resizeArt();
+    this.writeTransforms();
+    this.el.style.zIndex = String(this.zIndex);
+    if (this.collapsed) this.el.classList.add('is-collapsed');
+
+    header.addEventListener('pointerdown', this.onGrab);
+    for (const el of grips.children)
+      el.addEventListener('pointerdown', this.onResizeGrab as EventListener);
+    note.addEventListener('pointerdown', () => this.bringToFront());
+
+    host.layer.append(note);
+  }
+
+  private readonly halftonePath: SVGPathElement;
+  private readonly curlEl: SVGSVGElement;
+
+  // ------------------------------------------------------------------ state
+
+  get position(): { x: number; y: number } {
+    return { x: this.px.t, y: this.py.t };
+  }
+
+  get size(): { w: number; h: number } {
+    return { w: this.w, h: this.h };
+  }
+
+  get text(): string {
+    return this.bodyEl.textContent ?? '';
+  }
+
+  moveTo(x: number, y: number, animate = true): void {
+    this.px.t = x;
+    this.py.t = y;
+    if (!animate) {
+      snap(this.px, x);
+      snap(this.py, y);
+      this.writeTransforms();
+    } else {
+      this.host.loop.add(this);
+    }
+  }
+
+  resize(w: number, h: number): void {
+    const [maxW, maxH] = viewportCap();
+    this.w = Math.max(MIN_W, Math.min(w, maxW));
+    this.h = Math.max(MIN_H, Math.min(h, maxH));
+    this.sizeBoxes();
+    this.scheduleArt();
+  }
+
+  /** The only place that writes width/height. Called on create, on resize, and nowhere else. */
+  private sizeBoxes(): void {
+    for (const el of [this.faceEl, this.shadowEl]) {
+      el.style.width = `${this.w}px`;
+      el.style.height = `${this.h}px`;
+    }
+  }
+
+  setStyle(patch: Partial<NoteStyle>): void {
+    this.style = resolveStyle({ ...this.style, ...patch }, this.host.defaults);
+    this.applyStyle();
+    this.resizeArt();
+  }
+
+  /**
+   * Slow every spring down by `scale` (1 = normal, 6 = six times slower).
+   *
+   * This is how the constants in TUNING were chosen: at 1x a settle is 380 ms and the eye
+   * cannot separate the tilt from the spin from the curl. At 6x each degree of freedom is
+   * legible on its own. Kept in the shipped class rather than the harness because it is also
+   * how any future retune will be done.
+   */
+  setTimeScale(scale: number): void {
+    const k = 1 / Math.max(0.05, scale);
+    const t = TUNING;
+    retune(this.px, t.pos.w * k, t.pos.z);
+    retune(this.py, t.pos.w * k, t.pos.z);
+    retune(this.lz, t.lift.w * k, t.lift.z);
+    retune(this.rz, t.rz.w * k, t.rz.z);
+    retune(this.rx, t.tilt.w * k, t.tilt.z);
+    retune(this.ry, t.tilt.w * k, t.tilt.z);
+    retune(this.sk, t.skew.w * k, t.skew.z);
+    retune(this.curl, t.curl.w * k, t.curl.z);
+    this.timeScale = scale;
+  }
+
+  private timeScale = 1;
+
+  setCollapsed(next: boolean): void {
+    this.collapsed = next;
+    this.el.classList.toggle('is-collapsed', next);
+  }
+
+  setLocked(next: boolean): void {
+    this.locked = next;
+    this.applyEditable();
+  }
+
+  bringToFront(): void {
+    this.zIndex = this.host.raise(this);
+    this.el.style.zIndex = String(this.zIndex);
+  }
+
+  destroy(): void {
+    this.host.loop.remove(this);
+    this.el.remove();
+  }
+
+  // ------------------------------------------------------------------ style
+
+  private applyEditable(): void {
+    const mode = this.locked ? 'false' : 'plaintext-only';
+    this.bodyEl.setAttribute('contenteditable', mode);
+    // Firefox before 136 has no plaintext-only; `true` plus paste flattening is the fallback.
+    if (this.bodyEl.contentEditable !== 'plaintext-only' && !this.locked) {
+      this.bodyEl.setAttribute('contenteditable', 'true');
+      this.el.classList.add('no-plaintext-only');
+    }
+    this.bodyEl.setAttribute('aria-readonly', String(this.locked));
+  }
+
+  private applyStyle(): void {
+    const font = fontById(this.style.fontFamily);
+    for (const [k, v] of Object.entries(styleVars(this.style, font.stack))) {
+      this.el.style.setProperty(k, v);
+    }
+    this.bodyEl.dir = this.style.dir;
+    this.el.dataset.align = this.style.align;
+    this.el.dataset.shadow = this.style.shadow;
+    this.el.dataset.dark = isDarkPaper(this.style.paper ?? paletteById(this.style.palette).paper)
+      ? '1'
+      : '0';
+    this.el.dataset.tape = this.style.tape;
+    this.el.setAttribute('aria-label', `Sticky note: ${this.text.slice(0, 40)}`);
+    if (this.style.physics !== 'full') {
+      const inert = { w: 1e6, z: 1 };
+      for (const s of [this.rz, this.rx, this.ry, this.sk, this.curl]) retune(s, inert.w, inert.z);
+    } else {
+      retune(this.rz, TUNING.rz.w, TUNING.rz.z);
+      retune(this.rx, TUNING.tilt.w, TUNING.tilt.z);
+      retune(this.ry, TUNING.tilt.w, TUNING.tilt.z);
+      retune(this.sk, TUNING.skew.w, TUNING.skew.z);
+      retune(this.curl, TUNING.curl.w, TUNING.curl.z);
+    }
+  }
+
+  // -------------------------------------------------------------------- art
+
+  private artTimer = 0;
+
+  private scheduleArt(): void {
+    // Regenerating the tear and repainting the grain is ~0.5 ms. Cheap, but not per frame.
+    clearTimeout(this.artTimer);
+    this.artTimer = self.setTimeout(() => this.resizeArt(), 120);
+  }
+
+  private resizeArt(): void {
+    const { w, h } = this;
+    this.sizeBoxes();
+
+    const box = `0 0 ${w} ${h}`;
+    this.paperPath.ownerSVGElement?.setAttribute('viewBox', box);
+    this.curlEl.setAttribute('viewBox', box);
+    this.shadowEl.setAttribute('viewBox', box);
+
+    const d = tornRectPath(w, h, this.id, { amplitude: this.style.tornEdges });
+    this.paperPath.setAttribute('d', d);
+    this.halftonePath.setAttribute('d', d);
+    this.shadowPath.setAttribute('d', d);
+
+    this.tapeG.textContent = '';
+    const corners: Array<0 | 1 | 2 | 3> =
+      this.style.tape === 'none' ? [] : this.style.tape === 'one' ? [0] : [0, 2];
+    for (const c of corners) {
+      const t = tapeStrip(w, h, c, this.id);
+      const p = svg('path');
+      p.setAttribute('d', t.d);
+      p.setAttribute('class', 'tape-strip');
+      p.setAttribute('transform', t.transform);
+      this.tapeG.append(p);
+    }
+
+    for (let i = 0; i < CURL_LEVELS; i++) {
+      (this.curlPaths[i] as SVGPathElement).setAttribute(
+        'd',
+        curlPath(w, h, i / (CURL_LEVELS - 1)),
+      );
+    }
+
+    void import('~/cs/art/paper.ts').then(({ paintGrain }) =>
+      paintGrain(this.grainEl, w, h, Math.min(2, window.devicePixelRatio || 1)),
+    );
+  }
+
+  // ------------------------------------------------------------------- drag
+
+  private readonly onGrab = (e: PointerEvent): void => {
+    if (this.locked || e.button !== 0) return;
+    const target = e.currentTarget as HTMLElement;
+    if ((e.target as HTMLElement).closest('.act')) return;
+
+    e.preventDefault();
+    this.grabbed = true;
+    this.pointerId = e.pointerId;
+    // Pointer capture keeps every subsequent event on this element -- no document listeners,
+    // and the drag survives the pointer leaving the window. It throws for a pointer id that
+    // is not currently active (synthetic events, a pointer released between dispatch and
+    // handling), and a failed capture must not abort the drag -- it just means the drag ends
+    // if the pointer leaves the element.
+    try {
+      target.setPointerCapture(e.pointerId);
+    } catch {
+      /* capture is an optimisation, not a requirement */
+    }
+    target.addEventListener('pointermove', this.onMove);
+    target.addEventListener('pointerup', this.onRelease);
+    target.addEventListener('pointercancel', this.onRelease);
+    target.addEventListener('lostpointercapture', this.onRelease);
+
+    this.grabDx = e.clientX + window.scrollX - this.px.t;
+    this.grabDy = e.clientY + window.scrollY - this.py.t;
+    // Where on the note it was grabbed, -1..1 from the centre. This is what makes yanking a
+    // corner swing the note instead of sliding it flat.
+    this.lever = leverFrom(this.grabDx, this.w);
+
+    this.vx = 0;
+    this.vy = 0;
+    this.lastX = e.clientX;
+    this.lastY = e.clientY;
+    this.lastT = e.timeStamp;
+
+    this.lz.t = 1;
+    this.promote(true);
+    this.bringToFront();
+    this.el.classList.add('is-dragging');
+    this.host.loop.add(this);
+  };
+
+  private readonly onMove = (e: PointerEvent): void => {
+    if (!this.grabbed || e.pointerId !== this.pointerId) return;
+
+    // Coalesced events give the true pointer path on a high-rate mouse without forcing us to
+    // render at 1000 Hz -- we integrate them into velocity and render once per frame.
+    const events = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [e];
+    for (const ev of events.length ? events : [e]) {
+      const dt = Math.max(0.004, (ev.timeStamp - this.lastT) / 1000);
+      const a = smoothing(dt);
+      this.vx += ((ev.clientX - this.lastX) / dt - this.vx) * a;
+      this.vy += ((ev.clientY - this.lastY) / dt - this.vy) * a;
+      this.lastX = ev.clientX;
+      this.lastY = ev.clientY;
+      this.lastT = ev.timeStamp;
+    }
+
+    // Targets only. No DOM writes here -- that is the loop's job.
+    this.px.t = e.clientX + window.scrollX - this.grabDx;
+    this.py.t = e.clientY + window.scrollY - this.grabDy;
+    this.host.loop.wake();
+  };
+
+  private readonly onRelease = (e: PointerEvent): void => {
+    if (e.pointerId !== this.pointerId) return;
+    const target = e.currentTarget as HTMLElement;
+    target.removeEventListener('pointermove', this.onMove);
+    target.removeEventListener('pointerup', this.onRelease);
+    target.removeEventListener('pointercancel', this.onRelease);
+    target.removeEventListener('lostpointercapture', this.onRelease);
+    try {
+      if (target.hasPointerCapture(e.pointerId)) target.releasePointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+
+    this.grabbed = false;
+    this.pointerId = null;
+    this.lz.t = 0;
+    this.el.classList.remove('is-dragging');
+    this.host.loop.add(this);
+    this.host.onChange?.(this);
+  };
+
+  // ----------------------------------------------------------------- resize
+
+  private readonly onResizeGrab = (e: PointerEvent): void => {
+    if (this.locked || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const grip = (e.currentTarget as HTMLElement).dataset.grip ?? 'se';
+    const target = e.currentTarget as HTMLElement;
+    try {
+      target.setPointerCapture(e.pointerId);
+    } catch {
+      /* see onGrab */
+    }
+
+    const startW = this.w;
+    const startH = this.h;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    // Resizing writes width/height, which IS layout. So it never runs alongside the 3D
+    // physics: tilt and curl are pinned to zero for the duration.
+    this.el.classList.add('is-resizing');
+    let pending = 0;
+
+    const move = (ev: PointerEvent): void => {
+      if (pending) return;
+      pending = requestAnimationFrame(() => {
+        pending = 0;
+        const dx = grip === 's' ? 0 : ev.clientX - startX;
+        const dy = grip === 'e' ? 0 : ev.clientY - startY;
+        this.resize(startW + dx, startH + dy);
+      });
+    };
+    const up = (ev: PointerEvent): void => {
+      cancelAnimationFrame(pending);
+      target.removeEventListener('pointermove', move);
+      target.removeEventListener('pointerup', up);
+      target.removeEventListener('pointercancel', up);
+      try {
+        if (target.hasPointerCapture(ev.pointerId)) target.releasePointerCapture(ev.pointerId);
+      } catch {
+        /* already released */
+      }
+      this.el.classList.remove('is-resizing');
+      this.resizeArt();
+      this.host.onChange?.(this);
+    };
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', up);
+    target.addEventListener('pointercancel', up);
+  };
+
+  // ------------------------------------------------------------------ frame
+
+  step(dt: number): boolean {
+    if (this.style.physics === 'full') {
+      const pose = poseFromVelocity(this.vx, this.vy, this.lever, this.grabbed);
+      this.rx.t = pose.rx;
+      this.ry.t = pose.ry;
+      this.rz.t = pose.rz;
+      this.sk.t = pose.sk;
+      this.curl.t = pose.curl;
+      // Velocity decays on its own once the pointer stops moving.
+      const decay = Math.exp(-dt / (POSE.tau * this.timeScale));
+      this.vx *= decay;
+      this.vy *= decay;
+    }
+
+    let live = false;
+    for (const s of [this.px, this.py, this.lz, this.rz, this.rx, this.ry, this.sk, this.curl]) {
+      if (step(s, dt)) live = true;
+    }
+    this.writeTransforms();
+    return live || this.grabbed;
+  }
+
+  settle(): void {
+    this.promote(false);
+    this.writeTransforms();
+  }
+
+  private promote(on: boolean): void {
+    if (on === this.promoted) return;
+    this.promoted = on;
+    // Firefox has a will-change budget; permanently promoting every note silently disables
+    // promotion for all of them. So it goes on for the drag and comes straight back off.
+    this.el.style.willChange = on ? 'transform' : '';
+    this.faceEl.style.willChange = on ? 'transform' : '';
+  }
+
+  private writeTransforms(): void {
+    const lift = this.lz.x;
+    this.el.style.transform = `translate3d(${this.px.x.toFixed(2)}px, ${this.py.x.toFixed(2)}px, 0)`;
+    this.cardEl.style.transform =
+      `rotateX(${this.rx.x.toFixed(2)}deg) rotateY(${this.ry.x.toFixed(2)}deg) ` +
+      `translateZ(${(lift * 26).toFixed(2)}px)`;
+    this.faceEl.style.transform =
+      `rotate(${this.rz.x.toFixed(2)}deg) skewX(${this.sk.x.toFixed(2)}deg) ` +
+      `scale(${(1 + lift * 0.035).toFixed(4)})`;
+    this.shadowEl.style.transform =
+      `translate3d(${(4 + lift * 10).toFixed(2)}px, ${(5 + lift * 14).toFixed(2)}px, 0) ` +
+      `scale(${(1 + lift * 0.06).toFixed(4)})`;
+    this.shadowEl.style.opacity = (0.18 + lift * 0.18).toFixed(3);
+    // Light appears to move across the sheet as it tilts. Two cheap writes, big payoff.
+    this.sheenEl.style.transform = `translate3d(${(-this.ry.x * 3).toFixed(2)}px, ${(this.rx.x * 2).toFixed(2)}px, 0)`;
+    this.sheenEl.style.opacity = (lift * 0.5).toFixed(3);
+
+    // Cross-fade between the two nearest pre-baked curl paths. Opacity only.
+    const t = this.curl.x * (CURL_LEVELS - 1);
+    const i = Math.min(CURL_LEVELS - 2, Math.floor(t));
+    const f = t - i;
+    for (let k = 0; k < CURL_LEVELS; k++) {
+      const p = this.curlPaths[k] as SVGPathElement;
+      p.style.opacity = k === i ? String(1 - f) : k === i + 1 ? String(f) : '0';
+    }
+  }
+}
+
+function div(cls: string): HTMLDivElement {
+  const d = document.createElement('div');
+  d.className = cls;
+  return d;
+}
+
+/**
+ * One of five pre-baked corner folds, `t` from 0 (flat) to 1 (fully curled).
+ * Baked because morphing a path per frame is a main-thread repaint; cross-fading five static
+ * ones by opacity is free.
+ *
+ * Level 0 must be genuinely empty. An earlier version drew a 14px wedge there, which meant
+ * every note sat with a hard dark triangle stapled to its corner at rest -- it read as a
+ * rendering bug, not as paper.
+ */
+function curlPath(w: number, h: number, t: number): string {
+  if (t <= 0) return '';
+  const s = 6 + t * 54; // how far up the corner has lifted
+  const lift = t * 0.55;
+  const x0 = w - s;
+  const y0 = h;
+  const x1 = w;
+  const y1 = h - s;
+  const cx = w - s * (0.45 - lift * 0.2);
+  const cy = h - s * (0.45 - lift * 0.2);
+  return `M${x0.toFixed(1)} ${y0.toFixed(1)} Q${cx.toFixed(1)} ${cy.toFixed(1)} ${x1.toFixed(1)} ${y1.toFixed(1)} L${x1.toFixed(1)} ${y0.toFixed(1)} Z`;
+}
+
+export const __TUNING__ = __DEV__ ? TUNING : undefined;

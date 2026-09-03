@@ -102,7 +102,8 @@ async function reportSizes(): Promise<void> {
     const bytes = await readFile(join(OUT, file)).catch(() => null);
     if (!bytes) continue;
     const gz = gzipSync(bytes, { level: 9 }).byteLength;
-    const budget = BUDGETS_GZ[file];
+    // Dev builds are unminified with inline sourcemaps, so their sizes mean nothing here.
+    const budget = DEV ? undefined : BUDGETS_GZ[file];
     const flag = budget && gz > budget ? ' OVER BUDGET' : '';
     if (flag) over = true;
     const budgetStr = budget ? ` / ${(budget / 1024).toFixed(1)}kB` : '';
@@ -114,6 +115,24 @@ async function reportSizes(): Promise<void> {
   if (over && !DEV) {
     throw new Error('bundle size budget exceeded -- see plan section 2');
   }
+}
+
+/**
+ * Dev-only harnesses. These import the real modules and mount them outside the extension so
+ * the look and the feel can be judged and profiled directly in a browser. Never shipped --
+ * they are emitted next to their own HTML under spikes/, not into dist/.
+ */
+async function buildHarnesses(): Promise<void> {
+  if (!DEV) return;
+  await esbuild.build({
+    ...shared,
+    entryPoints: [join(ROOT, 'spikes/paper/main.ts')],
+    outfile: join(ROOT, 'spikes/paper/bundle.js'),
+    format: 'iife',
+    minify: false,
+    logLevel: 'warning',
+  });
+  process.stdout.write('  harness:  spikes/paper/index.html\n');
 }
 
 async function run(): Promise<void> {
@@ -135,6 +154,7 @@ async function run(): Promise<void> {
     await Promise.all(ctxs.map((c) => c.watch()));
     await buildManifest();
     await copyStatic();
+    await buildHarnesses();
     process.stdout.write(`\nwatching (host tag: ${HOST_TAG})\n`);
     return;
   }
@@ -146,6 +166,7 @@ async function run(): Promise<void> {
   process.stdout.write(`\nchevaletNote ${pkg.version}${DEV ? ' (dev)' : ''}\n`);
   process.stdout.write(`  host tag: ${HOST_TAG}\n  font ns:  ${FONT_NS}\n`);
   await reportSizes();
+  await buildHarnesses();
 }
 
 await run();

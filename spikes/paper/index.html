@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>R4 — paper feel</title>
+<style>
+  /* Deliberately hostile-ish host page styling: a universal reset with !important, a
+     dark-ish theme, and real prose behind the notes. If the notes survive this, the
+     shadow-root isolation is doing its job. */
+  * { box-sizing: border-box !important; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #ece5d6;
+    color: #2a2622;
+    font: 16px/1.7 Georgia, "Times New Roman", serif !important;
+    min-height: 300vh;
+  }
+  .page { max-width: 720px; margin: 0 auto; padding: 90px 24px 400px; }
+  h1 { font: 700 34px/1.15 system-ui, sans-serif; letter-spacing: -.5px; margin: 0 0 6px; }
+  h2 { font: 700 20px/1.3 system-ui, sans-serif; margin: 44px 0 10px; }
+  p { margin: 0 0 18px; }
+  .lede { font-size: 18px; opacity: .75; }
+  code { background: #ded5c2; padding: 1px 5px; font-family: ui-monospace, monospace; }
+
+  #panel {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    padding: 8px 14px; background: #14110e; color: #ffe94a;
+    font: 12px/1.4 ui-monospace, Consolas, monospace;
+    border-bottom: 3px solid #ff2e63;
+  }
+  #panel label { display: inline-flex; gap: 5px; align-items: center; white-space: nowrap; }
+  #panel button {
+    font: 700 12px ui-monospace, monospace; cursor: pointer;
+    background: #ffe94a; color: #14110e; border: 2px solid #14110e;
+    box-shadow: 2px 2px 0 #ff2e63; padding: 3px 9px;
+  }
+  #panel button:active { transform: translate(2px, 2px); box-shadow: none; }
+  #panel select, #panel input { font: 12px ui-monospace, monospace; }
+  #fps { margin-left: auto; color: #7ef0ff; }
+</style>
+</head>
+<body>
+
+<div id="panel">
+  <button id="respawn">respawn</button>
+  <button id="add">+ note</button>
+  <button id="stress">+30 (stress)</button>
+  <label>tear <input id="tornEdges" type="range" min="0" max="6" step="0.2" value="2.4"><span id="tornEdges-out">2.40</span></label>
+  <label>grain <input id="grain" type="range" min="0" max="0.6" step="0.02" value="0.16"><span id="grain-out">0.16</span></label>
+  <label>tape
+    <select id="tape"><option value="one" selected>one</option><option value="two">two</option><option value="none">none</option></select>
+  </label>
+  <label>shadow
+    <select id="shadow"><option value="hard" selected>hard</option><option value="soft">soft</option><option value="none">none</option></select>
+  </label>
+  <label>physics
+    <select id="physics"><option value="full" selected>full</option><option value="reduced">reduced</option><option value="off">off</option></select>
+  </label>
+  <label>slow-mo <input id="slowmo" type="checkbox"></label>
+  <span id="fps"></span>
+</div>
+
+<div class="page">
+  <h1>The Xerox Machine and the Zine</h1>
+  <p class="lede">
+    Filler text so the notes have something real to sit on top of. Scroll the page: a
+    document-anchored note should travel with this paragraph, not with the window.
+  </p>
+
+  <h2>Why the shadow root matters</h2>
+  <p>
+    This page sets <code>* { box-sizing: border-box !important }</code> and a serif
+    <code>font-family</code> with <code>!important</code> on <code>body</code>. Neither reaches
+    the notes: they live in a closed shadow root on a host with <code>all: initial</code>.
+  </p>
+  <p>
+    Every pixel that is not covered by a note hit-tests straight through to this text. Try
+    selecting this paragraph while a note overlaps it — the selection works normally, because
+    the host and its layers are <code>pointer-events: none</code> and only the note itself is
+    <code>auto</code>.
+  </p>
+
+  <h2>What to look for</h2>
+  <p>
+    Grab a note by its header and move it slowly: it should follow almost exactly, with a
+    barely perceptible lean. Now flick it. The sheet should lag, tilt into the direction of
+    travel, shear slightly, and curl at the corner — then settle with one soft overshoot rather
+    than snapping dead.
+  </p>
+  <p>
+    Grab a <em>top corner</em> and yank downward. The lever term should swing the note around
+    the grab point, the way a real sheet of paper pivots when you drag it by one edge.
+  </p>
+  <p>
+    Watch the fps read-out. With nothing moving it should say <em>idle · 0 animating</em>: the
+    shared requestAnimationFrame loop cancels itself when the last spring settles, so an idle
+    tab full of notes costs nothing at all.
+  </p>
+
+  <h2>More filler</h2>
+  <p>
+    A photocopier degrades an image a little every generation. Contrast climbs, midtones
+    collapse into pure black and white, dust on the platen becomes part of the artwork. Zine
+    makers leaned into it: if the third-generation copy looked rougher, you made the fourth.
+  </p>
+  <p>
+    That is the target look here — high-contrast ink on saturated stock, halftone dots coarse
+    enough to see, a hard unblurred drop shadow, and edges that were torn rather than cut.
+  </p>
+  <p>
+    The important constraint is that none of it may cost anything per frame. The tear is a path
+    generated once from a seeded PRNG. The grain is one tile shared by every note, multiplied
+    over the paper. The corner curl is five pre-baked paths cross-faded by opacity. Only
+    <code>transform</code> and <code>opacity</code> ever change while a note is moving.
+  </p>
+  <p>
+    Scroll all the way down and back up to confirm the notes are pinned to the document, then
+    resize the window and watch nothing jump.
+  </p>
+</div>
+
+<script src="bundle.js"></script>
+</body>
+</html>
