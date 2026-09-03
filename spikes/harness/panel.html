@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>chevaletNote — phase 0 spikes</title>
+<style>
+  :root {
+    --paper: #f4efe2; --ink: #14110e; --line: #14110e;
+    --ok: #0d7a3d; --bad: #c01b3a; --warn: #b8860b; --dim: #6b6355;
+    --hi: #ffe94a; --accent: #ff3d7f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 28px 80px; background: var(--paper); color: var(--ink);
+    font: 14px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.5px; }
+  h1 span { background: var(--hi); padding: 0 6px; box-shadow: 4px 4px 0 var(--ink); }
+  .sub { color: var(--dim); margin: 10px 0 26px; max-width: 78ch; }
+  section { border: 3px solid var(--line); background: #fff; margin: 0 0 22px; }
+  section > h2 {
+    margin: 0; padding: 8px 12px; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase;
+    background: var(--ink); color: var(--hi);
+  }
+  section > .body { padding: 14px 12px; }
+  p.hint { color: var(--dim); margin: 0 0 12px; max-width: 90ch; }
+  button {
+    font: inherit; font-weight: 700; cursor: pointer; padding: 5px 11px; margin: 0 6px 6px 0;
+    background: var(--hi); color: var(--ink); border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+  }
+  button:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--ink); }
+  button:active { transform: translate(3px, 3px); box-shadow: none; }
+  button.ghost { background: #fff; }
+  button.danger { background: var(--accent); color: #fff; }
+  button.sm { padding: 2px 7px; font-size: 12px; box-shadow: 2px 2px 0 var(--ink); }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  th, td { border: 1px solid #d8d2c4; padding: 4px 7px; text-align: left; vertical-align: top; }
+  th { background: #efe9db; font-weight: 700; position: sticky; top: 0; }
+  td.k { font-size: 11.5px; color: var(--dim); }
+  .pass { color: var(--ok); font-weight: 700; }
+  .fail { color: var(--bad); font-weight: 700; }
+  .note { color: var(--warn); }
+  pre {
+    background: #1b1815; color: #e8e2d4; padding: 10px 12px; overflow: auto;
+    max-height: 320px; font-size: 12px; margin: 0;
+  }
+  ol.matrix { margin: 0 0 8px; padding-left: 22px; max-width: 92ch; }
+  ol.matrix li { margin-bottom: 7px; }
+  ol.matrix code { background: #efe9db; padding: 0 4px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .scroll { max-height: 420px; overflow: auto; border: 1px solid #d8d2c4; }
+  .kv { display: grid; grid-template-columns: 200px 1fr; gap: 2px 12px; font-size: 12.5px; }
+  .kv dt { color: var(--dim); }
+  .kv dd { margin: 0; }
+</style>
+</head>
+<body>
+
+<h1><span>chevaletNote</span> · phase 0 spikes</h1>
+<p class="sub">
+  Every result here is evidence against a specific design decision in the plan. Anything that
+  fails changes the design — that is the point of running these before writing product code.
+  Run the whole sheet on Firefox release <em>and</em> ESR.
+</p>
+
+<section>
+  <h2>0 · Access</h2>
+  <div class="body">
+    <p class="hint">
+      Firefox MV3 does not grant host permissions at install. This button is the real onboarding
+      flow the product will use. Without it, nothing can be injected anywhere.
+    </p>
+    <button id="grant-all">Grant all sites</button>
+    <button id="grant-file" class="ghost">Grant file:// too</button>
+    <span id="perm-state" class="note"></span>
+  </div>
+</section>
+
+<section>
+  <h2>R1 · Does a content-script beforeunload actually prompt on tab close?</h2>
+  <div class="body">
+    <p class="hint">
+      Pick a tab below, press <strong>Inject probe</strong>, click once inside that page (sticky
+      activation is required), then <strong>Arm guard</strong> and work the matrix.
+      Record each answer — the whole close-confirmation feature rests on row 1.
+    </p>
+    <ol class="matrix">
+      <li>Armed + page interacted → close the tab. <strong>Dialog?</strong> If no, isolated-world cancellation is ignored and <code>world:"MAIN"</code> becomes mandatory.</li>
+      <li>Armed + page <em>never</em> interacted (inject, do not click, arm from here) → close. Expect <em>no</em> dialog, confirming the sticky-activation rule.</li>
+      <li>Arm three tabs, close the whole window. How many dialogs, and does Firefox focus each tab in turn? This sizes the guard budget.</li>
+      <li>Armed, then quit with Ctrl+Shift+Q. Dialogs? After choosing Stay, does session restore still work?</li>
+      <li>Armed → <strong>Close via tabs.remove()</strong> below. Expect the guard to be bypassed.</li>
+      <li>Set <code>dom.disable_beforeunload = true</code> in about:config → expect suppression.</li>
+      <li>Discard the tab in <code>about:unloads</code>, then close it. Expect silence.</li>
+      <li>bfcache: time a back-navigation with the guard armed vs disarmed.</li>
+    </ol>
+    <div class="row">
+      <label>tab id <input id="guard-tab" size="7" inputmode="numeric"></label>
+      <button id="guard-on">Arm guard</button>
+      <button id="guard-off" class="ghost">Disarm</button>
+      <button id="close-api" class="danger">Close via tabs.remove()</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>R5a · Tab identity — does sessions.setTabValue survive everything?</h2>
+  <div class="body">
+    <p class="hint">
+      A key is minted on each tab's first load. Do these and re-read the table each time:
+      restart with session restore · Ctrl+Shift+T · <strong>duplicate a tab</strong> (does the
+      clone carry the same key?) · drag a tab to a new window · a container tab · a private
+      window · discard via about:unloads · kill the Firefox process 3 s after a fresh tab loads.
+    </p>
+    <div class="row">
+      <button id="refresh-tabs">Refresh table</button>
+      <button id="time-keys" class="ghost">Time getTabValue for every tab</button>
+      <span id="key-timing" class="note"></span>
+    </div>
+    <div class="scroll"><table id="tabs-table"></table></div>
+  </div>
+</section>
+
+<section>
+  <h2>R5a · Recovery — restore and reattach</h2>
+  <div class="body">
+    <p class="hint">
+      <strong>Restore</strong> uses Firefox's own undo stack (shallow, ~10–25 entries).
+      <strong>Reopen + reattach</strong> is the product's own path: recreate the tab and hand it
+      back its old key. That one has no depth limit, and this is where we prove it.
+    </p>
+    <div class="row">
+      <button id="refresh-closed">Refresh recently closed</button>
+    </div>
+    <div class="scroll"><table id="closed-table"></table></div>
+  </div>
+</section>
+
+<section>
+  <h2>R2 + R6 · CSP-immune assets, and host survival on real sites</h2>
+  <div class="body">
+    <p class="hint">
+      Open a hostile site, come back, type its tab id and inject. Sweep at least:
+      github.com · x.com · mail.google.com · docs.google.com · notion.so · youtube.com (also in
+      fullscreen) · linkedin.com · a bank · a Next.js app · pdf.js · file:/// · a <code>#/</code>
+      hash-router SPA · a Persian RTL site · a page that clears <code>document.body</code>.
+    </p>
+    <div class="row">
+      <label>tab id <input id="probe-tab" size="7" inputmode="numeric"></label>
+      <button id="inject-probe">Inject probe</button>
+      <button id="refresh-results" class="ghost">Refresh results</button>
+      <button id="clear-store" class="danger">Clear all results + log</button>
+    </div>
+    <div class="scroll"><table id="results-table"></table></div>
+  </div>
+</section>
+
+<section>
+  <h2>R5b · IndexedDB at scale</h2>
+  <div class="body">
+    <p class="hint">
+      Seeds synthetic notes in the planned schema shape and times the paths that matter.
+      Gate: the hot-path query must stay under 5 ms at 10 000 notes, or the schema needs rework
+      before anything is built on it.
+    </p>
+    <div class="row">
+      <label>notes <input id="seed-count" size="8" value="10000" inputmode="numeric"></label>
+      <button id="run-bench">Seed &amp; benchmark</button>
+      <button id="drop-db" class="danger">Drop benchmark DB</button>
+    </div>
+    <dl class="kv" id="bench-out"></dl>
+  </div>
+</section>
+
+<section>
+  <h2>Durable event log</h2>
+  <div class="body">
+    <p class="hint">
+      Written to <code>storage.local</code>, so it is still here after a browser restart —
+      which is the only way to see what happened during session restore.
+    </p>
+    <div class="row">
+      <button id="refresh-log">Refresh</button>
+      <button id="copy-log" class="ghost">Copy as JSON</button>
+    </div>
+    <pre id="log-out"></pre>
+  </div>
+</section>
+
+<script src="panel.js"></script>
+</body>
+</html>

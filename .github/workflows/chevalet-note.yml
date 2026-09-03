@@ -1,0 +1,48 @@
+name: chevaletNote
+
+# Path-filtered on purpose: this repo also carries workspace docs, and a docs commit
+# should not spend CI minutes building a browser extension.
+on:
+  push:
+    paths: ['src/**', 'tests/**', '_locales/**', 'assets/**', 'build.ts', 'package.json', 'pnpm-lock.yaml', 'tsconfig.json', 'biome.json', '.github/workflows/chevalet-note.yml']
+  pull_request:
+    paths: ['src/**', 'tests/**', '_locales/**', 'assets/**', 'build.ts', 'package.json', 'pnpm-lock.yaml', 'tsconfig.json', 'biome.json']
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint and format
+        run: pnpm lint
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # AMO's own validator. The shipped extension must stay at zero of everything --
+      # a public listing is the goal, and reviewers see exactly this output.
+      - name: web-ext lint
+        run: pnpm exec web-ext lint --source-dir dist --no-config-discovery --warnings-as-errors
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chevalet-note-unsigned
+          path: dist/

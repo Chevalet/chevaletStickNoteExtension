@@ -1,0 +1,35 @@
+{
+  "name": "chevalet-note",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sticky notes stuck to the page, not the browser. Firefox extension.",
+  "license": "MPL-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node --experimental-strip-types build.ts",
+    "build:dev": "node --experimental-strip-types build.ts --dev",
+    "watch": "node --experimental-strip-types build.ts --dev --watch",
+    "dev": "pnpm build:dev && web-ext run --source-dir dist --target firefox-desktop",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "lint:ext": "pnpm build && web-ext lint --source-dir dist",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "pnpm build && web-ext build --source-dir dist --artifacts-dir artifacts --overwrite-dest",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm lint:ext"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.0",
+    "@types/firefox-webext-browser": "^120.0.4",
+    "@types/node": "^24.10.0",
+    "esbuild": "^0.25.10",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "web-ext": "^8.10.0"
+  },
+  "dependencies": {}
+}

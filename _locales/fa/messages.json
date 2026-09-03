@@ -1,0 +1,8 @@
+{
+  "extName":        { "message": "شوالیه‌نوت" },
+  "extDescription": { "message": "استیکی‌نوت‌هایی که به خودِ صفحه می‌چسبند، نه به مرورگر. آفلاین، خصوصی، و همیشه قابل خروجی‌گرفتن." },
+  "cmdNewNote":     { "message": "نوت تازه روی این صفحه" },
+  "cmdToggleTab":   { "message": "روشن/خاموش کردن نوت‌ها برای این تب" },
+  "cmdCycleNotes":  { "message": "رفتن به نوت بعدی" },
+  "cmdOpenManager": { "message": "باز کردن مدیریت نوت‌ها" }
+}

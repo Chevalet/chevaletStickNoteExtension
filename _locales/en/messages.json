@@ -1,0 +1,8 @@
+{
+  "extName":        { "message": "Chevalet Note" },
+  "extDescription": { "message": "Sticky notes that stay stuck to the page — not to your browser. Offline, private, and yours to export." },
+  "cmdNewNote":     { "message": "New note on this page" },
+  "cmdToggleTab":   { "message": "Turn notes on or off for this tab" },
+  "cmdCycleNotes":  { "message": "Focus the next note" },
+  "cmdOpenManager": { "message": "Open the note manager" }
+}

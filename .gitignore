@@ -1,0 +1,11 @@
+node_modules/
+dist/
+artifacts/
+web-ext-artifacts/
+*.log
+.DS_Store
+Thumbs.db
+
+# never commit secrets or AMO credentials
+.env
+*.env

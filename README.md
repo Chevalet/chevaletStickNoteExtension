@@ -1,0 +1,124 @@
+# Chevalet Note
+
+Sticky notes that stay stuck to **the page**, not to your browser.
+
+Put a note anywhere on any web page. It stays at that exact spot in the document — scroll, and
+it scrolls with the content like part of the site. Close the tab, close the browser, come back
+next week and open the same URL: the note is still there, in the same place.
+
+Firefox extension. Offline, private, and yours to export.
+
+> **Status: in development.** Phase 0 de-risking spikes are runnable
+> ([`docs/spikes.md`](docs/spikes.md)); the product is being built on top of them.
+> Not yet on addons.mozilla.org.
+
+---
+
+## What makes it different
+
+**It never touches the page.** One element is added to `<html>`, with a closed shadow root and
+`all: initial`. Every pixel not covered by a note hit-tests straight through, so the site stays
+completely usable. There are no document-level `pointermove`/`keydown`/`click` listeners, no
+whole-document `MutationObserver`, and no timers running when nothing is animating — an idle
+tab with notes on it costs **0% CPU**.
+
+**Assets are bytes, never URLs.** Fonts go in through `new FontFace(arrayBuffer)`, styles
+through `adoptedStyleSheets`, images through `createImageBitmap` into a canvas. The page's
+Content-Security-Policy has nothing to block, because no network request is ever made from the
+page's document — and it is the only technique that can render a font *you* uploaded.
+
+**Notes are anchored, not just positioned.** Every note records three things when you drop it:
+the element under the cursor, a text quote with its surrounding context (W3C Web Annotation
+selectors), and document coordinates. On reload they are resolved through a scored fallback
+chain, so a note survives responsive reflow, dynamic content and SPA routing instead of ending
+up 40,000px down an empty page. When an anchor genuinely cannot be found, the note says so and
+offers to reattach — it is never silently misplaced and never deleted.
+
+**Your notes are not in the cache.** They live in the extension's own IndexedDB, which
+"Clear cookies and site data" does not touch, and `unlimitedStorage` keeps exempt from
+eviction. The two things that *would* lose them — Refresh Firefox, and uninstalling the
+extension — are covered by scheduled ZIP backups. The README of a notes app should be honest
+about this, so: [see the durability table](#durability).
+
+**It feels like paper.** Dragging a note runs a critically-damped spring on position and
+underdamped springs on rotation, tilt, skew and corner curl, driven by pointer velocity and by
+where on the note you grabbed it. Only `transform` and `opacity` ever change per frame; the
+release settle is baked into a Web Animations keyframe list so it runs on the compositor and
+stays smooth even when the page's own JavaScript is blocking.
+
+---
+
+## Durability
+
+| Action | Your notes |
+|---|---|
+| Clear cache / cookies / site data | **survive** — the sanitizer excludes `moz-extension://` |
+| Forget About This Site | **survive** |
+| Disk pressure / quota eviction | **survive** — `unlimitedStorage` |
+| Refresh Firefox | lost — restore from a ZIP backup |
+| Uninstall the extension | lost — restore from a ZIP backup |
+
+Manual export and import is always available, needs no permission, and produces a single ZIP
+containing every note, its position and anchor, its images and ink, plus a human-readable
+Markdown mirror.
+
+## Privacy
+
+No network requests. No telemetry. No analytics. No accounts. Nothing leaves your machine,
+which is why the manifest declares `data_collection_permissions: { required: ["none"] }`.
+
+Host permissions are **not** requested at install. You grant access per site, per domain, or
+for all sites, from a button in the popup, whenever you decide to.
+
+---
+
+## Development
+
+Requires Node 24+ and pnpm 11+.
+
+```bash
+pnpm install
+pnpm dev
+```
+
+`pnpm dev` builds and launches a scratch Firefox profile with the extension loaded.
+
+| Command | What it does |
+|---|---|
+| `pnpm build` | Production build into `dist/` |
+| `pnpm watch` | Incremental rebuild |
+| `pnpm typecheck` | `tsc --noEmit`, strict |
+| `pnpm lint` | Biome check |
+| `pnpm test` | Vitest unit tests |
+| `pnpm lint:ext` | `web-ext lint` — AMO's own validator |
+| `pnpm check` | All of the above, the CI gate |
+| `pnpm package` | Zips an installable build into `artifacts/` |
+
+The build is a plain, readable [`build.ts`](build.ts) rather than a framework, deliberately:
+AMO reviewers must be able to reproduce `dist/` byte-for-byte from source. It is fully
+deterministic — no timestamps, no randomness, no network. Even the randomised shadow-host tag
+name is derived from `name@version` by SHA-256 so it is stable across machines.
+
+Bundle budgets are enforced by the build and will fail it:
+
+| Bundle | Budget | Why |
+|---|---|---|
+| `cs/guard.js` | 1 kB gz | runs at `document_start` on every annotated page |
+| `cs/renderer.js` | 24 kB gz | parsed on every page load that has notes |
+| background | 80 kB min | an event page parses its whole bundle on **every wake** |
+
+### Layout
+
+```
+src/bg/     background event page — the only writer to the database
+   scope/   URL normalization and scope matching (pure, heavily tested)
+   msg/     the typed protocol shared by all four contexts
+src/cs/     the in-page layer — host, anchoring, physics, note UI
+src/ui/     popup, options, and the note manager
+spikes/     throwaway harnesses that answer design questions against a real Firefox
+docs/       spike runbook, performance numbers, QA checklist
+```
+
+## License
+
+[MPL-2.0](LICENSE)

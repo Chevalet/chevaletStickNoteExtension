@@ -1,0 +1,9 @@
+# pnpm 11 requires explicit approval for dependency build scripts.
+# esbuild's postinstall installs/validates its native binary -- needed, and it is a
+# first-tier tool with a documented install script. spawn-sync is a legacy transitive
+# dependency of web-ext that does not need to run anything.
+allowBuilds:
+  esbuild: true
+  spawn-sync: false
+
+verifyDepsBeforeRun: false
