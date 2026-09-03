@@ -229,16 +229,29 @@ async function applyAllocation(): Promise<void> {
 
   const tabs: TabGuardState[] = [];
   for (const [tabId, st] of tabRuntime) {
+    // An edit counts as unsaved until the write is confirmed AND a grace window has passed.
+    // Dropping the listener the instant a write lands would leave the guard absent during
+    // exactly the gap that matters -- see DISARM_DELAY_MS.
+    const pending = st.hasUnsaved || now - st.lastEdit < DISARM_DELAY_MS;
     tabs.push({
       tabId,
       noteCount: st.noteCount,
-      // An edit counts as unsaved until the write is confirmed AND a grace window has
-      // passed. Dropping the listener the instant a write lands would leave the guard absent
-      // during exactly the gap that matters -- see DISARM_DELAY_MS.
-      hasUnsaved: st.hasUnsaved || now - st.lastEdit < DISARM_DELAY_MS,
+      hasUnsaved: pending,
       discarded: false,
-      // Only a volatile note is genuinely at risk; a URL-scoped one reappears by itself.
-      onlyPortableNotes: !st.volatile,
+      /**
+       * "Portable" means every note in this tab comes back on its own: written to storage,
+       * and scoped to something a fresh tab on the same page can find.
+       *
+       * This used to read `!st.volatile`, which is true for every ordinary tab -- and since
+       * the default policy arms only a tab whose notes are NOT portable, the close warning
+       * was silently never shown to anyone outside a private window. The feature was present,
+       * tested as a unit, wired up, and dead.
+       *
+       * A pending write is exactly what makes portability untrue: the note would come back,
+       * but without the edit that has not landed yet. A volatile private-window note is never
+       * written at all.
+       */
+      onlyPortableNotes: !st.volatile && !pending,
       volatile: st.volatile,
       msSinceEdit: now - st.lastEdit,
     });

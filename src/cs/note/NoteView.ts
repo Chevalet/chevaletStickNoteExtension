@@ -476,6 +476,39 @@ export class NoteView implements Animatable {
     this.renderPreview();
   }
 
+  /**
+   * Text direction, written in ONE place.
+   *
+   * The source and the rendered preview are two elements showing the same text, and the bug
+   * this method exists to stop is them disagreeing. `dir` used to be set on the source only,
+   * so a Persian note was right-aligned while you typed and jumped to the left the moment you
+   * clicked away -- then "fixed itself" when you clicked back in, which is exactly how it was
+   * reported.
+   *
+   * With `auto`, each TOP-LEVEL block gets its own `dir` as well: a container's `dir="auto"`
+   * resolves once, from the first strong character in the whole note, and per block is what a
+   * note mixing Persian and English actually needs.
+   *
+   * Top-level and no deeper, deliberately. `dir="auto"` skips any descendant that carries its
+   * own `dir`, so marking every `<li>` left the `<ul>` with no text of its own to judge and it
+   * fell back to LTR -- right-aligned items with their bullets stranded on the left. A list
+   * therefore takes one direction from its own content, which is the right granularity for a
+   * sticky note.
+   *
+   * Code is the exception at any depth: a fenced block stays LTR even when it opens with a
+   * Persian comment, because code is not prose.
+   */
+  private applyDirection(): void {
+    const dir = this.style.dir;
+    this.bodyEl.dir = dir;
+    this.previewEl.dir = dir;
+
+    if (dir === 'auto') {
+      for (const el of this.previewEl.children) (el as HTMLElement).dir = 'auto';
+    }
+    for (const pre of this.previewEl.querySelectorAll('pre')) pre.dir = 'ltr';
+  }
+
   private renderPreview(): void {
     const source = this.text;
     this.previewEl.textContent = '';
@@ -494,6 +527,8 @@ export class NoteView implements Animatable {
         },
       }),
     );
+    // The children are new, so their direction is too.
+    this.applyDirection();
   }
 
   /**
@@ -596,7 +631,17 @@ export class NoteView implements Animatable {
       return;
     }
 
-    if (active === this.bodyEl) return;
+    if (active === this.bodyEl) {
+      // Ctrl+Enter is the usual "I am done writing" chord, and it is the quickest route from
+      // typing to the note-level shortcuts.
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        this.bodyEl.blur();
+        this.el.focus({ preventScroll: true });
+      }
+      // Everything else belongs to the text. A plain "d" is a letter, not a drawing toggle.
+      return;
+    }
 
     const step = e.ctrlKey ? 25 : e.shiftKey ? 10 : 1;
     switch (e.key) {
@@ -873,7 +918,7 @@ export class NoteView implements Animatable {
     for (const [k, v] of Object.entries(styleVars(this.style, font.stack))) {
       this.el.style.setProperty(k, v);
     }
-    this.bodyEl.dir = this.style.dir;
+    this.applyDirection();
     this.el.dataset.align = this.style.align;
     this.el.dataset.shadow = this.style.shadow;
     this.el.dataset.dark = isDarkPaper(this.style.paper ?? paletteById(this.style.palette).paper)
@@ -991,6 +1036,16 @@ export class NoteView implements Animatable {
     this.lastX = e.clientX;
     this.lastY = e.clientY;
     this.lastT = e.timeStamp;
+
+    // Focus the note itself.
+    //
+    // Every keyboard shortcut below the text -- draw, palette, lock, collapse, delete -- only
+    // fires when the note WRAPPER has focus, and notes are deliberately kept out of the page's
+    // tab order (putting focusable elements into someone else's page changes that page's
+    // behaviour). So without this line there was no way to reach that state with a mouse:
+    // clicking the text focuses the body, and every plain-letter shortcut was unreachable.
+    // Grabbing the note's header is the natural "I mean the note, not the text" gesture.
+    this.el.focus({ preventScroll: true });
 
     this.lz.t = 1;
     this.promote(true);
