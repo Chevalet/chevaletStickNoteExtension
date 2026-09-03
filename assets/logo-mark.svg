@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Chevalet Note">
+  <title>Chevalet Note</title>
+  <!--
+    The small mark, for 24px and below: the favicon, the browser tab, the toolbar at 1x.
+
+    At that size the torn edge, the halftone and the five-degree tilt of logo.svg all collapse
+    into noise, and noise at 16px reads as a blurry blob rather than as texture. So this
+    version keeps only what survives: silhouette, the folded corner, one accent stroke, and a
+    keyline heavy enough to hold an edge when it is a single pixel wide.
+
+    It is the same mark, not a different one. Side by side at 32px they should be hard to
+    tell apart.
+  -->
+  <defs>
+    <linearGradient id="mkPaper" x1="0.1" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#FFF285"/>
+      <stop offset="1" stop-color="#FFDA10"/>
+    </linearGradient>
+    <linearGradient id="mkFlap" x1="1" y1="0" x2="0.1" y2="1">
+      <stop offset="0" stop-color="#FFEE9A"/>
+      <stop offset="1" stop-color="#B98A00"/>
+    </linearGradient>
+  </defs>
+
+  <path d="M10 9 H56 V40 L40 56 H10 Z" fill="#14110E" opacity="0.92"/>
+  <path d="M7 6 H53 V37 L37 53 H7 Z"
+        fill="url(#mkPaper)" stroke="#14110E" stroke-width="2.6" stroke-linejoin="round"/>
+  <path d="M37 53 L37 37 L53 37 Z"
+        fill="url(#mkFlap)" stroke="#14110E" stroke-width="2.6" stroke-linejoin="round"/>
+  <path d="M15 19 H45" stroke="#FF2E63" stroke-width="7" stroke-linecap="round"/>
+  <path d="M15 30 H35" stroke="#14110E" stroke-width="5.5" stroke-linecap="round" opacity="0.78"/>
+</svg>

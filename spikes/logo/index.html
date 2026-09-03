@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>logo proof</title>
+<style>
+  body { margin:0; padding:28px; background:#ece5d6; color:#14110e;
+         font:13px/1.5 ui-monospace, Consolas, monospace; }
+  h2 { font:700 12px/1 ui-monospace; letter-spacing:.12em; text-transform:uppercase;
+       margin:26px 0 10px; opacity:.6; }
+  .row { display:flex; align-items:flex-end; gap:22px; flex-wrap:wrap; }
+  .cell { text-align:center; }
+  .cell span { display:block; margin-top:6px; opacity:.55; font-size:11px; }
+  .dark { background:#14110e; padding:16px; }
+  .browserbar { background:#2b2b2b; padding:6px 10px; display:inline-flex; gap:8px;
+                align-items:center; border-radius:6px; color:#ddd; font-size:12px; }
+  img { display:block; }
+</style></head>
+<body>
+<h2>rendered from the SVG at real sizes</h2>
+<div class="row" id="sizes"></div>
+
+<h2>on dark chrome, the way a toolbar shows it</h2>
+<div class="row dark" id="dark"></div>
+
+<h2>as a browser tab</h2>
+<div class="row"><div class="browserbar"><img id="tab" width="16" height="16" alt=""><span>Chevalet Note</span></div></div>
+
+<h2>side by side at 32px &mdash; hero vs small mark</h2>
+<div class="row">
+  <div class="cell"><img src="/assets/logo.svg" width="32" height="32" alt=""><span>hero</span></div>
+  <div class="cell"><img src="/assets/logo-mark.svg" width="32" height="32" alt=""><span>mark</span></div>
+  <div class="cell"><img src="/assets/logo.svg" width="64" height="64" alt=""><span>hero 64</span></div>
+  <div class="cell"><img src="/assets/logo-mark.svg" width="64" height="64" alt=""><span>mark 64</span></div>
+</div>
+
+<h2>large</h2>
+<div class="row"><img src="/assets/logo.svg" width="230" height="230" alt=""></div>
+
+<script>
+  // Below 32px the small mark is used; at and above it, the hero. The proof sheet shows the
+  // handover so the two can be compared at the boundary.
+  const SWITCH = 32;
+  const src = (s) => (s < SWITCH ? '/assets/logo-mark.svg' : '/assets/logo.svg');
+  const sizes = [16, 20, 24, 32, 48, 64, 96, 128];
+  for (const host of ['sizes', 'dark']) {
+    const wrap = document.getElementById(host);
+    for (const s of sizes) {
+      const c = document.createElement('div'); c.className = 'cell';
+      const img = document.createElement('img');
+      img.src = src(s); img.width = s; img.height = s; img.alt = '';
+      const label = document.createElement('span');
+      label.textContent = s + 'px' + (s < SWITCH ? ' mark' : '');
+      c.append(img, label); wrap.append(c);
+    }
+  }
+  document.getElementById('tab').src = '/assets/logo-mark.svg';
+</script>
+</body></html>

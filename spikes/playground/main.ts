@@ -20,7 +20,7 @@ import {
   listTrash,
   trashNote,
 } from '~/bg/db/notes.ts';
-import { getMeta, setMeta } from '~/bg/db/notes.ts';
+import { assetsForNote, getMeta, putAsset, setMeta } from '~/bg/db/notes.ts';
 import { openDb } from '~/bg/db/open.ts';
 import type { NoteRecord } from '~/bg/db/schema.ts';
 import { defaultScopeFor, matchContext } from '~/bg/scope/match.ts';
@@ -132,6 +132,13 @@ function mount(rec: NoteRecord): NoteView {
       onInk: (_n, ink) => queueSave(rec.id, { ink }),
       onDelete: (n) => void remove(rec.id, n),
       onStyle: (_n, overrides) => queueSave(rec.id, { style: overrides }),
+      onText: (_n, text) => queueSave(rec.id, { body: { text } }),
+      onAsset: async (_n, file, name) => {
+        const id = await putAsset(rec.id, file, name);
+        await cacheAssets(rec.id);
+        return id;
+      },
+      resolveAsset: (id) => assetCanvas(id),
       onSaveDefault: (_n, style) => void saveDefaults(style),
       defaults,
     },
@@ -181,13 +188,53 @@ function toast(message: string, actionLabel?: string, action?: () => void): void
   }, 6000);
 }
 
+/**
+ * Pasted images, decoded once and kept as canvases.
+ *
+ * A canvas paint is not a network fetch, so no page CSP can block it -- which is the whole
+ * reason images are drawn rather than given to an <img src>. See plan section 4.
+ */
+const assetCanvases = new Map<string, HTMLCanvasElement>();
+
+async function cacheAssets(noteId: NoteId): Promise<void> {
+  for (const asset of await assetsForNote(noteId)) {
+    if (assetCanvases.has(asset.id)) continue;
+    try {
+      const bmp = await createImageBitmap(asset.blob);
+      const c = document.createElement('canvas');
+      c.width = bmp.width;
+      c.height = bmp.height;
+      c.getContext('2d')?.drawImage(bmp, 0, 0);
+      bmp.close();
+      assetCanvases.set(asset.id, c);
+    } catch {
+      /* an image we cannot decode simply stays missing, and the note says so */
+    }
+  }
+  for (const v of views.values()) v.refreshPreview();
+}
+
+function assetCanvas(id: string): HTMLElement | null {
+  const source = assetCanvases.get(id);
+  if (!source) return null;
+  // One canvas per placement: the same image can appear twice in one note.
+  const c = document.createElement('canvas');
+  c.width = source.width;
+  c.height = source.height;
+  c.getContext('2d')?.drawImage(source, 0, 0);
+  return c;
+}
+
 async function load(): Promise<void> {
   for (const v of views.values()) v.destroy();
   views.clear();
 
   const ctx = matchContext(page.url);
   if (!ctx) return;
-  for (const rec of await notesForContext(ctx)) mount(rec);
+  const records = await notesForContext(ctx);
+  for (const rec of records) mount(rec);
+  // Decode any images these notes reference, then let the previews pick them up.
+  for (const rec of records) if (rec.assets.length) await cacheAssets(rec.id);
   await refreshStatus();
 }
 

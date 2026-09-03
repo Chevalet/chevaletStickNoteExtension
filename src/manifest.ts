@@ -51,13 +51,19 @@ export function manifest({ version }: ManifestInput): Record<string, unknown> {
       default_title: '__MSG_extName__',
       default_icon: {
         16: 'assets/icon-16.png',
+        24: 'assets/icon-24.png',
         32: 'assets/icon-32.png',
         48: 'assets/icon-48.png',
       },
     },
 
+    // 16-32 come from assets/logo-mark.svg, 48 and up from assets/logo.svg -- below 32px the
+    // torn edge, the halftone and the tilt turn to mud, so the small mark drops them.
     icons: {
+      16: 'assets/icon-16.png',
+      32: 'assets/icon-32.png',
       48: 'assets/icon-48.png',
+      64: 'assets/icon-64.png',
       96: 'assets/icon-96.png',
       128: 'assets/icon-128.png',
     },

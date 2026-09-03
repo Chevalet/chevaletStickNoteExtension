@@ -21,6 +21,7 @@ import {
   step,
 } from '~/cs/physics/spring.ts';
 import { InkLayer } from './ink.ts';
+import { renderMarkdown, toggleTaskInSource } from './markdown.ts';
 import { SettingsPanel } from './SettingsPanel.ts';
 import {
   DEFAULT_STYLE,
@@ -89,6 +90,7 @@ function icon(path: string): SVGSVGElement {
   s.append(p);
   return s;
 }
+const COLLAPSED = 34;
 const MIN_W = 140;
 const MIN_H = 90;
 
@@ -132,8 +134,14 @@ export interface NoteHost {
   onChange?(note: NoteView): void;
   onInk?(note: NoteView, ink: { strokes: InkStroke[]; w: number; h: number }): void;
   onDelete?(note: NoteView): void;
+  /** The note's markdown source changed by something other than typing. */
+  onText?(note: NoteView, text: string): void;
   onStyle?(note: NoteView, overrides: Partial<NoteStyle>): void;
   onSaveDefault?(note: NoteView, style: NoteStyle): void;
+  /** Store a pasted or dropped image and return the id to reference it by. */
+  onAsset?(note: NoteView, file: Blob, name: string): Promise<string | null>;
+  /** Turn a stored asset id into something renderable, without any network fetch. */
+  resolveAsset?(id: string): HTMLElement | null;
 }
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -150,6 +158,8 @@ export class NoteView implements Animatable {
   private readonly cardEl: HTMLDivElement;
   private readonly faceEl: HTMLDivElement;
   private readonly bodyEl: HTMLDivElement;
+  private readonly previewEl: HTMLDivElement;
+  private editing = false;
   private readonly grainEl: HTMLCanvasElement;
   private readonly paperPath: SVGPathElement;
   private readonly tapeG: SVGGElement;
@@ -189,6 +199,7 @@ export class NoteView implements Animatable {
   private lastY = 0;
   private lastT = 0;
   private promoted = false;
+  private uncaptured = false;
 
   constructor(init: NoteInit, host: NoteHost) {
     this.id = init.id;
@@ -284,7 +295,14 @@ export class NoteView implements Animatable {
     this.bodyEl.setAttribute('aria-multiline', 'true');
     this.bodyEl.tabIndex = -1;
     this.bodyEl.textContent = init.text;
+    this.bodyEl.dataset.placeholder = 'Type. Markdown works.';
     this.applyEditable();
+
+    // Rendered markdown lives in its own element. The source stays the single truth; the
+    // preview is always a pure function of it, so there is never a "which one is right"
+    // question when the two could disagree.
+    this.previewEl = div('preview');
+    this.previewEl.dataset.placeholder = 'Click to write. Markdown works.';
 
     const grips = div('grips');
     for (const g of ['se', 's', 'e'] as const) {
@@ -294,7 +312,7 @@ export class NoteView implements Animatable {
     }
 
     this.inkInit = init.ink ?? null;
-    this.faceEl.append(this.grainEl, art, header, this.bodyEl, curlWrap, grips);
+    this.faceEl.append(this.grainEl, art, header, this.bodyEl, this.previewEl, curlWrap, grips);
     this.cardEl.append(this.faceEl);
     tilt.append(this.cardEl);
     note.append(this.shadowEl, tilt);
@@ -306,14 +324,31 @@ export class NoteView implements Animatable {
     this.el.style.zIndex = String(this.zIndex);
     if (this.collapsed) this.el.classList.add('is-collapsed');
 
+    // Source while you are in it, rendered the moment you leave.
+    this.bodyEl.addEventListener('focus', () => this.setEditing(true));
+    this.bodyEl.addEventListener('blur', () => this.setEditing(false));
+    this.bodyEl.addEventListener('input', () => {
+      this.el.setAttribute('aria-label', `Sticky note: ${this.text.slice(0, 40)}`);
+    });
+    this.bodyEl.addEventListener('paste', this.onPaste);
+    this.previewEl.addEventListener('pointerdown', this.onPreviewPointerDown);
+
     header.addEventListener('pointerdown', this.onGrab);
     for (const el of grips.children)
       el.addEventListener('pointerdown', this.onResizeGrab as EventListener);
-    note.addEventListener('pointerdown', () => this.bringToFront());
+    note.addEventListener('pointerdown', (e) => {
+      this.bringToFront();
+      // However the buttons end up unreachable, a click on a collapsed note always opens it.
+      if (this.collapsed && !(e.target as HTMLElement).closest('.act')) {
+        e.preventDefault();
+        this.setCollapsed(false);
+      }
+    });
     note.addEventListener('keydown', this.onKeyDown);
     this.actionsEl.addEventListener('click', this.onAction);
 
     host.layer.append(note);
+    this.setEditing(false);
     if (this.inkInit && this.inkInit.strokes.length > 0) this.enableInk(false);
   }
 
@@ -355,11 +390,19 @@ export class NoteView implements Animatable {
     this.scheduleArt();
   }
 
-  /** The only place that writes width/height. Called on create, on resize, and nowhere else. */
+  /**
+   * The only place that writes width/height.
+   *
+   * Collapse is handled HERE rather than in CSS. These are inline styles, so a stylesheet rule
+   * cannot override them: the CSS-only version left a collapsed note at full size with its
+   * content hidden -- a blank sheet with no visible controls and no way back.
+   */
   private sizeBoxes(): void {
+    const w = this.collapsed ? COLLAPSED : this.w;
+    const h = this.collapsed ? COLLAPSED : this.h;
     for (const el of [this.faceEl, this.shadowEl]) {
-      el.style.width = `${this.w}px`;
-      el.style.height = `${this.h}px`;
+      el.style.width = `${w}px`;
+      el.style.height = `${h}px`;
     }
   }
 
@@ -413,6 +456,92 @@ export class NoteView implements Animatable {
     this.bringToFront();
   }
 
+  // ---------------------------------------------------------------- markdown
+
+  /**
+   * Swap between the markdown source and its rendering.
+   *
+   * Only one of the two is in the layout at a time, so there is no chance of the caret landing
+   * in a rendered node -- an editor that lets you type into your own output is how markdown
+   * editors end up with unexplainable state.
+   */
+  private setEditing(on: boolean): void {
+    if (this.locked && on) return;
+    this.editing = on;
+    this.el.classList.toggle('is-editing', on);
+    if (on) {
+      this.previewEl.textContent = '';
+      return;
+    }
+    this.renderPreview();
+  }
+
+  private renderPreview(): void {
+    const source = this.text;
+    this.previewEl.textContent = '';
+    if (!source.trim()) return;
+    this.previewEl.append(
+      renderMarkdown(source, {
+        readOnly: this.locked,
+        resolveAsset: (id) => this.host.resolveAsset?.(id) ?? null,
+        onToggleTask: (index, checked) => {
+          // The click edits the SOURCE and re-renders, rather than mutating the rendering.
+          const next = toggleTaskInSource(this.text, index, checked);
+          this.bodyEl.textContent = next;
+          this.renderPreview();
+          this.host.onChange?.(this);
+          this.host.onText?.(this, next);
+        },
+      }),
+    );
+  }
+
+  /**
+   * A click on the preview normally means "let me edit this" -- except on the things that are
+   * interactive in their own right, where hijacking the click would be maddening.
+   */
+  private readonly onPreviewPointerDown = (e: PointerEvent): void => {
+    const target = e.target as HTMLElement;
+    if (target.closest('input, a, canvas, img')) return;
+    e.preventDefault();
+    this.focusBody();
+  };
+
+  /**
+   * Paste. Text falls through to the browser (contenteditable=plaintext-only already flattens
+   * it); an image is stored as a blob and referenced from the markdown, because a note that
+   * embedded base64 in its own text would bloat every read of that note forever.
+   */
+  private readonly onPaste = (e: ClipboardEvent): void => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.kind !== 'file' || !item.type.startsWith('image/')) continue;
+      const file = item.getAsFile();
+      if (!file) continue;
+      e.preventDefault();
+      void this.attachImage(file, file.name || 'pasted image');
+      return;
+    }
+  };
+
+  /** Store an image and drop a reference to it at the end of the note. */
+  async attachImage(file: Blob, name: string): Promise<void> {
+    const id = await this.host.onAsset?.(this, file, name);
+    if (!id) return;
+    const ref = `![${name.replace(/[[\]]/g, '')}](att:${id})`;
+    const current = this.text;
+    const next = current.trim() ? `${current}\n\n${ref}` : ref;
+    this.bodyEl.textContent = next;
+    this.renderPreview();
+    this.host.onText?.(this, next);
+    this.host.onChange?.(this);
+  }
+
+  /** Re-render the preview, e.g. after an asset finishes loading. */
+  refreshPreview(): void {
+    if (!this.editing) this.renderPreview();
+  }
   // ----------------------------------------------------------------- actions
 
   private readonly onAction = (e: Event): void => {
@@ -665,6 +794,8 @@ export class NoteView implements Animatable {
   setCollapsed(next: boolean): void {
     this.collapsed = next;
     this.el.classList.toggle('is-collapsed', next);
+    if (next) this.setEditing(false);
+    this.resizeArt();
     this.host.onChange?.(this);
   }
 
@@ -679,6 +810,8 @@ export class NoteView implements Animatable {
   setLocked(next: boolean): void {
     this.locked = next;
     this.applyEditable();
+    if (next) this.setEditing(false);
+    else this.renderPreview();
     this.el.classList.toggle('is-locked', next);
     this.actionsEl.querySelector('.act-lock')?.classList.toggle('is-on', next);
     this.host.onChange?.(this);
@@ -686,7 +819,12 @@ export class NoteView implements Animatable {
 
   /** Put the caret in the body. Used right after creating a note, so typing just works. */
   focusBody(): void {
+    if (this.locked) return;
     this.bringToFront();
+    // Edit mode FIRST. The source element is display:none while the rendering is showing, and
+    // a display:none element cannot take focus -- calling focus() before this silently did
+    // nothing, which meant a note could not be typed into at all.
+    this.setEditing(true);
     this.bodyEl.focus({ preventScroll: true });
     const sel = this.bodyEl.getRootNode() as Document | ShadowRoot;
     const selection = (sel as Document).getSelection?.() ?? document.getSelection();
@@ -766,7 +904,8 @@ export class NoteView implements Animatable {
   }
 
   private resizeArt(): void {
-    const { w, h } = this;
+    const w = this.collapsed ? COLLAPSED : this.w;
+    const h = this.collapsed ? COLLAPSED : this.h;
     this.sizeBoxes();
 
     const box = `0 0 ${w} ${h}`;
@@ -820,10 +959,21 @@ export class NoteView implements Animatable {
     // is not currently active (synthetic events, a pointer released between dispatch and
     // handling), and a failed capture must not abort the drag -- it just means the drag ends
     // if the pointer leaves the element.
+    let captured = false;
     try {
       target.setPointerCapture(e.pointerId);
+      captured = true;
     } catch {
-      /* capture is an optimisation, not a requirement */
+      /* see the fallback below */
+    }
+    // Without capture, a pointer that leaves the handle never delivers pointerup here -- so
+    // `grabbed` stayed true forever, the shared loop never went idle, and the note burned a
+    // frame's work every 16ms for the rest of the session. A window-level release listener,
+    // for the duration of this drag only, closes that hole.
+    if (!captured) {
+      window.addEventListener('pointerup', this.onRelease, { once: true });
+      window.addEventListener('pointercancel', this.onRelease, { once: true });
+      this.uncaptured = true;
     }
     target.addEventListener('pointermove', this.onMove);
     target.addEventListener('pointerup', this.onRelease);
@@ -873,7 +1023,12 @@ export class NoteView implements Animatable {
 
   private readonly onRelease = (e: PointerEvent): void => {
     if (e.pointerId !== this.pointerId) return;
-    const target = e.currentTarget as HTMLElement;
+    if (this.uncaptured) {
+      window.removeEventListener('pointerup', this.onRelease);
+      window.removeEventListener('pointercancel', this.onRelease);
+      this.uncaptured = false;
+    }
+    const target = (e.currentTarget ?? this.el.querySelector('.handle')) as HTMLElement;
     target.removeEventListener('pointermove', this.onMove);
     target.removeEventListener('pointerup', this.onRelease);
     target.removeEventListener('pointercancel', this.onRelease);
@@ -964,6 +1119,17 @@ export class NoteView implements Animatable {
       if (step(s, dt)) live = true;
     }
     this.writeTransforms();
+
+    // Last-resort guard on the shared loop: a grab still open two seconds after the last
+    // pointer event is a pointer we lost, not a slow user. Without this the loop can be held
+    // running forever by a single dropped pointerup.
+    if (this.grabbed && performance.now() - this.lastT > 2000) {
+      this.grabbed = false;
+      this.pointerId = null;
+      this.lz.t = 0;
+      this.el.classList.remove('is-dragging');
+      if (__DEV__) console.warn('[cn] released a stuck drag');
+    }
     return live || this.grabbed;
   }
 

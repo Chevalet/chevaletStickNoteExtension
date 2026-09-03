@@ -13,7 +13,7 @@
  * bundle. On a dev port, staleness is never the behaviour you want.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import * as esbuild from 'esbuild';
 import {
@@ -181,6 +181,36 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     res.write(`data: ${JSON.stringify({ generation: state.generation, ok: state.ok })}\n\n`);
     clients.add(res);
     req.on('close', () => clients.delete(res));
+    return;
+  }
+
+  // Icon regeneration. The PNGs are rasterized by the browser from assets/logo*.svg -- the
+  // same renderer that will show them -- and posted back here to be written. That keeps the
+  // vector as the only source of truth and makes regenerating every size a one-click job.
+  // Dev server only, and it will only ever write assets/icon-<size>.png.
+  if (url.startsWith('/__dev/write-icons') && req.method === 'POST') {
+    const body = await new Promise<string>((finish) => {
+      let buf = '';
+      req.on('data', (c) => {
+        buf += c;
+      });
+      req.on('end', () => finish(buf));
+    });
+    try {
+      const icons = JSON.parse(body) as Record<string, string>;
+      const written: string[] = [];
+      for (const [size, b64] of Object.entries(icons)) {
+        if (!/^\d{1,4}$/.test(size)) continue;
+        const file = join(ROOT, 'assets', `icon-${size}.png`);
+        await writeFile(file, Buffer.from(b64, 'base64'));
+        written.push(`icon-${size}.png`);
+      }
+      process.stdout.write(`  ${stamp()}  wrote ${written.length} icons\n`);
+      noStore(res, 'text/plain; charset=utf-8');
+      res.end(written.join('\n'));
+    } catch (e) {
+      res.writeHead(400).end(String(e));
+    }
     return;
   }
 

@@ -83,6 +83,9 @@ export const SHEET_CSS = /* css */ `
   display: grid;
   grid-template-rows: 30px 1fr;
   isolation: isolate;
+  /* Lets the toolbar respond to the NOTE's width rather than the viewport's -- a note is
+     resized by hand, so a media query would be measuring the wrong thing entirely. */
+  container: note / inline-size;
 }
 
 /* ------------------------------------------------------------------- paper */
@@ -236,29 +239,46 @@ export const SHEET_CSS = /* css */ `
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 6px 0 8px;
+  gap: 4px;
+  padding: 0 5px 0 7px;
   cursor: grab;
   touch-action: none;
-  border-bottom: 2px solid color-mix(in oklab, var(--cn-ink) 18%, transparent);
+  /* The row must never push past the paper. Without min-width:0 a flex item refuses to
+     shrink below its content, so on a narrow note the toolbar spilled out over the torn
+     edge -- buttons hanging in mid-air outside the sheet. */
+  min-width: 0;
+  overflow: hidden;
+}
+/* The divider is inset rather than a full-width border, because the torn edge wanders
+   inward and a full-width line pokes out through the tear. */
+.handle::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: 0;
+  height: 2px;
+  background: color-mix(in oklab, var(--cn-ink) 18%, transparent);
 }
 .note.is-dragging .handle { cursor: grabbing; }
 
 .grip-dots {
-  width: 34px;
+  flex: 0 1 34px;
+  min-width: 0;
   height: 9px;
   opacity: .5;
   background-image: radial-gradient(var(--cn-ink) 1px, transparent 1.2px);
   background-size: 5px 5px;
 }
 
-.actions { display: flex; gap: 1px; }
+.actions { display: flex; gap: 1px; flex: 0 0 auto; }
 /* 26px targets. The first version used 18px glyphs at 55% opacity and the first person to
    try the build simply could not hit them -- notably, could not delete a note at all. */
 .act {
   all: unset;
   box-sizing: border-box;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
   color: var(--cn-ink);
@@ -277,6 +297,19 @@ export const SHEET_CSS = /* css */ `
 }
 .act-delete:hover { background: var(--cn-accent); color: var(--cn-paper); }
 .note.is-locked .body { cursor: default; }
+
+/* Below these widths the toolbar would crowd the drag handle, so the lower-priority
+   buttons step aside. Everything they do is still on the keyboard, and widening the note
+   brings them straight back. */
+@container note (max-width: 210px) {
+  .grip-dots { display: none; }
+}
+@container note (max-width: 178px) {
+  .act-lock { display: none; }
+}
+@container note (max-width: 155px) {
+  .act-collapse { display: none; }
+}
 
 /* -------------------------------------------------------------------- body */
 
@@ -398,6 +431,90 @@ export const SHEET_CSS = /* css */ `
 .set-btn.primary { background: var(--cn-accent); color: var(--cn-paper); border-color: var(--cn-accent); }
 .set-btn:focus-visible { outline: 2px solid var(--cn-accent); outline-offset: 2px; }
 
+/* ---------------------------------------------------------------- markdown */
+
+/* Exactly one of the two occupies the row at a time: the source while you are editing it,
+   the rendering the moment you leave. Never both, so the caret can never land in output. */
+.body, .preview {
+  grid-row: 2;
+  grid-column: 1;
+}
+.note:not(.is-editing) .body { display: none; }
+.note.is-editing .preview { display: none; }
+
+.preview {
+  padding: 7px 11px 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  unicode-bidi: plaintext;
+  cursor: text;
+  scrollbar-width: thin;
+}
+.preview:empty::before {
+  content: attr(data-placeholder);
+  opacity: .38;
+}
+.preview > :first-child { margin-top: 0; }
+.preview > :last-child { margin-bottom: 0; }
+.preview p { margin: 0 0 .5em; }
+.preview .md-h {
+  margin: .7em 0 .3em;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -.01em;
+}
+.preview h3.md-h { font-size: 1.25em; }
+.preview h4.md-h { font-size: 1.1em; }
+.preview h5.md-h, .preview h6.md-h { font-size: 1em; opacity: .85; }
+.preview a { color: inherit; text-decoration-color: var(--cn-accent); text-underline-offset: 2px; }
+.preview code {
+  font: .88em/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+  background: color-mix(in oklab, var(--cn-ink) 12%, transparent);
+  padding: 0 3px;
+  border-radius: 2px;
+}
+.preview pre {
+  margin: 0 0 .5em;
+  padding: 6px 8px;
+  overflow-x: auto;
+  background: color-mix(in oklab, var(--cn-ink) 10%, transparent);
+  border-inline-start: 3px solid color-mix(in oklab, var(--cn-ink) 30%, transparent);
+}
+.preview pre code { background: none; padding: 0; }
+.preview blockquote {
+  margin: 0 0 .5em;
+  padding-inline-start: 9px;
+  border-inline-start: 3px solid var(--cn-accent);
+  opacity: .85;
+}
+.preview hr {
+  border: 0;
+  border-top: 2px solid color-mix(in oklab, var(--cn-ink) 25%, transparent);
+  margin: .7em 0;
+}
+.preview .md-list { margin: 0 0 .5em; padding-inline-start: 1.2em; }
+.preview .md-list li { margin: 0 0 .15em; }
+.preview .md-task { list-style: none; margin-inline-start: -1.2em; display: flex; gap: 6px; }
+.preview .md-task.is-done .md-item { opacity: .55; text-decoration: line-through; }
+.preview .md-check {
+  accent-color: var(--cn-accent);
+  margin: .28em 0 0;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+.preview .md-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: .4em 0;
+  border: 2px solid color-mix(in oklab, var(--cn-ink) 45%, transparent);
+}
+.preview .md-missing {
+  font-size: .85em;
+  opacity: .5;
+  word-break: break-all;
+}
+
 /* ------------------------------------------------------------------- grips */
 
 .grips { position: absolute; inset: 0; pointer-events: none; }
@@ -421,15 +538,25 @@ export const SHEET_CSS = /* css */ `
 
 /* --------------------------------------------------------------- collapsed */
 
-.note.is-collapsed .face {
-  width: 34px;
-  height: 34px;
-  grid-template-rows: 1fr;
-}
+/* The size itself is set inline by sizeBoxes(); CSS only rearranges what is inside. */
+.note.is-collapsed .face { grid-template-rows: 1fr; }
 .note.is-collapsed .body,
-.note.is-collapsed .actions,
+.note.is-collapsed .preview,
 .note.is-collapsed .grips,
+.note.is-collapsed .grip-dots,
+.note.is-collapsed .inkbar,
 .note.is-collapsed .curl { display: none; }
+/* Hiding the whole toolbar is what trapped a collapsed note with no way to reopen it. The
+   expand button stays, and it is the only one that fits. */
+.note.is-collapsed .act { display: none; }
+.note.is-collapsed .act-collapse { display: grid; }
+.note.is-collapsed .handle {
+  padding: 0;
+  justify-content: center;
+  cursor: pointer;
+  height: 100%;
+}
+.note.is-collapsed .handle::before { display: none; }
 
 /* Resizing writes width/height, which is layout. Physics is pinned off while it happens. */
 .note.is-resizing .card,

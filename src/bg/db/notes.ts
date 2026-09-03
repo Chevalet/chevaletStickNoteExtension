@@ -13,6 +13,7 @@ import { candidateKeys, indexColumns, type MatchContext, scopeMatches } from '~/
 import type { AssetId, NoteId, NoteState, Scope } from '~/shared/types.ts';
 import { done, read, req, tx } from './open.ts';
 import {
+  type AssetRecord,
   deriveTitle,
   type NoteRecord,
   type NoteUi,
@@ -352,11 +353,6 @@ export function revisionsFor(noteId: NoteId): Promise<RevisionRecord[]> {
 
 // ------------------------------------------------------------------ assets
 
-export async function assetIdsFor(noteId: NoteId): Promise<AssetId[]> {
-  const note = await getNote(noteId);
-  return note?.assets ?? [];
-}
-
 // -------------------------------------------------------------------- meta
 
 export async function getMeta<T>(k: string): Promise<T | undefined> {
@@ -371,3 +367,47 @@ export async function setMeta(k: string, v: unknown): Promise<void> {
 }
 
 export { stateKey };
+
+// ------------------------------------------------------------------ assets
+
+export function newAssetId(): AssetId {
+  return `a_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
+}
+
+/**
+ * Store a pasted image.
+ *
+ * The blob goes in its own store and the note only keeps its id, so reading a note never
+ * drags a megabyte of picture along with it -- and the markdown stays short enough to stay
+ * readable in the exported .md mirror.
+ */
+export async function putAsset(noteId: NoteId, blob: Blob, name: string): Promise<AssetId> {
+  const id = newAssetId();
+  const t = await tx(['assets', 'notes'], 'readwrite');
+  t.objectStore('assets').put({
+    id,
+    noteId,
+    name,
+    mime: blob.type || 'application/octet-stream',
+    size: blob.size,
+    blob,
+    createdAt: Date.now(),
+  });
+  const store = t.objectStore('notes');
+  const note = await req(store.get(noteId) as IDBRequest<NoteRecord | undefined>);
+  if (note) store.put({ ...note, assets: [...note.assets, id] });
+  await done(t);
+  return id;
+}
+
+export function getAsset(id: AssetId): Promise<AssetRecord | undefined> {
+  return read('assets', (s) => s.get(id) as IDBRequest<AssetRecord | undefined>);
+}
+
+export function assetsForNote(noteId: NoteId): Promise<AssetRecord[]> {
+  return read('assets', (s) => s.index('by_note').getAll(noteId) as IDBRequest<AssetRecord[]>);
+}
+
+export function allAssets(): Promise<AssetRecord[]> {
+  return read('assets', (s) => s.getAll() as IDBRequest<AssetRecord[]>);
+}
