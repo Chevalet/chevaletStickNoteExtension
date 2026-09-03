@@ -20,13 +20,14 @@ import {
   listTrash,
   trashNote,
 } from '~/bg/db/notes.ts';
+import { getMeta, setMeta } from '~/bg/db/notes.ts';
 import { openDb } from '~/bg/db/open.ts';
 import type { NoteRecord } from '~/bg/db/schema.ts';
 import { defaultScopeFor, matchContext } from '~/bg/scope/match.ts';
 import { createSharedDefs } from '~/cs/art/defs.ts';
 import { createHost } from '~/cs/host.ts';
 import { NoteView } from '~/cs/note/NoteView.ts';
-import { PALETTES } from '~/cs/note/theme.ts';
+import { DEFAULT_STYLE, type NoteStyle, PALETTES } from '~/cs/note/theme.ts';
 import { Loop } from '~/cs/physics/spring.ts';
 import { SHEET_CSS } from '~/cs/styles.ts';
 import type { NoteId } from '~/shared/types.ts';
@@ -66,6 +67,27 @@ let topZ = 10;
 const el = (id: string) => document.getElementById(id);
 const page = currentPage();
 
+/**
+ * The user's defaults for every new note. In the extension these live in `storage.local`;
+ * here they live under a meta key in the same database, so the behaviour is identical.
+ */
+const DEFAULTS_KEY = 'style.defaults';
+let defaults: NoteStyle = { ...DEFAULT_STYLE };
+
+async function loadDefaults(): Promise<void> {
+  const stored = await getMeta<Partial<NoteStyle>>(DEFAULTS_KEY);
+  if (stored) defaults = { ...DEFAULT_STYLE, ...stored };
+}
+
+async function saveDefaults(style: NoteStyle): Promise<void> {
+  defaults = { ...style };
+  await setMeta(DEFAULTS_KEY, defaults);
+  // Every note that never overrode a field now follows the new default -- that is the whole
+  // point of storing overrides sparsely, so prove it by reloading them all.
+  await load();
+  toast('Saved as your default for new notes');
+}
+
 /** Debounced autosave, one timer per note. Mirrors the extension's 250ms quiet window. */
 const saveTimers = new Map<NoteId, number>();
 function queueSave(id: NoteId, patch: Parameters<typeof patchNote>[1]): void {
@@ -104,11 +126,14 @@ function mount(rec: NoteRecord): NoteView {
         const { w, h } = n.size;
         queueSave(rec.id, {
           ui: { x, y, w, h, collapsed: n.isCollapsed },
-          style: { palette: n.styleNow.palette },
+          style: n.styleOverrides,
         });
       },
       onInk: (_n, ink) => queueSave(rec.id, { ink }),
       onDelete: (n) => void remove(rec.id, n),
+      onStyle: (_n, overrides) => queueSave(rec.id, { style: overrides }),
+      onSaveDefault: (_n, style) => void saveDefaults(style),
+      defaults,
     },
   );
   topZ = Math.max(topZ, rec.ui.z);
@@ -278,6 +303,7 @@ window.cn = { addNote, load, views, loop, page, host };
 // boots the same way the real renderer does.
 void (async () => {
   await openDb();
+  await loadDefaults();
   buildPageSwitcher();
   await load();
 })();

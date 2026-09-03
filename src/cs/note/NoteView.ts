@@ -21,7 +21,9 @@ import {
   step,
 } from '~/cs/physics/spring.ts';
 import { InkLayer } from './ink.ts';
+import { SettingsPanel } from './SettingsPanel.ts';
 import {
+  DEFAULT_STYLE,
   fontById,
   isDarkPaper,
   type NoteStyle,
@@ -70,6 +72,13 @@ const TOOLBAR: ReadonlyArray<readonly [name: string, label: string, path: string
   ['collapse', 'Collapse (M)', 'M5 11h14v2H5z'],
   ['delete', 'Delete (Del)', 'M6 7h12l-1 14H7L6 7zm3-4h6l1 2h4v2H4V5h4l1-2z'],
 ] as const;
+
+const ICON_PEN =
+  'M3 17.3V21h3.7L17.6 10.1l-3.7-3.7L3 17.3zM20.7 7a1 1 0 0 0 0-1.4l-2.3-2.3a1 1 0 0 0-1.4 0l-1.8 1.8 3.7 3.7L20.7 7z';
+const ICON_ERASER =
+  'M16.2 3.3a1.8 1.8 0 0 1 2.5 0l2 2a1.8 1.8 0 0 1 0 2.5l-8 8H20v2h-9.5l-2-2-3.2-3.2a1.8 1.8 0 0 1 0-2.5l10.9-6.8zM7.7 13.4l2.9 2.9 4.2-4.2-2.9-2.9-4.2 4.2z';
+const ICON_CLEAR =
+  'M6 7h12l-1 14H7L6 7zm3-4h6l1 2h4v2H4V5h4l1-2zm1 7v8h1.5v-8H10zm3.5 0v8H15v-8h-1.5z';
 
 function icon(path: string): SVGSVGElement {
   const s = document.createElementNS(NS, 'svg');
@@ -123,6 +132,8 @@ export interface NoteHost {
   onChange?(note: NoteView): void;
   onInk?(note: NoteView, ink: { strokes: InkStroke[]; w: number; h: number }): void;
   onDelete?(note: NoteView): void;
+  onStyle?(note: NoteView, overrides: Partial<NoteStyle>): void;
+  onSaveDefault?(note: NoteView, style: NoteStyle): void;
 }
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -143,13 +154,13 @@ export class NoteView implements Animatable {
   private readonly paperPath: SVGPathElement;
   private readonly tapeG: SVGGElement;
   private readonly curlPaths: SVGPathElement[] = [];
-  private readonly sheenEl: HTMLDivElement;
-  private readonly sheenBand: HTMLDivElement;
-  private readonly glossRim: HTMLDivElement;
   private actionsEl!: HTMLDivElement;
   private ink: InkLayer | null = null;
+  private inkBar: HTMLDivElement | null = null;
 
   private style: NoteStyle;
+  private overrides: Partial<NoteStyle>;
+  private settings: SettingsPanel | null = null;
   private w: number;
   private h: number;
   private zIndex: number;
@@ -182,7 +193,8 @@ export class NoteView implements Animatable {
   constructor(init: NoteInit, host: NoteHost) {
     this.id = init.id;
     this.host = host;
-    this.style = resolveStyle(init.style, host.defaults);
+    this.overrides = { ...init.style };
+    this.style = resolveStyle(this.overrides, host.defaults);
     this.w = init.w;
     this.h = init.h;
     this.zIndex = init.z;
@@ -248,13 +260,6 @@ export class NoteView implements Animatable {
     }
     this.curlEl = curlWrap;
 
-    // Glass, not matte paper: a bright specular band that travels across the sheet as it
-    // tilts. The wrapper clips (and never moves) so the band's transform stays free.
-    this.sheenEl = div('sheen');
-    this.sheenBand = div('sheen-band');
-    this.sheenEl.append(this.sheenBand);
-    this.glossRim = div('gloss-rim');
-
     const header = document.createElement('header');
     header.className = 'handle';
     header.append(div('grip-dots'));
@@ -289,16 +294,7 @@ export class NoteView implements Animatable {
     }
 
     this.inkInit = init.ink ?? null;
-    this.faceEl.append(
-      this.grainEl,
-      art,
-      header,
-      this.bodyEl,
-      this.glossRim,
-      this.sheenEl,
-      curlWrap,
-      grips,
-    );
+    this.faceEl.append(this.grainEl, art, header, this.bodyEl, curlWrap, grips);
     this.cardEl.append(this.faceEl);
     tilt.append(this.cardEl);
     note.append(this.shadowEl, tilt);
@@ -367,10 +363,54 @@ export class NoteView implements Animatable {
     }
   }
 
+  /** Apply an override. The note keeps only what it actually changed, so a later change to
+   *  the user's defaults still moves every field this note never touched. */
   setStyle(patch: Partial<NoteStyle>): void {
-    this.style = resolveStyle({ ...this.style, ...patch }, this.host.defaults);
+    this.overrides = { ...this.overrides, ...patch };
+    this.style = resolveStyle(this.overrides, this.host.defaults);
     this.applyStyle();
     this.resizeArt();
+    this.settings?.refresh();
+    this.host.onStyle?.(this, this.overrides);
+  }
+
+  /** Drop one override so the field follows the user's default again. */
+  resetStyle(key: keyof NoteStyle): void {
+    if (this.overrides[key] === undefined) return;
+    const { [key]: _dropped, ...rest } = this.overrides;
+    this.overrides = rest;
+    this.style = resolveStyle(this.overrides, this.host.defaults);
+    this.applyStyle();
+    this.resizeArt();
+    this.settings?.refresh();
+    this.host.onStyle?.(this, this.overrides);
+  }
+
+  get styleOverrides(): Partial<NoteStyle> {
+    return { ...this.overrides };
+  }
+
+  toggleSettings(force?: boolean): void {
+    const open = force ?? this.settings === null;
+    if (!open) {
+      this.settings?.el.remove();
+      this.settings = null;
+      this.actionsEl.querySelector('.act-settings')?.classList.remove('is-on');
+      return;
+    }
+    if (this.settings) return;
+    this.settings = new SettingsPanel({
+      style: () => this.style,
+      overrides: () => this.overrides,
+      defaults: () => this.host.defaults ?? (DEFAULT_STYLE as NoteStyle),
+      change: (patch) => this.setStyle(patch),
+      reset: (key) => this.resetStyle(key),
+      saveAsDefault: () => this.host.onSaveDefault?.(this, this.style),
+      close: () => this.toggleSettings(false),
+    });
+    this.faceEl.append(this.settings.el);
+    this.actionsEl.querySelector('.act-settings')?.classList.add('is-on');
+    this.bringToFront();
   }
 
   // ----------------------------------------------------------------- actions
@@ -386,6 +426,9 @@ export class NoteView implements Animatable {
         break;
       case 'palette':
         this.cyclePalette();
+        break;
+      case 'settings':
+        this.toggleSettings();
         break;
       case 'lock':
         this.setLocked(!this.locked);
@@ -410,14 +453,21 @@ export class NoteView implements Animatable {
     const root = this.el.getRootNode();
     const active = root instanceof ShadowRoot ? root.activeElement : document.activeElement;
 
-    if (active === this.bodyEl) {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
+    // Escape always means "get me out of whatever mode I am in", wherever focus happens to be.
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      if (this.ink?.isEnabled) {
+        this.enableInk(false);
+        return;
+      }
+      if (active === this.bodyEl) {
         this.bodyEl.blur();
         this.el.focus({ preventScroll: true });
       }
       return;
     }
+
+    if (active === this.bodyEl) return;
 
     const step = e.ctrlKey ? 25 : e.shiftKey ? 10 : 1;
     switch (e.key) {
@@ -451,6 +501,10 @@ export class NoteView implements Animatable {
       case 'C':
         this.cyclePalette();
         break;
+      case 's':
+      case 'S':
+        this.toggleSettings();
+        break;
       case 'l':
       case 'L':
         this.setLocked(!this.locked);
@@ -458,6 +512,14 @@ export class NoteView implements Animatable {
       case 'm':
       case 'M':
         this.setCollapsed(!this.collapsed);
+        break;
+      case 'p':
+      case 'P':
+        this.setInkTool('pen');
+        break;
+      case 'e':
+      case 'E':
+        this.setInkTool('eraser');
         break;
       case 'z':
       case 'Z':
@@ -475,17 +537,91 @@ export class NoteView implements Animatable {
         this.w,
         this.h,
         this.inkInit?.strokes ?? [],
-        { color: 'var(--cn-ink)', size: 7 },
+        { color: 'var(--cn-ink)', size: 7, tool: 'pen' },
         (strokes) => this.host.onInk?.(this, { strokes, w: this.w, h: this.h }),
       );
-      // Above the text so a drawing can annotate what is written, below the gloss.
-      this.faceEl.insertBefore(this.ink.el, this.sheenEl);
+      // Above the text so a drawing can annotate what is written, below the corner curl.
+      this.faceEl.insertBefore(this.ink.el, this.curlEl);
     }
     this.ink.setEnabled(on);
     this.el.classList.toggle('is-inking', on);
+    if (on) this.buildInkBar();
+    else this.inkBar?.remove();
+    // Without focus the note hears no keys, so Esc could not get you back out.
+    if (on) this.el.focus({ preventScroll: true });
     this.actionsEl.querySelector('.act-pen')?.classList.toggle('is-on', on);
     // Drawing and editing are mutually exclusive; a caret under a pen is only confusing.
     this.bodyEl.setAttribute('contenteditable', on || this.locked ? 'false' : 'plaintext-only');
+  }
+
+  /** Pen / eraser / thickness / clear. Only exists while drawing is on. */
+  private buildInkBar(): void {
+    if (this.inkBar?.isConnected) return;
+    const bar = div('inkbar');
+    this.inkBar = bar;
+
+    const tool = (name: 'pen' | 'eraser', label: string, path: string): HTMLButtonElement => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `ink-tool ink-${name}`;
+      b.title = label;
+      b.setAttribute('aria-label', label);
+      b.append(icon(path));
+      b.classList.toggle('is-on', (this.ink?.tool ?? 'pen') === name);
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.ink?.setOptions({ tool: name });
+        for (const other of bar.querySelectorAll('.ink-tool')) {
+          other.classList.toggle('is-on', other === b);
+        }
+      });
+      return b;
+    };
+
+    const size = document.createElement('input');
+    size.type = 'range';
+    size.min = '2';
+    size.max = '22';
+    size.step = '1';
+    size.value = '7';
+    size.className = 'ink-size';
+    size.title = 'Thickness';
+    size.setAttribute('aria-label', 'Stroke thickness');
+    size.addEventListener('input', (e) => {
+      e.stopPropagation();
+      this.ink?.setOptions({ size: Number(size.value) });
+    });
+    size.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'ink-tool ink-clear';
+    clear.title = 'Erase everything';
+    clear.setAttribute('aria-label', 'Erase everything');
+    clear.append(icon(ICON_CLEAR));
+    clear.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.ink?.clear();
+      if (this.ink) this.host.onInk?.(this, this.ink.toJSON());
+    });
+
+    bar.append(
+      tool('pen', 'Pen (P)', ICON_PEN),
+      tool('eraser', 'Eraser (E)', ICON_ERASER),
+      size,
+      clear,
+    );
+    bar.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this.faceEl.append(bar);
+  }
+
+  /** Switch between pen and eraser without leaving drawing mode. */
+  setInkTool(tool: 'pen' | 'eraser'): void {
+    if (!this.ink?.isEnabled) this.enableInk(true);
+    this.ink?.setOptions({ tool });
+    for (const b of this.inkBar?.querySelectorAll('.ink-tool') ?? []) {
+      b.classList.toggle('is-on', b.classList.contains(`ink-${tool}`));
+    }
   }
 
   get inkJSON(): { strokes: InkStroke[]; w: number; h: number } | null {
@@ -575,6 +711,8 @@ export class NoteView implements Animatable {
   destroy(): void {
     this.host.loop.remove(this);
     this.ink?.destroy();
+    this.inkBar?.remove();
+    this.settings?.el.remove();
     clearTimeout(this.artTimer);
     this.el.remove();
   }
@@ -856,10 +994,6 @@ export class NoteView implements Animatable {
       `translate3d(${(4 + lift * 10).toFixed(2)}px, ${(5 + lift * 14).toFixed(2)}px, 0) ` +
       `scale(${(1 + lift * 0.06).toFixed(4)})`;
     this.shadowEl.style.opacity = (0.18 + lift * 0.18).toFixed(3);
-    // Light sweeping across a coated sheet. The band travels far enough to read as a real
-    // reflection rather than a wash, and a little gloss stays even at rest.
-    this.sheenBand.style.transform = `translate3d(${(-this.ry.x * 15 - this.sk.x * 8).toFixed(2)}px, ${(this.rx.x * 9).toFixed(2)}px, 0)`;
-    this.sheenEl.style.opacity = (0.07 + lift * 0.78).toFixed(3);
 
     // Cross-fade between the two nearest pre-baked curl paths. Opacity only.
     const t = this.curl.x * (CURL_LEVELS - 1);

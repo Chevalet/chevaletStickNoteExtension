@@ -12,10 +12,16 @@ import type { InkStroke } from '~/bg/db/schema.ts';
 
 const NS = 'http://www.w3.org/2000/svg';
 
+export type InkTool = 'pen' | 'eraser';
+
 export interface InkOptions {
   color: string;
   size: number;
+  tool: InkTool;
 }
+
+/** How close the eraser has to pass to a stroke to take it out, on top of the stroke's width. */
+const ERASER_SLOP = 6;
 
 /** Turn a flat [x, y, pressure, ...] list into an SVG outline path. */
 export function strokeToPath(stroke: InkStroke): string {
@@ -71,7 +77,7 @@ export class InkLayer {
     private w: number,
     private h: number,
     strokes: InkStroke[] = [],
-    private options: InkOptions = { color: 'currentColor', size: 7 },
+    private options: InkOptions = { color: 'currentColor', size: 7, tool: 'pen' },
     private readonly onCommit?: (strokes: InkStroke[]) => void,
   ) {
     this.strokes = strokes.map((s) => ({ ...s, points: [...s.points] }));
@@ -106,6 +112,11 @@ export class InkLayer {
 
   setOptions(o: Partial<InkOptions>): void {
     this.options = { ...this.options, ...o };
+    this.el.classList.toggle('is-erasing', this.options.tool === 'eraser');
+  }
+
+  get tool(): InkTool {
+    return this.options.tool;
   }
 
   resize(w: number, h: number): void {
@@ -151,6 +162,16 @@ export class InkLayer {
     } catch {
       /* capture is an optimisation */
     }
+
+    if (this.options.tool === 'eraser') {
+      this.erasing = true;
+      this.eraseAt(e);
+      this.el.addEventListener('pointermove', this.onMove);
+      this.el.addEventListener('pointerup', this.onUp);
+      this.el.addEventListener('pointercancel', this.onUp);
+      return;
+    }
+
     this.drawing = { points: [], color: this.options.color, size: this.options.size };
     this.push(e);
 
@@ -159,7 +180,64 @@ export class InkLayer {
     this.el.addEventListener('pointercancel', this.onUp);
   };
 
+  private erasing = false;
+  private erasedAny = false;
+
+  /**
+   * Whole-stroke erase.
+   *
+   * Strokes are vectors, so removing one is exact and instant; splitting a stroke into
+   * fragments would be pixel-thinking applied to the wrong data structure, and on a note it
+   * is not what anyone wants anyway.
+   */
+  private eraseAt(e: PointerEvent): void {
+    const p = this.toLocal(e);
+    const before = this.strokes.length;
+    this.strokes = this.strokes.filter((stroke) => !this.hits(stroke, p.x, p.y));
+    if (this.strokes.length !== before) {
+      this.erasedAny = true;
+      this.redraw();
+    }
+  }
+
+  private hits(stroke: InkStroke, x: number, y: number): boolean {
+    const reach = stroke.size / 2 + ERASER_SLOP + this.options.size / 2;
+    const reach2 = reach * reach;
+    const pts = stroke.points;
+    for (let i = 0; i + 2 < pts.length; i += 3) {
+      const dx = (pts[i] as number) - x;
+      const dy = (pts[i + 1] as number) - y;
+      if (dx * dx + dy * dy <= reach2) return true;
+      // Also test the segment to the next sample, or a fast stroke can be jumped over.
+      if (i + 5 < pts.length) {
+        const d = distToSegment(
+          x,
+          y,
+          pts[i] as number,
+          pts[i + 1] as number,
+          pts[i + 3] as number,
+          pts[i + 4] as number,
+        );
+        if (d <= reach) return true;
+      }
+    }
+    return false;
+  }
+
+  private toLocal(e: PointerEvent): { x: number; y: number } {
+    const r = this.el.getBoundingClientRect();
+    return {
+      x: ((e.clientX - r.left) / Math.max(1, r.width)) * this.w,
+      y: ((e.clientY - r.top) / Math.max(1, r.height)) * this.h,
+    };
+  }
+
   private readonly onMove = (e: PointerEvent): void => {
+    if (this.erasing) {
+      const events = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [];
+      for (const ev of events.length ? events : [e]) this.eraseAt(ev);
+      return;
+    }
     if (!this.drawing) return;
     const events = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [];
     for (const ev of events.length ? events : [e]) this.push(ev);
@@ -179,6 +257,16 @@ export class InkLayer {
     cancelAnimationFrame(this.raf);
     this.raf = 0;
     this.live.removeAttribute('d');
+
+    if (this.erasing) {
+      this.erasing = false;
+      if (this.erasedAny) {
+        this.erasedAny = false;
+        this.onCommit?.(this.strokes);
+      }
+      this.drawing = null;
+      return;
+    }
 
     if (this.drawing && this.drawing.points.length >= 3) {
       this.strokes.push(this.drawing);
@@ -214,4 +302,22 @@ export class InkLayer {
       this.committed.append(p);
     }
   }
+}
+
+/** Distance from a point to a line segment. Used so a fast eraser stroke cannot skip over ink. */
+function distToSegment(
+  px: number,
+  py: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): number {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / len2;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
 }

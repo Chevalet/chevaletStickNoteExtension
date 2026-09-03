@@ -29,11 +29,13 @@
     "@types/node": "^24.10.0",
     "esbuild": "^0.25.10",
     "fake-indexeddb": "^6.2.5",
+    "happy-dom": "^20.13.1",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "web-ext": "^8.10.0"
   },
   "dependencies": {
+    "approx-string-match": "^2.0.0",
     "perfect-freehand": "^1.2.3"
   }
 }

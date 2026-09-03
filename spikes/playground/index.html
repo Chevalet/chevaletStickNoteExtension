@@ -124,13 +124,22 @@
     <kbd>&#8594;</kbd> move 1px &middot; <kbd>Shift</kbd>+arrow 10px &middot;
     <kbd>Ctrl</kbd>+arrow 25px &middot; <kbd>Alt</kbd>+arrow resize &middot;
     <kbd>Enter</kbd> edit &middot; <kbd>Esc</kbd> stop editing &middot;
-    <kbd>D</kbd> draw &middot; <kbd>C</kbd> next colour &middot; <kbd>L</kbd> lock &middot;
-    <kbd>M</kbd> collapse &middot; <kbd>Z</kbd> undo last stroke &middot;
+    <kbd>D</kbd> draw &middot; <kbd>P</kbd> pen &middot; <kbd>E</kbd> eraser &middot;
+    <kbd>Z</kbd> undo last stroke &middot; <kbd>S</kbd> settings &middot;
+    <kbd>C</kbd> next colour &middot; <kbd>L</kbd> lock &middot; <kbd>M</kbd> collapse &middot;
     <kbd>Del</kbd> delete.
   </p>
   <p>
-    The toolbar in each note's header does the same things:
-    pen, colour, lock, collapse, delete.
+    The toolbar in each note's header does the same things: pen, settings, colour, lock,
+    collapse, delete. While drawing, a second strip appears under the note with
+    <strong>pen, eraser, thickness and erase-all</strong> &mdash; and <kbd>Esc</kbd> always
+    gets you back out of drawing mode.
+  </p>
+  <p>
+    <strong>Settings</strong> are per note, stored as a sparse diff against your defaults. A
+    dot next to a field means this note has overridden it; click the dot to follow the default
+    again. <em>Save as my default</em> makes every new note start like this one &mdash; and
+    every existing note that never overrode that field follows along.
   </p>
 
   <h2>Filler, so there is something to scroll past</h2>
