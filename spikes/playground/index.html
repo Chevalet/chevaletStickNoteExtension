@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>chevaletNote — playground</title>
+<style>
+  /* A deliberately opinionated host page: a universal reset with !important and a serif
+     body font. Neither should reach the notes. */
+  * { box-sizing: border-box !important; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #ece5d6;
+    color: #2a2622;
+    font: 16px/1.7 Georgia, "Times New Roman", serif !important;
+    min-height: 260vh;
+  }
+  .page { max-width: 700px; margin: 0 auto; padding: 120px 24px 400px; }
+  h1 { font: 700 32px/1.15 system-ui, sans-serif; margin: 0 0 8px; letter-spacing: -.5px; }
+  h2 { font: 700 19px/1.3 system-ui, sans-serif; margin: 40px 0 10px; }
+  p { margin: 0 0 18px; }
+  code { background: #ded5c2; padding: 1px 5px; font-family: ui-monospace, monospace; font-size: .9em; }
+  .hint { border-left: 5px solid #ff2e63; padding: 2px 0 2px 14px; color: #5d554b; }
+
+  #panel {
+    position: fixed; inset: 0 0 auto 0; z-index: 10;
+    padding: 8px 14px; background: #14110e; color: #ffe94a;
+    font: 12px/1.5 ui-monospace, Consolas, monospace;
+    border-bottom: 3px solid #ff2e63;
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  }
+  #panel label { display: inline-flex; gap: 6px; align-items: center; }
+  #panel button {
+    font: 700 12px ui-monospace, monospace; cursor: pointer; padding: 3px 9px;
+    background: #ffe94a; color: #14110e; border: 2px solid #14110e; box-shadow: 2px 2px 0 #ff2e63;
+  }
+  #panel button:active { transform: translate(2px, 2px); box-shadow: none; }
+  #panel button.danger { background: #ff2e63; color: #fff; box-shadow: 2px 2px 0 #14110e; }
+  #panel button.sm { font-size: 11px; padding: 2px 6px; box-shadow: 1px 1px 0 #ff2e63; }
+  #panel select { font: 12px ui-monospace, monospace; max-width: 320px; }
+  .row2 { flex-basis: 100%; display: flex; gap: 14px; flex-wrap: wrap; color: #7ef0ff; }
+  .row2 b { color: #ffe94a; font-weight: 400; }
+  #status { position: fixed; inset: auto 0 0 0; z-index: 10;
+            padding: 6px 14px; background: #14110e; color: #7ef0ff;
+            font: 12px ui-monospace, monospace; border-top: 3px solid #ffe94a; }
+  #trash { display: flex; gap: 6px; flex-wrap: wrap; }
+  #toast {
+    position: fixed; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 11;
+    background: #14110e; color: #ffe94a; padding: 9px 14px;
+    border: 2px solid #ff2e63; box-shadow: 4px 4px 0 #ff2e63;
+    font: 13px ui-monospace, monospace;
+  }
+  #toast button {
+    font: 700 12px ui-monospace, monospace; cursor: pointer; margin-left: 8px; padding: 2px 8px;
+    background: #ffe94a; color: #14110e; border: 2px solid #14110e;
+  }
+  kbd {
+    font: 11px ui-monospace, monospace; background: #14110e; color: #ffe94a;
+    padding: 1px 5px; border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+
+<div id="panel">
+  <label>pretending this page is <select id="page"></select></label>
+  <button id="add">+ note</button>
+  <button id="reload">reload from DB</button>
+  <button id="wipe" class="danger">wipe database</button>
+  <span id="trash"></span>
+  <div class="row2">
+    <span>url: <b id="pageurl"></b></span>
+    <span>key: <b id="urlkey"></b></span>
+    <span><b id="ctx"></b></span>
+  </div>
+</div>
+
+<div class="page">
+  <h1>Playground</h1>
+  <p class="hint">
+    <strong>Double-click anywhere</strong> on this page to stick a note there, then type.
+    Everything is real: the note is written to IndexedDB under the normalized key for the URL
+    shown in the bar above.
+  </p>
+
+  <h2>What to try</h2>
+  <p>
+    <strong>Reload the page.</strong> The notes come back in the same places. They are not in
+    the cache and not in <code>localStorage</code> — they are in the extension's own IndexedDB,
+    which is the store that survives clearing browsing data.
+  </p>
+  <p>
+    <strong>Switch to “Same article, shared link”.</strong> The notes are still there: the
+    <code>?utm_source</code> is stripped before the key is computed. Same for the
+    <code>http</code> + <code>www</code> + trailing-slash version — all four spellings are one
+    page. Now switch to “A different article” and they are correctly gone.
+  </p>
+  <p>
+    <strong>Switch between the two YouTube videos.</strong> Notes follow <code>?v=</code> and
+    ignore <code>?t=</code>, so a note on a video stays on that video and does not leak onto
+    every other video.
+  </p>
+  <p>
+    <strong>Switch between the two SPA routes.</strong> <code>#/inbox</code> and
+    <code>#/settings</code> are different pages, because a <code>#/</code> fragment is a route.
+    A plain <code>#section</code> fragment is not, and would be ignored.
+  </p>
+  <p>
+    <strong>Scroll.</strong> A note stays with the paragraph it was dropped on, because its
+    position is stored in document coordinates, not viewport coordinates.
+  </p>
+  <p>
+    <strong>Drag one, then reload.</strong> Position is saved 250 ms after you let go — the
+    same debounce the extension uses so that typing never floods the database.
+  </p>
+  <p>
+    <strong>Delete one</strong> with the <code>×</code> button. It goes to the trash rather than
+    being destroyed, and a restore button appears in the bar above.
+  </p>
+
+  <h2>Keyboard</h2>
+  <p>
+    Click a note once to focus it (do not click into the text), then:
+    <kbd>&#8594;</kbd> move 1px &middot; <kbd>Shift</kbd>+arrow 10px &middot;
+    <kbd>Ctrl</kbd>+arrow 25px &middot; <kbd>Alt</kbd>+arrow resize &middot;
+    <kbd>Enter</kbd> edit &middot; <kbd>Esc</kbd> stop editing &middot;
+    <kbd>D</kbd> draw &middot; <kbd>C</kbd> next colour &middot; <kbd>L</kbd> lock &middot;
+    <kbd>M</kbd> collapse &middot; <kbd>Z</kbd> undo last stroke &middot;
+    <kbd>Del</kbd> delete.
+  </p>
+  <p>
+    The toolbar in each note's header does the same things:
+    pen, colour, lock, collapse, delete.
+  </p>
+
+  <h2>Filler, so there is something to scroll past</h2>
+  <p>
+    A photocopier degrades an image a little every generation. Contrast climbs, midtones
+    collapse into pure black and white, and dust on the platen becomes part of the artwork.
+    Zine makers leaned into it: if the third-generation copy looked rougher, you made a fourth.
+  </p>
+  <p>
+    That is the look this extension is going for — high-contrast ink on saturated stock,
+    halftone dots coarse enough to see, a hard unblurred drop shadow, and edges that were torn
+    rather than cut. The constraint is that none of it may cost anything per frame.
+  </p>
+  <p>
+    The tear is a path generated once from a seeded pseudo-random number generator keyed on the
+    note's id, so it is identical on every reload and on every machine. The grain is a single
+    tile shared by every note. The corner curl is five pre-baked paths cross-faded by opacity.
+    While a note is moving, only <code>transform</code> and <code>opacity</code> change.
+  </p>
+  <p>
+    Keep scrolling and drop a note down here, then go back to the top and return. It should be
+    exactly where you left it.
+  </p>
+</div>
+
+<div id="toast" hidden></div>
+<div id="status">loading…</div>
+<script src="bundle.js"></script>
+</body>
+</html>

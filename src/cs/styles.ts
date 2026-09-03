@@ -81,7 +81,7 @@ export const SHEET_CSS = /* css */ `
   color: var(--cn-ink);
   font: var(--cn-size) / var(--cn-lh) var(--cn-font);
   display: grid;
-  grid-template-rows: 26px 1fr;
+  grid-template-rows: 30px 1fr;
   isolation: isolate;
 }
 
@@ -129,19 +129,57 @@ export const SHEET_CSS = /* css */ `
   pointer-events: none;
 }
 
+/* The gloss. Not matte paper -- a laminated sheet that catches the light, so lifting a note
+   sweeps a specular band across it. The wrapper clips and never moves; only the band inside
+   is transformed, which keeps the whole effect on the compositor. */
 .sheen {
   position: absolute;
-  inset: -20%;
-  z-index: -1;
+  inset: 2px;
+  z-index: 6;
+  overflow: hidden;
   opacity: 0;
   pointer-events: none;
-  background: linear-gradient(
-    108deg,
-    transparent 34%,
-    color-mix(in oklab, white 70%, transparent) 48%,
-    transparent 62%
-  );
-  mix-blend-mode: soft-light;
+  mix-blend-mode: screen;
+  will-change: opacity;
+}
+.sheen-band {
+  position: absolute;
+  inset: -70% -90%;
+  /* A narrow, near-white specular streak plus a second thinner one trailing it. Wide, soft
+     gradients read as a wash; a real reflection has an edge. */
+  background:
+    linear-gradient(
+      101deg,
+      transparent 39%,
+      rgba(255, 255, 255, .22) 44%,
+      rgba(255, 255, 255, .95) 48.5%,
+      rgba(255, 255, 255, 1) 50%,
+      rgba(255, 255, 255, .95) 51.5%,
+      rgba(255, 255, 255, .22) 56%,
+      transparent 61%
+    ),
+    linear-gradient(
+      101deg,
+      transparent 63%,
+      rgba(255, 255, 255, .45) 66.5%,
+      rgba(255, 255, 255, .55) 68%,
+      rgba(255, 255, 255, .12) 71%,
+      transparent 75%
+    ),
+    /* A cool ambient tint over the whole sheet, the way coated stock picks up the room. */
+    linear-gradient(160deg, rgba(190, 225, 255, .16), transparent 55%);
+  will-change: transform;
+}
+/* A permanent hint of gloss along the top edge, so the sheet reads as coated even at rest. */
+.gloss-rim {
+  position: absolute;
+  inset: 2px 2px auto 2px;
+  height: 46%;
+  z-index: 5;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, .42), rgba(255, 255, 255, .06) 45%, transparent 90%);
+  mix-blend-mode: screen;
 }
 
 .tape-strip {
@@ -150,6 +188,20 @@ export const SHEET_CSS = /* css */ `
   stroke: color-mix(in oklab, var(--cn-ink) 20%, transparent);
   stroke-width: .8;
 }
+
+.ink {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 4;
+  pointer-events: none;
+  overflow: visible;
+}
+.ink.is-drawing { pointer-events: auto; cursor: crosshair; }
+.ink path { fill: var(--cn-ink); }
+.note.is-inking .body { cursor: crosshair; }
+.note.is-inking .face { outline: 2px dashed color-mix(in oklab, var(--cn-accent) 70%, transparent); outline-offset: 2px; }
 
 .curl {
   position: absolute;
@@ -189,21 +241,32 @@ export const SHEET_CSS = /* css */ `
   background-size: 5px 5px;
 }
 
-.actions { display: flex; gap: 2px; }
+.actions { display: flex; gap: 1px; }
+/* 26px targets. The first version used 18px glyphs at 55% opacity and the first person to
+   try the build simply could not hit them -- notably, could not delete a note at all. */
 .act {
   all: unset;
-  width: 18px;
-  height: 18px;
+  box-sizing: border-box;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
-  font: 700 14px/1 var(--cn-font);
   color: var(--cn-ink);
   cursor: pointer;
-  border-radius: 2px;
-  opacity: .55;
+  border-radius: 3px;
+  opacity: .78;
 }
-.act:hover { opacity: 1; background: color-mix(in oklab, var(--cn-ink) 14%, transparent); }
+.act svg { width: 15px; height: 15px; display: block; }
+.act svg path { fill: currentColor; }
+.act:hover { opacity: 1; background: color-mix(in oklab, var(--cn-ink) 16%, transparent); }
+.act:focus-visible { outline: 2px solid var(--cn-accent); outline-offset: -2px; }
+.act.is-on {
+  opacity: 1;
+  background: var(--cn-accent);
+  color: var(--cn-paper);
+}
 .act-delete:hover { background: var(--cn-accent); color: var(--cn-paper); }
+.note.is-locked .body { cursor: default; }
 
 /* -------------------------------------------------------------------- body */
 
@@ -221,6 +284,11 @@ export const SHEET_CSS = /* css */ `
   scrollbar-width: thin;
 }
 .body:focus { outline: none; }
+.body:empty::before {
+  content: attr(data-placeholder);
+  opacity: .38;
+  pointer-events: none;
+}
 .note[data-align="center"] .body { text-align: center; }
 .note[data-align="end"] .body { text-align: end; }
 
@@ -243,7 +311,7 @@ export const SHEET_CSS = /* css */ `
     linear-gradient(135deg, transparent 68%, var(--cn-ink) 68%, var(--cn-ink) 76%, transparent 76%);
 }
 .grip-s { left: 16px; right: 16px; bottom: 0; height: 7px; cursor: ns-resize; }
-.grip-e { top: 26px; bottom: 16px; right: 0; width: 7px; cursor: ew-resize; }
+.grip-e { top: 30px; bottom: 16px; right: 0; width: 7px; cursor: ew-resize; }
 
 /* --------------------------------------------------------------- collapsed */
 

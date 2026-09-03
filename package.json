@@ -20,16 +20,20 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "package": "pnpm build && web-ext build --source-dir dist --artifacts-dir artifacts --overwrite-dest",
-    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm lint:ext"
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm lint:ext",
+    "serve": "node --experimental-strip-types tools/dev.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.0",
     "@types/firefox-webext-browser": "^120.0.4",
     "@types/node": "^24.10.0",
     "esbuild": "^0.25.10",
+    "fake-indexeddb": "^6.2.5",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "web-ext": "^8.10.0"
   },
-  "dependencies": {}
+  "dependencies": {
+    "perfect-freehand": "^1.2.3"
+  }
 }

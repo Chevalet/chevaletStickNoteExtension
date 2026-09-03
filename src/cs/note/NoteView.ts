@@ -8,6 +8,7 @@
  * the host page is doing.
  */
 
+import type { InkStroke } from '~/bg/db/schema.ts';
 import { tapeStrip, tornRectPath } from '~/cs/art/paper.ts';
 import { leverFrom, TUNING as POSE, poseFromVelocity, smoothing } from '~/cs/physics/pose.ts';
 import {
@@ -19,10 +20,12 @@ import {
   spring,
   step,
 } from '~/cs/physics/spring.ts';
+import { InkLayer } from './ink.ts';
 import {
   fontById,
   isDarkPaper,
   type NoteStyle,
+  PALETTES,
   paletteById,
   resolveStyle,
   styleVars,
@@ -42,6 +45,41 @@ const TUNING = {
 } as const;
 
 const CURL_LEVELS = 5;
+const PALETTE_IDS = PALETTES.map((p) => p.id);
+
+/**
+ * Toolbar. 26px targets, full opacity on hover, real icons -- deliberately not the 18px
+ * half-transparent glyphs the first version shipped, which nobody could hit.
+ */
+const TOOLBAR: ReadonlyArray<readonly [name: string, label: string, path: string]> = [
+  [
+    'pen',
+    'Draw (D)',
+    'M3 17.3V21h3.7L17.6 10.1l-3.7-3.7L3 17.3zM20.7 7a1 1 0 0 0 0-1.4l-2.3-2.3a1 1 0 0 0-1.4 0l-1.8 1.8 3.7 3.7L20.7 7z',
+  ],
+  [
+    'palette',
+    'Colour (C)',
+    'M12 3a9 9 0 1 0 0 18c.8 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1-.3-.3-.4-.6-.4-1 0-.8.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.4-4-8-9-8zm-5.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z',
+  ],
+  [
+    'lock',
+    'Lock (L)',
+    'M17 9V7a5 5 0 0 0-10 0v2H5v12h14V9h-2zM9 7a3 3 0 0 1 6 0v2H9V7zm3 11a2 2 0 1 1 0-4 2 2 0 0 1 0 4z',
+  ],
+  ['collapse', 'Collapse (M)', 'M5 11h14v2H5z'],
+  ['delete', 'Delete (Del)', 'M6 7h12l-1 14H7L6 7zm3-4h6l1 2h4v2H4V5h4l1-2z'],
+] as const;
+
+function icon(path: string): SVGSVGElement {
+  const s = document.createElementNS(NS, 'svg');
+  s.setAttribute('viewBox', '0 0 24 24');
+  s.setAttribute('aria-hidden', 'true');
+  const p = document.createElementNS(NS, 'path');
+  p.setAttribute('d', path);
+  s.append(p);
+  return s;
+}
 const MIN_W = 140;
 const MIN_H = 90;
 
@@ -73,6 +111,7 @@ export interface NoteInit {
   style?: Partial<NoteStyle>;
   collapsed?: boolean;
   locked?: boolean;
+  ink?: { strokes: InkStroke[]; w: number; h: number };
 }
 
 export interface NoteHost {
@@ -82,6 +121,8 @@ export interface NoteHost {
   /** Bring this note to the front; returns the new z. */
   raise(note: NoteView): number;
   onChange?(note: NoteView): void;
+  onInk?(note: NoteView, ink: { strokes: InkStroke[]; w: number; h: number }): void;
+  onDelete?(note: NoteView): void;
 }
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -103,6 +144,10 @@ export class NoteView implements Animatable {
   private readonly tapeG: SVGGElement;
   private readonly curlPaths: SVGPathElement[] = [];
   private readonly sheenEl: HTMLDivElement;
+  private readonly sheenBand: HTMLDivElement;
+  private readonly glossRim: HTMLDivElement;
+  private actionsEl!: HTMLDivElement;
+  private ink: InkLayer | null = null;
 
   private style: NoteStyle;
   private w: number;
@@ -203,25 +248,31 @@ export class NoteView implements Animatable {
     }
     this.curlEl = curlWrap;
 
+    // Glass, not matte paper: a bright specular band that travels across the sheet as it
+    // tilts. The wrapper clips (and never moves) so the band's transform stays free.
     this.sheenEl = div('sheen');
+    this.sheenBand = div('sheen-band');
+    this.sheenEl.append(this.sheenBand);
+    this.glossRim = div('gloss-rim');
 
     const header = document.createElement('header');
     header.className = 'handle';
     header.append(div('grip-dots'));
     const actions = div('actions');
-    for (const [name, glyph, label] of [
-      ['collapse', '–', 'Collapse'],
-      ['delete', '×', 'Delete'],
-    ] as const) {
+    // 18px glyphs at 55% opacity were unhittable in practice -- the first person to try the
+    // build could not delete a note at all. These are 26px targets with real icons.
+    for (const [name, label, path] of TOOLBAR) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `act act-${name}`;
       b.tabIndex = -1;
-      b.textContent = glyph;
+      b.title = label;
       b.setAttribute('aria-label', label);
+      b.append(icon(path));
       actions.append(b);
     }
     header.append(actions);
+    this.actionsEl = actions;
 
     this.bodyEl = div('body');
     this.bodyEl.setAttribute('role', 'textbox');
@@ -237,7 +288,17 @@ export class NoteView implements Animatable {
       grips.append(el);
     }
 
-    this.faceEl.append(this.grainEl, art, this.sheenEl, header, this.bodyEl, curlWrap, grips);
+    this.inkInit = init.ink ?? null;
+    this.faceEl.append(
+      this.grainEl,
+      art,
+      header,
+      this.bodyEl,
+      this.glossRim,
+      this.sheenEl,
+      curlWrap,
+      grips,
+    );
     this.cardEl.append(this.faceEl);
     tilt.append(this.cardEl);
     note.append(this.shadowEl, tilt);
@@ -253,11 +314,15 @@ export class NoteView implements Animatable {
     for (const el of grips.children)
       el.addEventListener('pointerdown', this.onResizeGrab as EventListener);
     note.addEventListener('pointerdown', () => this.bringToFront());
+    note.addEventListener('keydown', this.onKeyDown);
+    this.actionsEl.addEventListener('click', this.onAction);
 
     host.layer.append(note);
+    if (this.inkInit && this.inkInit.strokes.length > 0) this.enableInk(false);
   }
 
   private readonly halftonePath: SVGPathElement;
+  private readonly inkInit: { strokes: InkStroke[]; w: number; h: number } | null;
   private readonly curlEl: SVGSVGElement;
 
   // ------------------------------------------------------------------ state
@@ -308,6 +373,135 @@ export class NoteView implements Animatable {
     this.resizeArt();
   }
 
+  // ----------------------------------------------------------------- actions
+
+  private readonly onAction = (e: Event): void => {
+    const btn = (e.target as HTMLElement).closest('.act');
+    if (!btn) return;
+    e.stopPropagation();
+    const name = [...btn.classList].find((c) => c.startsWith('act-'))?.slice(4);
+    switch (name) {
+      case 'pen':
+        this.enableInk(!this.ink?.isEnabled);
+        break;
+      case 'palette':
+        this.cyclePalette();
+        break;
+      case 'lock':
+        this.setLocked(!this.locked);
+        break;
+      case 'collapse':
+        this.setCollapsed(!this.collapsed);
+        break;
+      case 'delete':
+        this.host.onDelete?.(this);
+        break;
+    }
+  };
+
+  /**
+   * Keyboard, once a note has focus. Notes stay out of the page's tab order (plan section 6),
+   * so this only fires for a note the user deliberately focused -- it can never shadow a
+   * shortcut belonging to the host page.
+   */
+  private readonly onKeyDown = (e: KeyboardEvent): void => {
+    // Never interfere with typing, and never with an IME composition.
+    if (e.isComposing || e.keyCode === 229) return;
+    const root = this.el.getRootNode();
+    const active = root instanceof ShadowRoot ? root.activeElement : document.activeElement;
+
+    if (active === this.bodyEl) {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        this.bodyEl.blur();
+        this.el.focus({ preventScroll: true });
+      }
+      return;
+    }
+
+    const step = e.ctrlKey ? 25 : e.shiftKey ? 10 : 1;
+    switch (e.key) {
+      case 'ArrowLeft':
+      case 'ArrowRight':
+      case 'ArrowUp':
+      case 'ArrowDown': {
+        e.preventDefault();
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+        if (e.altKey) this.resize(this.w + dx * 10, this.h + dy * 10);
+        else this.moveTo(this.px.t + dx, this.py.t + dy);
+        this.host.onChange?.(this);
+        break;
+      }
+      case 'Enter':
+      case 'F2':
+        e.preventDefault();
+        this.focusBody();
+        break;
+      case 'Delete':
+      case 'Backspace':
+        e.preventDefault();
+        this.host.onDelete?.(this);
+        break;
+      case 'd':
+      case 'D':
+        this.enableInk(!this.ink?.isEnabled);
+        break;
+      case 'c':
+      case 'C':
+        this.cyclePalette();
+        break;
+      case 'l':
+      case 'L':
+        this.setLocked(!this.locked);
+        break;
+      case 'm':
+      case 'M':
+        this.setCollapsed(!this.collapsed);
+        break;
+      case 'z':
+      case 'Z':
+        if (this.ink?.undo()) this.host.onInk?.(this, this.ink.toJSON());
+        break;
+    }
+  };
+
+  // --------------------------------------------------------------------- ink
+
+  /** Turn the drawing layer on or off, creating it lazily the first time it is needed. */
+  enableInk(on: boolean): void {
+    if (!this.ink) {
+      this.ink = new InkLayer(
+        this.w,
+        this.h,
+        this.inkInit?.strokes ?? [],
+        { color: 'var(--cn-ink)', size: 7 },
+        (strokes) => this.host.onInk?.(this, { strokes, w: this.w, h: this.h }),
+      );
+      // Above the text so a drawing can annotate what is written, below the gloss.
+      this.faceEl.insertBefore(this.ink.el, this.sheenEl);
+    }
+    this.ink.setEnabled(on);
+    this.el.classList.toggle('is-inking', on);
+    this.actionsEl.querySelector('.act-pen')?.classList.toggle('is-on', on);
+    // Drawing and editing are mutually exclusive; a caret under a pen is only confusing.
+    this.bodyEl.setAttribute('contenteditable', on || this.locked ? 'false' : 'plaintext-only');
+  }
+
+  get inkJSON(): { strokes: InkStroke[]; w: number; h: number } | null {
+    return this.ink && this.ink.strokeCount > 0 ? this.ink.toJSON() : null;
+  }
+
+  clearInk(): void {
+    this.ink?.clear();
+  }
+
+  /** Step to the next palette. The fastest possible recolour, and it needs no popup. */
+  cyclePalette(): void {
+    const i = PALETTE_IDS.indexOf(this.style.palette);
+    this.setStyle({ palette: PALETTE_IDS[(i + 1) % PALETTE_IDS.length] as string });
+    this.host.onChange?.(this);
+  }
   /**
    * Slow every spring down by `scale` (1 = normal, 6 = six times slower).
    *
@@ -335,11 +529,42 @@ export class NoteView implements Animatable {
   setCollapsed(next: boolean): void {
     this.collapsed = next;
     this.el.classList.toggle('is-collapsed', next);
+    this.host.onChange?.(this);
+  }
+
+  get isCollapsed(): boolean {
+    return this.collapsed;
+  }
+
+  get styleNow(): NoteStyle {
+    return this.style;
   }
 
   setLocked(next: boolean): void {
     this.locked = next;
     this.applyEditable();
+    this.el.classList.toggle('is-locked', next);
+    this.actionsEl.querySelector('.act-lock')?.classList.toggle('is-on', next);
+    this.host.onChange?.(this);
+  }
+
+  /** Put the caret in the body. Used right after creating a note, so typing just works. */
+  focusBody(): void {
+    this.bringToFront();
+    this.bodyEl.focus({ preventScroll: true });
+    const sel = this.bodyEl.getRootNode() as Document | ShadowRoot;
+    const selection = (sel as Document).getSelection?.() ?? document.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(this.bodyEl);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  /** Placeholder text shown while the body is empty. */
+  setPlaceholder(text: string): void {
+    this.bodyEl.dataset.placeholder = text;
   }
 
   bringToFront(): void {
@@ -349,6 +574,8 @@ export class NoteView implements Animatable {
 
   destroy(): void {
     this.host.loop.remove(this);
+    this.ink?.destroy();
+    clearTimeout(this.artTimer);
     this.el.remove();
   }
 
@@ -408,6 +635,8 @@ export class NoteView implements Animatable {
     this.paperPath.ownerSVGElement?.setAttribute('viewBox', box);
     this.curlEl.setAttribute('viewBox', box);
     this.shadowEl.setAttribute('viewBox', box);
+
+    this.ink?.resize(w, h);
 
     const d = tornRectPath(w, h, this.id, { amplitude: this.style.tornEdges });
     this.paperPath.setAttribute('d', d);
@@ -627,9 +856,10 @@ export class NoteView implements Animatable {
       `translate3d(${(4 + lift * 10).toFixed(2)}px, ${(5 + lift * 14).toFixed(2)}px, 0) ` +
       `scale(${(1 + lift * 0.06).toFixed(4)})`;
     this.shadowEl.style.opacity = (0.18 + lift * 0.18).toFixed(3);
-    // Light appears to move across the sheet as it tilts. Two cheap writes, big payoff.
-    this.sheenEl.style.transform = `translate3d(${(-this.ry.x * 3).toFixed(2)}px, ${(this.rx.x * 2).toFixed(2)}px, 0)`;
-    this.sheenEl.style.opacity = (lift * 0.5).toFixed(3);
+    // Light sweeping across a coated sheet. The band travels far enough to read as a real
+    // reflection rather than a wash, and a little gloss stays even at rest.
+    this.sheenBand.style.transform = `translate3d(${(-this.ry.x * 15 - this.sk.x * 8).toFixed(2)}px, ${(this.rx.x * 9).toFixed(2)}px, 0)`;
+    this.sheenEl.style.opacity = (0.07 + lift * 0.78).toFixed(3);
 
     // Cross-fade between the two nearest pre-baked curl paths. Opacity only.
     const t = this.curl.x * (CURL_LEVELS - 1);

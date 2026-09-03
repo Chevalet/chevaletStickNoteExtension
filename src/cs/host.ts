@@ -60,6 +60,8 @@ const HOST_CSS = [
 ].join(';');
 
 export interface Host {
+  /** The host element itself. Needed to tell our own events apart from the page's. */
+  readonly rootEl: HTMLElement;
   readonly root: ShadowRoot;
   /** Layer for document-anchored notes: scrolls with the page for free. */
   readonly docLayer: HTMLDivElement;
@@ -131,6 +133,7 @@ export function createHost(sheet: CSSStyleSheet): Host {
   mo.observe(document.documentElement, { childList: true, subtree: false });
 
   return {
+    rootEl: el,
     root,
     docLayer,
     pinLayer,
