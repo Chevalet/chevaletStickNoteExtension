@@ -26,6 +26,7 @@ import {
   sharedOptions,
   SRC,
   TARGETS,
+  writeLocales,
   writeManifest,
 } from '../build.config.ts';
 
@@ -93,6 +94,7 @@ async function settle(): Promise<void> {
   state.generation++;
   if (state.ok) {
     await writeManifest().catch(() => {});
+    await writeLocales().catch(() => {});
     await copyStatic().catch(() => {});
     process.stdout.write(
       `  ${stamp()}  rebuilt #${state.generation}  (${errorsByTarget.size} bundles)\n`,

@@ -1,8 +1,318 @@
 {
-  "extName":        { "message": "شوالیه‌نوت" },
-  "extDescription": { "message": "استیکی‌نوت‌هایی که به خودِ صفحه می‌چسبند، نه به مرورگر. آفلاین، خصوصی، و همیشه قابل خروجی‌گرفتن." },
-  "cmdNewNote":     { "message": "نوت تازه روی این صفحه" },
-  "cmdToggleTab":   { "message": "روشن/خاموش کردن نوت‌ها برای این تب" },
-  "cmdCycleNotes":  { "message": "رفتن به نوت بعدی" },
-  "cmdOpenManager": { "message": "باز کردن مدیریت نوت‌ها" }
+  "extName": {
+    "message": "شوالیه‌نوت"
+  },
+  "extDescription": {
+    "message": "استیکی‌نوت‌هایی که به خودِ صفحه می‌چسبند، نه به مرورگر. آفلاین، خصوصی، و همیشه قابل خروجی‌گرفتن."
+  },
+  "cmdNewNote": {
+    "message": "نوت تازه روی این صفحه"
+  },
+  "cmdToggleTab": {
+    "message": "روشن/خاموش کردن نوت‌ها برای این تب"
+  },
+  "cmdCycleNotes": {
+    "message": "رفتن به نوت بعدی"
+  },
+  "cmdOpenManager": {
+    "message": "باز کردن مدیریت نوت‌ها"
+  },
+  "menuNewNote": {
+    "message": "یک نوت اینجا بچسبان"
+  },
+  "menuNoteOnSelection": {
+    "message": "یک نوت روی این متن"
+  },
+  "menuOpenManager": {
+    "message": "همهٔ نوت‌های من…"
+  },
+  "noteDraw": {
+    "message": "ترسیم"
+  },
+  "noteSettings": {
+    "message": "تنظیمات"
+  },
+  "noteColour": {
+    "message": "رنگ بعدی"
+  },
+  "noteLock": {
+    "message": "قفل"
+  },
+  "noteCollapse": {
+    "message": "جمع کردن"
+  },
+  "noteExpand": {
+    "message": "باز کردن"
+  },
+  "noteDelete": {
+    "message": "حذف"
+  },
+  "notePen": {
+    "message": "قلم"
+  },
+  "noteEraser": {
+    "message": "پاک‌کن"
+  },
+  "noteThickness": {
+    "message": "ضخامت"
+  },
+  "noteEraseAll": {
+    "message": "پاک کردن همه"
+  },
+  "noteDrawingHint": {
+    "message": "در حال ترسیم — Esc برای خروج"
+  },
+  "notePlaceholder": {
+    "message": "برای نوشتن کلیک کن. Markdown کار می‌کند."
+  },
+  "setPaper": {
+    "message": "کاغذ"
+  },
+  "setType": {
+    "message": "نوشته"
+  },
+  "setMaterial": {
+    "message": "جنس"
+  },
+  "setPalette": {
+    "message": "پالت"
+  },
+  "setInk": {
+    "message": "جوهر"
+  },
+  "setAccent": {
+    "message": "تأکید"
+  },
+  "setFont": {
+    "message": "فونت"
+  },
+  "setSize": {
+    "message": "اندازه"
+  },
+  "setLineHeight": {
+    "message": "ارتفاع خط"
+  },
+  "setDirection": {
+    "message": "جهت"
+  },
+  "setDirAuto": {
+    "message": "خودکار (هر پاراگراف)"
+  },
+  "setDirLtr": {
+    "message": "چپ به راست"
+  },
+  "setDirRtl": {
+    "message": "راست به چپ"
+  },
+  "setAlign": {
+    "message": "تراز"
+  },
+  "setOpacity": {
+    "message": "شفافیت"
+  },
+  "setTornEdge": {
+    "message": "لبه‌ی پاره"
+  },
+  "setGrain": {
+    "message": "دانه"
+  },
+  "setTape": {
+    "message": "چسب"
+  },
+  "setShadow": {
+    "message": "سایه"
+  },
+  "setMotion": {
+    "message": "حرکت"
+  },
+  "setSaveDefault": {
+    "message": "ذخیره به‌عنوان پیش‌فرض من"
+  },
+  "setResetNote": {
+    "message": "بازنشانی این نوت"
+  },
+  "setCustomHint": {
+    "message": "سفارشی. کلیک کن تا دوباره از پیش‌فرض پیروی کند."
+  },
+  "optTitle": {
+    "message": "تنظیمات"
+  },
+  "optWhereNotes": {
+    "message": "نوت‌ها کجا ظاهر شوند"
+  },
+  "optCloseWarning": {
+    "message": "هشدار قبل از بسته شدن تب"
+  },
+  "optKeeping": {
+    "message": "نگه‌داری و حذف"
+  },
+  "optBackup": {
+    "message": "بکاپ"
+  },
+  "optSurvives": {
+    "message": "نوت‌هایت از چه چیزهایی جان سالم می‌برند"
+  },
+  "optPrivacy": {
+    "message": "حریم خصوصی"
+  },
+  "optSaved": {
+    "message": "ذخیره شد."
+  },
+  "optLanguage": {
+    "message": "زبان"
+  },
+  "optFollowBrowser": {
+    "message": "پیروی از مرورگر"
+  },
+  "mgrTitle": {
+    "message": "کمد"
+  },
+  "mgrSearch": {
+    "message": "جستجو در همه‌ی نوت‌ها…"
+  },
+  "mgrAllNotes": {
+    "message": "همه‌ی نوت‌ها"
+  },
+  "mgrTrash": {
+    "message": "سطل زباله"
+  },
+  "mgrBackToNotes": {
+    "message": "بازگشت به نوت‌ها"
+  },
+  "mgrCabinetView": {
+    "message": "کمد"
+  },
+  "mgrListView": {
+    "message": "فهرست"
+  },
+  "mgrExport": {
+    "message": "خروجی ZIP"
+  },
+  "mgrExportSelection": {
+    "message": "خروجی انتخاب‌شده‌ها"
+  },
+  "mgrImport": {
+    "message": "ورود…"
+  },
+  "mgrSelected": {
+    "message": "انتخاب‌شده"
+  },
+  "mgrClear": {
+    "message": "پاک کردن"
+  },
+  "mgrRestore": {
+    "message": "بازیابی"
+  },
+  "mgrMoveToTrash": {
+    "message": "انتقال به سطل زباله"
+  },
+  "mgrDeleteForever": {
+    "message": "حذف همیشگی"
+  },
+  "mgrUntitled": {
+    "message": "(بی‌عنوان)"
+  },
+  "mgrEmptyDrawer": {
+    "message": "این کشو خالی است"
+  },
+  "mgrEmptyHint": {
+    "message": "یک نوت روی صفحه بچسبان تا خودش اینجا بایگانی شود."
+  },
+  "mgrNoMatch": {
+    "message": "چیزی با این پیدا نشد"
+  },
+  "mgrNoMatchHint": {
+    "message": "کلمات کمتری امتحان کن، یا جستجو را پاک کن."
+  },
+  "mgrTrashHint": {
+    "message": "نوت‌های حذف‌شده ۳۰ روز اینجا می‌مانند."
+  },
+  "mgrNotes": {
+    "message": "نوت"
+  },
+  "mgrSites": {
+    "message": "سایت"
+  },
+  "mgrInTrash": {
+    "message": "در سطل زباله"
+  },
+  "mgrCancel": {
+    "message": "انصراف"
+  },
+  "impTitle": {
+    "message": "ورود آرشیو"
+  },
+  "impNothingWritten": {
+    "message": "هنوز چیزی نوشته نشده است."
+  },
+  "impKeepNewest": {
+    "message": "جدیدترین را نگه دار"
+  },
+  "impArchiveWins": {
+    "message": "آرشیو اولویت دارد"
+  },
+  "impAsCopies": {
+    "message": "ورود به‌عنوان کپی"
+  },
+  "impNew": {
+    "message": "جدید"
+  },
+  "impUpdated": {
+    "message": "به‌روزشده"
+  },
+  "impSkipped": {
+    "message": "دست‌نخورده (نسخه‌ی اینجا جدیدتر است)"
+  },
+  "popEnabled": {
+    "message": "نوت‌ها برای این تب روشن"
+  },
+  "popDisabled": {
+    "message": "نوت‌ها برای این تب خاموش"
+  },
+  "popNewNote": {
+    "message": "نوت تازه"
+  },
+  "popOpenCabinet": {
+    "message": "باز کردن کمد"
+  },
+  "popGrantSite": {
+    "message": "اجازه در این سایت"
+  },
+  "popGrantDomain": {
+    "message": "اجازه در این دامنه"
+  },
+  "popGrantAll": {
+    "message": "اجازه در همه‌ی سایت‌ها"
+  },
+  "popNoAccess": {
+    "message": "شوالیه‌نوت هنوز به این سایت دسترسی ندارد."
+  },
+  "popReopen": {
+    "message": "باز کردن مجدد"
+  },
+  "popClosedWithNotes": {
+    "message": "با نوت بسته شد"
+  },
+  "guardWillWarn": {
+    "message": "قبل از بسته شدن این تب هشدار می‌دهد."
+  },
+  "guardBestEffort": {
+    "message": "هشدار بستن تب «تا حد امکان» است: مرورگرها فقط در صفحه‌هایی اجازه می‌دهند که با آن‌ها تعامل داشته‌ای. نوت‌هایت در هر صورت ذخیره می‌شوند.",
+    "description": "Shown in options next to the close-warning setting. Must not over-promise."
+  },
+  "guardModeNever": {
+    "message": "هرگز هشدار نده"
+  },
+  "guardModeUnsaved": {
+    "message": "اگر تغییر ذخیره‌نشده هست هشدار بده"
+  },
+  "guardModeHasNotes": {
+    "message": "هر وقت صفحه نوت دارد هشدار بده"
+  },
+  "durabilitySurvives": {
+    "message": "نوت‌های تو با پاک کردن داده‌های مرورگر از بین نمی‌روند."
+  },
+  "durabilityLost": {
+    "message": "با «Refresh Firefox» یا حذف اکستنشن از بین می‌روند — و بکاپ ZIP دقیقاً برای همین است."
+  }
 }

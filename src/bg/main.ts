@@ -2,105 +2,616 @@
  * Background entry -- a Firefox MV3 *event page*, not a service worker.
  *
  * THE RULE THIS FILE EXISTS TO ENFORCE (plan section 1.1):
- * every `addListener` call must run at module top level, synchronously, before any `await`.
- * The event page is spun up to deliver an event; a listener registered after an await is
- * registered too late and the event is silently dropped. That failure mode is intermittent
- * and miserable to debug, so all registration lives here and nowhere else.
+ * every `addListener` call runs at module top level, synchronously, before any `await`. The
+ * event page is spun up in order to deliver an event; a listener registered after an await is
+ * registered too late and the event is dropped. That failure is intermittent and miserable to
+ * debug, so all registration lives here and nowhere else.
  *
- * Handlers themselves are async and start with `await ready()`, which lazily opens the
- * database and rehydrates the small amount of state the background keeps.
+ * Handlers are async and start with `await ready()`, which lazily opens the database. The
+ * background keeps deliberately little in memory: at ten thousand notes, rebuilding an index
+ * would cost 60-150ms on every wake, and the event page wakes dozens of times a minute while
+ * someone is browsing. An IndexedDB index lookup answers the same question in about 1ms.
  */
 
-import { DEFAULT_URL_MATCH } from '~/shared/types.ts';
-import { errReply, type HelloReply, okReply, PROTOCOL_V, type Reply } from './msg/protocol.ts';
-import { normalizeUrlFull, presetQueryPolicy } from './scope/normalize.ts';
+import { t } from '~/shared/i18n.ts';
+import type { NoteId } from '~/shared/types.ts';
+import {
+  countForContext,
+  createNote,
+  getNote,
+  type NotePatch,
+  notesForContext,
+  patchNote,
+  purgeNote,
+  trashNote,
+} from './db/notes.ts';
+import { openDb } from './db/open.ts';
+import type { NoteRecord } from './db/schema.ts';
+import { allocate, DISARM_DELAY_MS, type TabGuardState } from './guard/budget.ts';
+import { injectNow, mayAccess, syncRegistrations } from './inject.ts';
+import {
+  errReply,
+  type HelloReply,
+  type NoteWire,
+  okReply,
+  PROTOCOL_V,
+  type Reply,
+} from './msg/protocol.ts';
+import {
+  DEFAULT_UI,
+  sanitizeStyle,
+  sanitizeTags,
+  sanitizeText,
+  sanitizeUi,
+} from './msg/sanitize.ts';
+import { defaultScopeFor, matchContext } from './scope/match.ts';
+import { isEnabledFor, loadSettings, type Settings } from './settings.ts';
+import { forgetTab, getTabFlags, resolveTabKey, setTabEnabled } from './tabs/identity.ts';
 
 declare const __DEV__: boolean;
 declare const __VERSION__: string;
 
-// --------------------------------------------------------------------------- listeners
+// --------------------------------------------------------------------- listeners
 
 browser.runtime.onMessage.addListener(onMessage);
-browser.runtime.onInstalled.addListener(onInstalled);
-browser.runtime.onStartup.addListener(() => void ready());
+browser.runtime.onInstalled.addListener((d) => void onInstalled(d));
+browser.runtime.onStartup.addListener(() => void onStartup());
 browser.commands.onCommand.addListener((name) => void onCommand(name));
+browser.menus.onClicked.addListener((info, tab) => void onMenuClicked(info, tab));
+// A granted or revoked origin changes which pages we are registered on. These fire in the
+// background even when the popup is what did the granting.
+browser.permissions.onAdded.addListener(() => void onPermissionsChanged(true));
+browser.permissions.onRemoved.addListener(() => void onPermissionsChanged(false));
+browser.tabs.onRemoved.addListener((tabId, info) => void onTabRemoved(tabId, info));
+browser.tabs.onUpdated.addListener((tabId, change, tab) => void onTabUpdated(tabId, change, tab));
+browser.storage.onChanged.addListener((_changes, area) => {
+  // Settings changed somewhere. Drop the cache; the next read picks it up.
+  if (area === 'local') settingsCache = null;
+});
 // No action.onClicked listener: the manifest declares a default_popup, so it never fires.
 
-// --------------------------------------------------------------------------- init
+// ------------------------------------------------------------------------ state
 
+interface TabRuntime {
+  noteCount: number;
+  hasUnsaved: boolean;
+  lastEdit: number;
+  /** Notes in a private window that will never be written really do vanish on close. */
+  volatile: boolean;
+}
+
+const tabRuntime = new Map<number, TabRuntime>();
+const armedTabs = new Set<number>();
+let settingsCache: Settings | null = null;
 let readyPromise: Promise<void> | null = null;
+let allocationTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Memoized rehydration. Cheap on purpose: the background holds no note index (plan §11). */
 function ready(): Promise<void> {
   readyPromise ??= (async () => {
-    // TODO(phase 1): open IndexedDB, load settings, rehydrate the tabId<->tabKey map.
+    await openDb().catch(() => undefined);
     if (__DEV__) console.warn(`[cn bg] ready, v${__VERSION__}`);
   })();
   return readyPromise;
 }
 
+async function settings(): Promise<Settings> {
+  settingsCache ??= await loadSettings();
+  return settingsCache;
+}
+
+// ------------------------------------------------------------------- lifecycle
+
 async function onInstalled(details: browser.runtime._OnInstalledDetails): Promise<void> {
   await ready();
-  if (details.reason === 'update') {
-    // Content scripts from the previous version are orphaned and will throw
-    // "Extension context invalidated" on their next message. Tell them to tear down.
-    // TODO(phase 2): re-inject fresh copies into matching loaded tabs.
+  await buildMenus();
+  await syncRegistrations();
+  if (details.reason !== 'update') return;
+  // Content scripts from the previous version are orphaned: their next message throws
+  // "Extension context invalidated". Tell the ones still loaded to tear down cleanly.
+  for (const tab of await browser.tabs.query({}).catch(() => [])) {
+    if (tab.id === undefined) continue;
+    void tell(tab.id, { t: 'teardown', reason: 'update' });
   }
 }
 
-// --------------------------------------------------------------------------- messages
+async function onStartup(): Promise<void> {
+  await ready();
+  tabRuntime.clear();
+  armedTabs.clear();
+  await buildMenus();
+  // `persistAcrossSessions` should have carried these across the restart, but re-syncing is
+  // cheap and a registration that silently failed to persist would mean an extension that
+  // does nothing until reinstalled.
+  await syncRegistrations();
+}
+
+/**
+ * A permission was granted or revoked.
+ *
+ * On a grant we also inject into the tab in front of the user, because registration only
+ * affects future navigations -- see inject.ts. On a revoke the pages we can no longer touch
+ * are told to tear themselves down, so no note is left on screen that we cannot save.
+ */
+async function onPermissionsChanged(granted: boolean): Promise<void> {
+  await ready();
+  await syncRegistrations();
+
+  if (granted) {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id !== undefined) await injectNow(tab.id);
+    return;
+  }
+
+  for (const tabId of [...tabRuntime.keys()]) {
+    const tab = await browser.tabs.get(tabId).catch(() => null);
+    if (!tab?.url) continue;
+    if (!(await mayAccess(tab.url))) {
+      void tell(tabId, { t: 'teardown', reason: 'revoked' });
+      tabRuntime.delete(tabId);
+    }
+  }
+  scheduleAllocation();
+}
+
+async function onTabRemoved(tabId: number, info: browser.tabs._OnRemovedRemoveInfo): Promise<void> {
+  const had = tabRuntime.get(tabId);
+  tabRuntime.delete(tabId);
+  armedTabs.delete(tabId);
+  forgetTab(tabId);
+
+  // The recovery affordance. Nothing was lost -- the note reached the database well before
+  // `beforeunload` could run -- but a visible "that tab had notes" is what stops the worry.
+  if (had && had.noteCount > 0) {
+    await browser.action.setBadgeText({ text: '↩' }).catch(() => undefined);
+    await browser.action.setBadgeBackgroundColor({ color: '#ff2e63' }).catch(() => undefined);
+    setTimeout(() => void browser.action.setBadgeText({ text: '' }).catch(() => undefined), 15_000);
+    if (__DEV__) {
+      console.warn(
+        `[cn bg] tab ${tabId} closed with ${had.noteCount} note(s)${info.isWindowClosing ? ' (window closing)' : ''}`,
+      );
+    }
+  }
+  scheduleAllocation();
+}
+
+async function onTabUpdated(
+  tabId: number,
+  change: browser.tabs._OnUpdatedChangeInfo,
+  tab: browser.tabs.Tab,
+): Promise<void> {
+  if (change.discarded !== undefined) {
+    // No content process means no listener, so the slot should go to a tab that can use it.
+    scheduleAllocation();
+    return;
+  }
+  if (change.status !== 'complete' || !tab.url) return;
+  await ready();
+  await refreshTab(tabId, tab.url, Boolean(tab.incognito));
+}
+
+/** Recount a tab's notes and re-run the guard allocation. */
+async function refreshTab(tabId: number, url: string, incognito: boolean): Promise<void> {
+  const s = await settings();
+  const key = await resolveTabKey(tabId);
+  const ctx = matchContext(url, key ?? undefined);
+  if (!ctx) {
+    tabRuntime.delete(tabId);
+    scheduleAllocation();
+    return;
+  }
+  const count = await countForContext(ctx).catch(() => 0);
+  const previous = tabRuntime.get(tabId);
+  tabRuntime.set(tabId, {
+    noteCount: count,
+    hasUnsaved: previous?.hasUnsaved ?? false,
+    lastEdit: previous?.lastEdit ?? 0,
+    volatile: incognito && !s.persistPrivateNotes && count > 0,
+  });
+  scheduleAllocation();
+}
+
+// ------------------------------------------------------------------- the guard
+
+/**
+ * Re-run the allocation, coalesced.
+ *
+ * A window closing produces a burst of `onRemoved`, and a page load produces several
+ * `onUpdated`. Allocating once per burst rather than once per event keeps this cheap.
+ */
+function scheduleAllocation(): void {
+  if (allocationTimer) clearTimeout(allocationTimer);
+  allocationTimer = setTimeout(() => void applyAllocation(), 120);
+}
+
+async function applyAllocation(): Promise<void> {
+  const s = await settings();
+  const now = Date.now();
+
+  const tabs: TabGuardState[] = [];
+  for (const [tabId, st] of tabRuntime) {
+    tabs.push({
+      tabId,
+      noteCount: st.noteCount,
+      // An edit counts as unsaved until the write is confirmed AND a grace window has
+      // passed. Dropping the listener the instant a write lands would leave the guard absent
+      // during exactly the gap that matters -- see DISARM_DELAY_MS.
+      hasUnsaved: st.hasUnsaved || now - st.lastEdit < DISARM_DELAY_MS,
+      discarded: false,
+      // Only a volatile note is genuinely at risk; a URL-scoped one reappears by itself.
+      onlyPortableNotes: !st.volatile,
+      volatile: st.volatile,
+      msSinceEdit: now - st.lastEdit,
+    });
+  }
+
+  const { armed, disarmed } = allocate(tabs, s.guard);
+
+  for (const tabId of armed) {
+    if (armedTabs.has(tabId)) continue;
+    armedTabs.add(tabId);
+    void tell(tabId, { t: 'guard/set', armed: true, reason: 'policy' });
+  }
+  for (const tabId of disarmed) {
+    if (!armedTabs.has(tabId)) continue;
+    armedTabs.delete(tabId);
+    void tell(tabId, { t: 'guard/set', armed: false, reason: 'budget' });
+  }
+}
+
+/** Send to a tab, tolerating the very common "no content script there" case. */
+async function tell(tabId: number, message: unknown): Promise<void> {
+  await browser.tabs.sendMessage(tabId, message).catch(() => undefined);
+}
+
+// -------------------------------------------------------------------- messages
 
 async function onMessage(
   msg: unknown,
   sender: browser.runtime.MessageSender,
 ): Promise<Reply<unknown>> {
   await ready();
-  const t = (msg as { t?: string } | null)?.t;
+  const type = (msg as { t?: string } | null)?.t;
 
-  switch (t) {
-    case 'hello': {
-      const m = msg as { url: string; protocolV: number };
-      if (m.protocolV !== PROTOCOL_V) return errReply('PROTOCOL', `expected v${PROTOCOL_V}`);
+  switch (type) {
+    case 'hello':
+      return hello(msg as { url: string; protocolV: number }, sender);
 
-      // `sender.tab.id` is authoritative -- a content script never names its own tab.
+    case 'guard/state': {
+      // `sender.tab.id` is authoritative. A content script never gets to name a tab.
       const tabId = sender.tab?.id;
       if (tabId === undefined) return errReply('INTERNAL', 'no sender tab');
-
-      const parsed = normalizeUrlFull(m.url, {
-        ...DEFAULT_URL_MATCH,
-        query: presetQueryPolicy(safeHostname(m.url)),
+      const m = msg as { hasUnsaved: boolean; noteCount: number };
+      const previous = tabRuntime.get(tabId);
+      tabRuntime.set(tabId, {
+        noteCount: m.noteCount,
+        hasUnsaved: m.hasUnsaved,
+        lastEdit: m.hasUnsaved ? Date.now() : (previous?.lastEdit ?? 0),
+        volatile: previous?.volatile ?? false,
       });
-
-      const hello: HelloReply = {
-        protocolV: PROTOCOL_V,
-        version: __VERSION__,
-        enabled: true,
-        urlKey: parsed?.key ?? null,
-        noteCount: 0, // TODO(phase 2): index lookup
-        notes: [],
-      };
-      return okReply(hello);
+      scheduleAllocation();
+      return okReply({ armed: armedTabs.has(tabId) });
     }
 
+    case 'popup/status': {
+      const tabId = (msg as { tabId: number }).tabId;
+      const st = tabRuntime.get(tabId);
+      const flags = await getTabFlags(tabId);
+      return okReply({
+        noteCount: st?.noteCount ?? (await countFor(tabId)),
+        guardArmed: armedTabs.has(tabId),
+        ...(flags.enabled === undefined ? {} : { tabOverride: flags.enabled }),
+      });
+    }
+
+    case 'tab/setEnabled': {
+      const m = msg as { tabId: number; enabled: boolean };
+      await setTabEnabled(m.tabId, m.enabled);
+      await tell(m.tabId, { t: 'tab/enabled', enabled: m.enabled });
+      if (!m.enabled) {
+        tabRuntime.delete(m.tabId);
+        scheduleAllocation();
+      }
+      return okReply({ enabled: m.enabled });
+    }
+
+    case 'notes/forContext': {
+      const tabId = sender.tab?.id;
+      if (tabId === undefined) return errReply('INTERNAL', 'no sender tab');
+      const ctx = matchContext(
+        (msg as { url: string }).url,
+        (await resolveTabKey(tabId)) ?? undefined,
+      );
+      if (!ctx) return okReply({ notes: [] });
+      const records = await notesForContext(ctx).catch(() => []);
+      return okReply({ notes: records.map(toWire) });
+    }
+
+    case 'note/create': {
+      const tabId = sender.tab?.id;
+      if (tabId === undefined) return errReply('INTERNAL', 'no sender tab');
+      return createFor(msg as CreateMsg, tabId, sender);
+    }
+
+    case 'note/patch': {
+      const m = msg as { id: NoteId; rev: number; patch: NotePatch };
+      // rev 0 means "I am the only writer, do not check" -- the content script's own autosave
+      // of a note nobody else is touching. A real base rev IS checked, so a genuine race with
+      // the manager page is reported rather than silently clobbered.
+      const base = m.rev > 0 ? m.rev : undefined;
+      const result = await patchNote(m.id, sanitizePatch(m.patch), base);
+      if (!result.ok) {
+        // Hand back what is actually stored, so the caller can reconcile rather than guess.
+        if (result.code === 'STALE_REV') return errReply('STALE_REV', String(result.current.rev));
+        return errReply('NOT_FOUND');
+      }
+      touch(sender.tab?.id);
+      return okReply({ rev: result.note.rev, updatedAt: result.note.updatedAt });
+    }
+
+    case 'note/delete': {
+      const m = msg as { id: NoteId; soft: boolean };
+      // Soft by default, always. A note is someone's writing, and an undo that lives for a few
+      // seconds in one tab is not an undo -- the trash in the manager is.
+      if (m.soft) {
+        if (!(await trashNote(m.id))) return errReply('NOT_FOUND');
+      } else {
+        if (!(await getNote(m.id))) return errReply('NOT_FOUND');
+        await purgeNote(m.id);
+      }
+      const tabId = sender.tab?.id;
+      if (tabId !== undefined) {
+        const st = tabRuntime.get(tabId);
+        if (st) st.noteCount = Math.max(0, st.noteCount - 1);
+        scheduleAllocation();
+      }
+      return okReply({ trashed: m.soft });
+    }
+
+    case 'command':
+      await onCommand((msg as { name: string }).name);
+      return okReply(null);
+
     default:
-      return errReply('SCHEMA', `unknown message: ${String(t)}`);
+      return errReply('SCHEMA', `unknown message: ${String(type)}`);
   }
 }
 
-function safeHostname(url: string): string {
+async function hello(
+  m: { url: string; protocolV: number },
+  sender: browser.runtime.MessageSender,
+): Promise<Reply<HelloReply>> {
+  if (m.protocolV !== PROTOCOL_V) return errReply('PROTOCOL', `expected v${PROTOCOL_V}`);
+
+  const tabId = sender.tab?.id;
+  if (tabId === undefined) return errReply('INTERNAL', 'no sender tab');
+
+  const s = await settings();
+  const key = await resolveTabKey(tabId);
+  const ctx = matchContext(m.url, key ?? undefined);
+
+  const quiet: HelloReply = {
+    protocolV: PROTOCOL_V,
+    version: __VERSION__,
+    enabled: false,
+    urlKey: null,
+    noteCount: 0,
+    notes: [],
+  };
+  if (!ctx) return okReply(quiet);
+
+  const flags = await getTabFlags(tabId);
+  const enabled = isEnabledFor(s, ctx.origin, flags.enabled);
+  if (!enabled) return okReply(quiet);
+
+  const records = await notesForContext(ctx).catch(() => []);
+
+  tabRuntime.set(tabId, {
+    noteCount: records.length,
+    hasUnsaved: false,
+    lastEdit: 0,
+    volatile: Boolean(sender.tab?.incognito) && !s.persistPrivateNotes && records.length > 0,
+  });
+  scheduleAllocation();
+
+  return okReply({
+    protocolV: PROTOCOL_V,
+    version: __VERSION__,
+    enabled: true,
+    urlKey: null,
+    noteCount: records.length,
+    notes: records.map(toWire),
+  });
+}
+
+async function countFor(tabId: number): Promise<number> {
+  const tab = await browser.tabs.get(tabId).catch(() => null);
+  if (!tab?.url) return 0;
+  const ctx = matchContext(tab.url, (await resolveTabKey(tabId)) ?? undefined);
+  return ctx ? await countForContext(ctx).catch(() => 0) : 0;
+}
+
+// ---------------------------------------------------------------------- writes
+
+type CreateMsg = {
+  url: string;
+  note?: Partial<Omit<NoteWire, 'id' | 'rev' | 'updatedAt'>> & { body?: { text?: string } };
+};
+
+async function createFor(
+  m: CreateMsg,
+  tabId: number,
+  sender: browser.runtime.MessageSender,
+): Promise<Reply<{ note: NoteWire }>> {
+  const s = await settings();
+  const flags = await getTabFlags(tabId);
+  const ctx = matchContext(m.url, (await resolveTabKey(tabId)) ?? undefined);
+  if (!ctx) return errReply('READONLY', 'notes are not available on this page');
+  if (!isEnabledFor(s, ctx.origin, flags.enabled)) {
+    return errReply('READONLY', 'notes are turned off for this tab');
+  }
+
+  // The scope comes from the sender's own URL, never from the message body.
+  const scope = defaultScopeFor(m.url);
+  if (!scope) return errReply('READONLY', 'this page cannot be annotated');
+
+  const incoming = m.note ?? {};
+  const record = await createNote({
+    scope,
+    text: sanitizeText(incoming.body?.text),
+    ui: sanitizeUi(incoming.ui),
+    anchor: incoming.anchor ?? null,
+    style: sanitizeStyle(incoming.style),
+    tags: sanitizeTags(incoming.tags),
+    context: {
+      url: m.url,
+      title: sender.tab?.title ?? '',
+      ...(sender.tab?.favIconUrl ? { favIconUrl: sender.tab.favIconUrl } : {}),
+    },
+  });
+
+  const st = tabRuntime.get(tabId);
+  const privateAndUnwritten = Boolean(sender.tab?.incognito) && !s.persistPrivateNotes;
+  tabRuntime.set(tabId, {
+    noteCount: (st?.noteCount ?? 0) + 1,
+    hasUnsaved: false,
+    lastEdit: Date.now(),
+    volatile: privateAndUnwritten || (st?.volatile ?? false),
+  });
+  scheduleAllocation();
+
+  return okReply({ note: toWire(record) });
+}
+
+/**
+ * A patch is a write too.
+ *
+ * Creation was clamped and patching was not, which meant every bound could be walked straight
+ * past by editing a note instead of making one. `ui` is merged over the stored value rather
+ * than replaced, so a patch that only moves a note keeps its size.
+ */
+function sanitizePatch(patch: NotePatch): NotePatch {
+  const out: NotePatch = {};
+  if (patch.body !== undefined) out.body = { text: sanitizeText(patch.body.text) };
+  if (patch.ui !== undefined) {
+    // Sparse: only the keys actually sent are clamped and written.
+    const full = sanitizeUi({ ...DEFAULT_UI, ...patch.ui });
+    const partial: Partial<NoteWire['ui']> = {};
+    for (const k of Object.keys(patch.ui) as Array<keyof NoteWire['ui']>) {
+      if (k in full) (partial as Record<string, unknown>)[k] = full[k];
+    }
+    out.ui = partial;
+  }
+  if (patch.style !== undefined) out.style = sanitizeStyle(patch.style);
+  if (patch.tags !== undefined) out.tags = sanitizeTags(patch.tags);
+  if (patch.anchor !== undefined) out.anchor = patch.anchor;
+  if (patch.ink !== undefined) out.ink = patch.ink;
+  // `scope` is deliberately NOT copied. A content script does not get to move a note to
+  // another page's notes; that is the manager's job, and it runs in our own context.
+  return out;
+}
+
+/** Note the moment of a write, so the guard's "most recently edited" ordering is real. */
+function touch(tabId: number | undefined): void {
+  if (tabId === undefined) return;
+  const st = tabRuntime.get(tabId);
+  if (st) st.lastEdit = Date.now();
+}
+
+/**
+ * Stored record -> wire shape.
+ *
+ * The index columns and field clocks stay in the background: they are an implementation detail
+ * of how notes are found, and a content script that cannot see them cannot come to depend on
+ * them.
+ */
+function toWire(r: NoteRecord): NoteWire {
+  return {
+    id: r.id,
+    rev: r.rev,
+    scope: r.scope,
+    body: { format: 'md', text: r.body.text },
+    ui: r.ui,
+    anchor: r.anchor,
+    style: r.style,
+    tags: r.tags,
+    updatedAt: r.updatedAt,
+    ...(r.ink ? { ink: r.ink } : {}),
+  } as NoteWire;
+}
+
+// ----------------------------------------------------------------------- menu
+
+const MENU_NEW = 'cn-new-note';
+const MENU_SELECTION = 'cn-note-on-selection';
+const MENU_MANAGER = 'cn-open-manager';
+
+/**
+ * Build the context menu.
+ *
+ * Idempotent, because it runs on install and on every browser start, and `create` throws on a
+ * duplicate id. `removeAll` first is cheaper than tracking what already exists.
+ */
+async function buildMenus(): Promise<void> {
+  await browser.menus.removeAll().catch(() => undefined);
+  const contexts: browser.menus.ContextType[] = ['page', 'image', 'link'];
   try {
-    return new URL(url).hostname;
-  } catch {
-    return '';
+    browser.menus.create({
+      id: MENU_NEW,
+      title: t('menuNewNote'),
+      contexts,
+    });
+    browser.menus.create({
+      id: MENU_SELECTION,
+      title: t('menuNoteOnSelection'),
+      contexts: ['selection'],
+    });
+    browser.menus.create({
+      id: MENU_MANAGER,
+      title: t('menuOpenManager'),
+      contexts: ['page', 'selection', 'browser_action'],
+    });
+  } catch (e) {
+    if (__DEV__) console.warn('[cn bg] menu build failed', e);
   }
 }
 
-// --------------------------------------------------------------------------- commands
+async function onMenuClicked(
+  info: browser.menus.OnClickData,
+  tab: browser.tabs.Tab | undefined,
+): Promise<void> {
+  await ready();
+  if (info.menuItemId === MENU_MANAGER) return openManager();
+  if (tab?.id === undefined) return;
+
+  // targetElementId is the whole point of using menus rather than a shortcut here: it lets the
+  // content script ask the browser which element was right-clicked, so the note lands where
+  // the person actually pointed instead of in a corner.
+  await tell(tab.id, {
+    t: 'command',
+    name: info.menuItemId === MENU_SELECTION ? 'note-on-selection' : 'new-note',
+    ...(info.targetElementId === undefined ? {} : { targetElementId: info.targetElementId }),
+  });
+}
+
+// -------------------------------------------------------------------- commands
 
 async function onCommand(name: string): Promise<void> {
   await ready();
   if (name === 'open-manager') return openManager();
-  // TODO(phase 3): new-note / toggle-tab / cycle-notes forward to the active tab.
+
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+  if (tab?.id === undefined) return;
+
+  if (name === 'toggle-tab') {
+    const flags = await getTabFlags(tab.id);
+    const next = !(flags.enabled ?? true);
+    await setTabEnabled(tab.id, next);
+    await tell(tab.id, { t: 'tab/enabled', enabled: next });
+    return;
+  }
+
+  // new-note and cycle-notes belong to the renderer, which may not be loaded there yet.
+  await tell(tab.id, { t: 'command', name });
 }
 
 async function openManager(): Promise<void> {

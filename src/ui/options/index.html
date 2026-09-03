@@ -5,25 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chevalet Note — settings</title>
 <style>
-  :root { color-scheme: light dark; }
-  body {
-    margin: 0 auto;
-    max-width: 860px;
-    padding: 24px;
-    background: #f4efe2;
-    color: #14110e;
-    font: 14px/1.5 system-ui, "Segoe UI", sans-serif;
-  }
-  #app:empty::after {
-    content: "loading6";
-    display: block;
-    padding: 20px;
-    opacity: 0.5;
+  html { background: #f2ece0; }
+  body:empty::after {
+    content: "loading…";
+    display: block; padding: 28px;
+    font: 13px ui-monospace, monospace; color: #6f665a;
   }
 </style>
 </head>
-<body>
-<div id="app"></div>
+<body></body>
 <script src="options.js"></script>
-</body>
 </html>

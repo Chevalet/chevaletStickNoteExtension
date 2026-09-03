@@ -1,8 +1,318 @@
 {
-  "extName":        { "message": "Chevalet Note" },
-  "extDescription": { "message": "Sticky notes that stay stuck to the page — not to your browser. Offline, private, and yours to export." },
-  "cmdNewNote":     { "message": "New note on this page" },
-  "cmdToggleTab":   { "message": "Turn notes on or off for this tab" },
-  "cmdCycleNotes":  { "message": "Focus the next note" },
-  "cmdOpenManager": { "message": "Open the note manager" }
+  "extName": {
+    "message": "Chevalet Note"
+  },
+  "extDescription": {
+    "message": "Sticky notes that stay stuck to the page — not to your browser. Offline, private, and yours to export."
+  },
+  "cmdNewNote": {
+    "message": "New note on this page"
+  },
+  "cmdToggleTab": {
+    "message": "Turn notes on or off for this tab"
+  },
+  "cmdCycleNotes": {
+    "message": "Focus the next note"
+  },
+  "cmdOpenManager": {
+    "message": "Open the note manager"
+  },
+  "menuNewNote": {
+    "message": "Add a note here"
+  },
+  "menuNoteOnSelection": {
+    "message": "Add a note on this text"
+  },
+  "menuOpenManager": {
+    "message": "All my notes…"
+  },
+  "noteDraw": {
+    "message": "Draw"
+  },
+  "noteSettings": {
+    "message": "Settings"
+  },
+  "noteColour": {
+    "message": "Next colour"
+  },
+  "noteLock": {
+    "message": "Lock"
+  },
+  "noteCollapse": {
+    "message": "Collapse"
+  },
+  "noteExpand": {
+    "message": "Expand"
+  },
+  "noteDelete": {
+    "message": "Delete"
+  },
+  "notePen": {
+    "message": "Pen"
+  },
+  "noteEraser": {
+    "message": "Eraser"
+  },
+  "noteThickness": {
+    "message": "Thickness"
+  },
+  "noteEraseAll": {
+    "message": "Erase everything"
+  },
+  "noteDrawingHint": {
+    "message": "drawing — Esc to stop"
+  },
+  "notePlaceholder": {
+    "message": "Click to write. Markdown works."
+  },
+  "setPaper": {
+    "message": "Paper"
+  },
+  "setType": {
+    "message": "Type"
+  },
+  "setMaterial": {
+    "message": "Material"
+  },
+  "setPalette": {
+    "message": "Palette"
+  },
+  "setInk": {
+    "message": "Ink"
+  },
+  "setAccent": {
+    "message": "Accent"
+  },
+  "setFont": {
+    "message": "Font"
+  },
+  "setSize": {
+    "message": "Size"
+  },
+  "setLineHeight": {
+    "message": "Line height"
+  },
+  "setDirection": {
+    "message": "Direction"
+  },
+  "setDirAuto": {
+    "message": "Auto (per paragraph)"
+  },
+  "setDirLtr": {
+    "message": "Left to right"
+  },
+  "setDirRtl": {
+    "message": "Right to left"
+  },
+  "setAlign": {
+    "message": "Align"
+  },
+  "setOpacity": {
+    "message": "Opacity"
+  },
+  "setTornEdge": {
+    "message": "Torn edge"
+  },
+  "setGrain": {
+    "message": "Grain"
+  },
+  "setTape": {
+    "message": "Tape"
+  },
+  "setShadow": {
+    "message": "Shadow"
+  },
+  "setMotion": {
+    "message": "Motion"
+  },
+  "setSaveDefault": {
+    "message": "Save as my default"
+  },
+  "setResetNote": {
+    "message": "Reset this note"
+  },
+  "setCustomHint": {
+    "message": "Custom. Click to follow the default again."
+  },
+  "optTitle": {
+    "message": "Settings"
+  },
+  "optWhereNotes": {
+    "message": "Where notes appear"
+  },
+  "optCloseWarning": {
+    "message": "Warning before a tab closes"
+  },
+  "optKeeping": {
+    "message": "Keeping and deleting"
+  },
+  "optBackup": {
+    "message": "Backup"
+  },
+  "optSurvives": {
+    "message": "What your notes survive"
+  },
+  "optPrivacy": {
+    "message": "Privacy"
+  },
+  "optSaved": {
+    "message": "Saved."
+  },
+  "optLanguage": {
+    "message": "Language"
+  },
+  "optFollowBrowser": {
+    "message": "Follow the browser"
+  },
+  "mgrTitle": {
+    "message": "Cabinet"
+  },
+  "mgrSearch": {
+    "message": "Search every note…"
+  },
+  "mgrAllNotes": {
+    "message": "All notes"
+  },
+  "mgrTrash": {
+    "message": "Trash"
+  },
+  "mgrBackToNotes": {
+    "message": "Back to notes"
+  },
+  "mgrCabinetView": {
+    "message": "Cabinet"
+  },
+  "mgrListView": {
+    "message": "List"
+  },
+  "mgrExport": {
+    "message": "Export ZIP"
+  },
+  "mgrExportSelection": {
+    "message": "Export selection"
+  },
+  "mgrImport": {
+    "message": "Import…"
+  },
+  "mgrSelected": {
+    "message": "selected"
+  },
+  "mgrClear": {
+    "message": "Clear"
+  },
+  "mgrRestore": {
+    "message": "Restore"
+  },
+  "mgrMoveToTrash": {
+    "message": "Move to trash"
+  },
+  "mgrDeleteForever": {
+    "message": "Delete forever"
+  },
+  "mgrUntitled": {
+    "message": "(untitled)"
+  },
+  "mgrEmptyDrawer": {
+    "message": "This drawer is empty"
+  },
+  "mgrEmptyHint": {
+    "message": "Stick a note on a page and it files itself here."
+  },
+  "mgrNoMatch": {
+    "message": "Nothing matches that"
+  },
+  "mgrNoMatchHint": {
+    "message": "Try fewer words, or clear the search."
+  },
+  "mgrTrashHint": {
+    "message": "Deleted notes wait here for 30 days."
+  },
+  "mgrNotes": {
+    "message": "notes"
+  },
+  "mgrSites": {
+    "message": "sites"
+  },
+  "mgrInTrash": {
+    "message": "in trash"
+  },
+  "mgrCancel": {
+    "message": "Cancel"
+  },
+  "impTitle": {
+    "message": "Import archive"
+  },
+  "impNothingWritten": {
+    "message": "Nothing has been written yet."
+  },
+  "impKeepNewest": {
+    "message": "Keep newest"
+  },
+  "impArchiveWins": {
+    "message": "Archive wins"
+  },
+  "impAsCopies": {
+    "message": "Import as copies"
+  },
+  "impNew": {
+    "message": "new"
+  },
+  "impUpdated": {
+    "message": "updated"
+  },
+  "impSkipped": {
+    "message": "left alone (already newer here)"
+  },
+  "popEnabled": {
+    "message": "Notes on for this tab"
+  },
+  "popDisabled": {
+    "message": "Notes off for this tab"
+  },
+  "popNewNote": {
+    "message": "New note"
+  },
+  "popOpenCabinet": {
+    "message": "Open cabinet"
+  },
+  "popGrantSite": {
+    "message": "Allow on this site"
+  },
+  "popGrantDomain": {
+    "message": "Allow on this domain"
+  },
+  "popGrantAll": {
+    "message": "Allow on all sites"
+  },
+  "popNoAccess": {
+    "message": "Chevalet Note has no access to this site yet."
+  },
+  "popReopen": {
+    "message": "Reopen"
+  },
+  "popClosedWithNotes": {
+    "message": "Closed with notes"
+  },
+  "guardWillWarn": {
+    "message": "Will warn before this tab closes."
+  },
+  "guardBestEffort": {
+    "message": "Close warnings are best-effort: browsers only allow them on pages you have interacted with. Your notes are saved either way.",
+    "description": "Shown in options next to the close-warning setting. Must not over-promise."
+  },
+  "guardModeNever": {
+    "message": "Never warn"
+  },
+  "guardModeUnsaved": {
+    "message": "Warn if there are unsaved edits"
+  },
+  "guardModeHasNotes": {
+    "message": "Warn whenever the page has notes"
+  },
+  "durabilitySurvives": {
+    "message": "Your notes survive clearing your browsing data."
+  },
+  "durabilityLost": {
+    "message": "They are lost by \"Refresh Firefox\" or by uninstalling the extension — which is what the ZIP backup is for."
+  }
 }

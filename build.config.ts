@@ -10,7 +10,7 @@
  * reproduces `dist/` byte-for-byte.
  */
 import { createHash } from 'node:crypto';
-import { cp, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type * as esbuild from 'esbuild';
@@ -96,8 +96,37 @@ export async function writeManifest(): Promise<void> {
   );
 }
 
+/**
+ * Write _locales from the single catalogue in src/shared/i18n.ts.
+ *
+ * Keeping the strings in TypeScript and generating the JSON means a string cannot exist in
+ * the code while being missing from a shipped locale -- which is the usual way an extension
+ * ends up showing a raw message key to a reviewer.
+ */
+export async function writeLocales(): Promise<void> {
+  const { CATALOGUE, toMessagesJson } = await import(`./src/shared/i18n.ts?v=${Date.now()}`);
+  for (const lang of ['en', 'fa'] as const) {
+    const dir = join(OUT, '_locales', lang);
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      join(dir, 'messages.json'),
+      `${JSON.stringify(toMessagesJson(lang), null, 2)}\n`,
+      'utf8',
+    );
+    // Also update the checked-in copies, so the repo shows what ships.
+    const repoDir = join(ROOT, '_locales', lang);
+    await mkdir(repoDir, { recursive: true });
+    await writeFile(
+      join(repoDir, 'messages.json'),
+      `${JSON.stringify(toMessagesJson(lang), null, 2)}\n`,
+      'utf8',
+    );
+  }
+  return void CATALOGUE;
+}
+
 export async function copyStatic(): Promise<void> {
-  for (const dir of ['_locales', 'assets']) {
+  for (const dir of ['assets']) {
     await cp(join(ROOT, dir), join(OUT, dir), { recursive: true, force: true }).catch(() => {});
   }
   // HTML shells live next to their entry point in src/ui/<name>/index.html
@@ -108,8 +137,28 @@ export async function copyStatic(): Promise<void> {
   }
 }
 
-/** Gzipped budgets from plan section 2. Exceeding one fails a production build. */
+/**
+ * Gzipped budgets. Exceeding one fails a production build.
+ *
+ * A budget is only worth having if raising it costs an argument, so here is the argument for
+ * the current numbers.
+ *
+ * `cs/guard.js` — 1 kB. This runs at `document_start` on every granted origin, ahead of the
+ * page's own scripts, and exists solely to hold a `beforeunload` listener. It has to stay
+ * small enough that its cost is not measurable. Currently 0.3 kB.
+ *
+ * `cs/renderer.js` — 28 kB. Raised from 24 kB when anchoring moved onto this path (~3 kB gz
+ * for `anchor/`, plus 1.7 kB minified of `approx-string-match`). The budget predated that
+ * code being here, and the measured breakdown says there is no fat to cut instead: of 78 kB
+ * minified, 20 kB is NoteView, 16 kB is the stylesheet, and the remainder is spread fairly
+ * evenly across the settings panel, the ink layer, `perfect-freehand`, markdown and
+ * anchoring. Each of those is the feature itself.
+ *
+ * Before raising it again, re-measure with an esbuild metafile, and ask the question this
+ * number exists to force: is the new code needed on a page that has no notes yet? That is the
+ * common case, and the only reason this is watched.
+ */
 export const BUDGETS_GZ: Readonly<Record<string, number>> = {
   'cs/guard.js': 1_024,
-  'cs/renderer.js': 24 * 1024,
+  'cs/renderer.js': 28 * 1024,
 };

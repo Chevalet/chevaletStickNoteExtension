@@ -69,6 +69,41 @@ Enforced by `build.ts`; exceeding a budget fails a production build.
 
 ---
 
+### Why the renderer budget moved to 28 kB
+
+Measured with an esbuild metafile rather than estimated, at 78.2 kB minified:
+
+| kB | module |
+|---:|---|
+| 19.9 | `cs/note/NoteView.ts` |
+| 16.2 | `cs/styles.ts` |
+| 4.8 | `cs/note/SettingsPanel.ts` |
+| 4.7 | `cs/note/ink.ts` |
+| 4.5 | `perfect-freehand` |
+| 4.2 | `cs/renderer.ts` |
+| 3.1 | `cs/note/md-lex.ts` |
+| 3.0 | `cs/anchor/text.ts` |
+| 2.6 | `cs/note/markdown.ts` |
+| 2.5 | `cs/anchor/index.ts` |
+| 2.0 | `cs/anchor/element.ts` |
+| 1.7 | `approx-string-match` |
+
+Two things came out of this measurement rather than out of an opinion.
+
+**`marked` was removed.** It was 42.2 kB of a then-107 kB bundle — forty per cent of what
+every annotated page had to parse — for a full CommonMark + GFM implementation whose tables,
+footnotes, reference links and HTML blocks a sticky note never uses. `md-lex.ts` replaced it
+at 3.1 kB, and the 32 existing markdown tests, written against `marked`, passed unchanged.
+That is the only reason replacing a battle-tested parser was defensible — and the harness
+then found a bug in it that those tests did not (see below), which is the honest cost of the
+decision.
+
+**The budget went from 24 kB to 28 kB gz**, once anchoring moved onto this path (~3 kB gz for
+`anchor/` plus `approx-string-match`). The table says there is no fat to cut instead: the two
+largest entries are the note itself and its stylesheet. Before raising it again, re-measure,
+and ask the question the number exists to force — is the new code needed on a page that has
+no notes yet? That is the common case.
+
 ## Notes from measuring in a preview pane
 
 Two environment traps cost real time here, worth remembering before trusting any in-pane
@@ -105,3 +140,11 @@ Each of these was invisible in code review and obvious the moment it rendered.
    literal. Twice. `tests/styles.test.ts` now fails the build on any backtick in the CSS.
 7. **`setPointerCapture` threw and aborted the drag** for a pointer id that was no longer
    active. Capture is an optimisation; failing it must not cancel the gesture.
+8. **A blockquote swallowed the rest of the note.** Lazy continuation absorbed *any* unmarked
+   line under a quote, so a code fence written straight after a quote with no blank line
+   between took the fence, the paragraph after it and the rule after that inside the quote.
+   The unit tests passed throughout, because they asserted those blocks *existed* and never
+   where they sat. One screenshot of a note holding a realistic markdown sample showed a
+   single quote bar running down two thirds of the card. `startsBlock()` is now one shared
+   definition used by both the paragraph loop and the quote loop, and the tests assert
+   nesting.

@@ -23,6 +23,7 @@ import {
   SRC,
   sharedOptions,
   TARGETS,
+  writeLocales,
   writeManifest,
 } from './build.config.ts';
 
@@ -66,6 +67,7 @@ await Promise.all(
   ),
 );
 await writeManifest();
+await writeLocales();
 await copyStatic();
 
 process.stdout.write(`\nchevaletNote ${pkg.version}${DEV ? ' (dev)' : ''}\n`);
