@@ -20,7 +20,13 @@ import {
   listTrash,
   trashNote,
 } from '~/bg/db/notes.ts';
-import { assetsForNote, getMeta, putAsset, setMeta } from '~/bg/db/notes.ts';
+import {
+  assetsForNote,
+  getMeta,
+  type NotePatch,
+  putAsset,
+  setMeta,
+} from '~/bg/db/notes.ts';
 import { openDb } from '~/bg/db/open.ts';
 import type { NoteRecord } from '~/bg/db/schema.ts';
 import { defaultScopeFor, matchContext } from '~/bg/scope/match.ts';
@@ -88,18 +94,47 @@ async function saveDefaults(style: NoteStyle): Promise<void> {
   toast('Saved as your default for new notes');
 }
 
-/** Debounced autosave, one timer per note. Mirrors the extension's 250ms quiet window. */
+/**
+ * Debounced autosave, one timer per note. Mirrors the extension's 250ms quiet window.
+ *
+ * Pending patches are MERGED, not replaced. The first version reset the timer with only the
+ * newest patch, so typing and then recolouring within the same 250ms silently threw the text
+ * away -- notes turned up in the cabinet as "(untitled)" with an empty body. Any debounce that
+ * coalesces writes has to accumulate them.
+ */
 const saveTimers = new Map<NoteId, number>();
-function queueSave(id: NoteId, patch: Parameters<typeof patchNote>[1]): void {
+const pending = new Map<NoteId, NotePatch>();
+
+function queueSave(id: NoteId, patch: NotePatch): void {
+  const merged = { ...(pending.get(id) ?? {}), ...patch };
+  // `ui` is itself partial, so a move and a resize in the same window must not clobber.
+  if (patch.ui) merged.ui = { ...(pending.get(id)?.ui ?? {}), ...patch.ui };
+  if (patch.style) merged.style = { ...(pending.get(id)?.style ?? {}), ...patch.style };
+  pending.set(id, merged);
+
   clearTimeout(saveTimers.get(id));
   saveTimers.set(
     id,
-    self.setTimeout(async () => {
-      saveTimers.delete(id);
-      await patchNote(id, patch);
-      void refreshStatus();
+    self.setTimeout(() => {
+      void (async () => {
+        saveTimers.delete(id);
+        const toWrite = pending.get(id);
+        pending.delete(id);
+        if (toWrite) await patchNote(id, toWrite);
+        await refreshStatus();
+      })();
     }, 250),
   );
+}
+
+/** Write everything still queued. Used before navigating away. */
+async function flushSaves(): Promise<void> {
+  for (const [id, patch] of [...pending]) {
+    clearTimeout(saveTimers.get(id));
+    saveTimers.delete(id);
+    pending.delete(id);
+    await patchNote(id, patch);
+  }
 }
 
 function mount(rec: NoteRecord): NoteView {
@@ -303,9 +338,12 @@ function buildPageSwitcher(): void {
     sel.append(o);
   }
   sel.addEventListener('change', () => {
-    const u = new URL(location.href);
-    u.searchParams.set('page', sel.value);
-    location.href = u.toString();
+    void (async () => {
+      await flushSaves();
+      const u = new URL(location.href);
+      u.searchParams.set('page', sel.value);
+      location.href = u.toString();
+    })();
   });
   const urlEl = el('pageurl');
   if (urlEl) urlEl.textContent = page.url;
@@ -341,10 +379,14 @@ declare global {
       loop: Loop;
       page: typeof page;
       host: typeof host;
+      flushSaves: () => Promise<void>;
     };
   }
 }
-window.cn = { addNote, load, views, loop, page, host };
+window.cn = { addNote, load, views, loop, page, host, flushSaves };
+
+// Whatever is still queued when the page goes away gets written first.
+window.addEventListener('pagehide', () => void flushSaves());
 
 // Content scripts are IIFE bundles, which cannot carry top-level await -- so the harness
 // boots the same way the real renderer does.

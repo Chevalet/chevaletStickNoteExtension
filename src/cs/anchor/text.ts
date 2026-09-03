@@ -60,9 +60,7 @@ export function buildTextIndex(root: Node = document.body, epoch = 0): TextIndex
       for (let el: Element | null = parent; el; el = el.parentElement) {
         if (isHidden(el)) return NodeFilter.FILTER_REJECT;
       }
-      return node.nodeValue && node.nodeValue.trim()
-        ? NodeFilter.FILTER_ACCEPT
-        : NodeFilter.FILTER_REJECT;
+      return node.nodeValue?.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
     },
   });
 
