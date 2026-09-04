@@ -73,10 +73,22 @@ https://github.com/Chevalet/chevaletStickNoteExtension
 
 ---
 
-## Categories
+## Categories — tick two
 
-- **Primary:** Productivity
-- **Secondary:** Appearance
+AMO's list for Firefox extensions has **no "Productivity"**, which an earlier draft of this
+file wrongly assumed. The real options are: Alerts & Updates, Appearance, Bookmarks, Download
+Management, Feeds News & Blogging, Games & Entertainment, Language Support, Photos Music &
+Videos, Privacy & Security, Search Tools, Shopping, Social & Communication, Tabs, Web
+Development.
+
+Nothing fits exactly. The two closest, and the honest picks:
+
+- **Bookmarks** — saving and organising things about pages is what this is adjacent to
+- **Appearance** — it does put visible things onto pages
+
+Three are allowed; two is better than padding with a third that does not fit. Do **not** tick
+"Privacy & Security": storing notes locally is not a privacy tool, and claiming that category
+invites a reviewer to hold the add-on to a standard it is not trying to meet.
 
 ## Tags
 
