@@ -48,7 +48,7 @@ What to upload as the source archive: a zip of the repository *without* `node_mo
 and `web-ext-artifacts`. The cleanest way is an archive of the tagged commit:
 
 ```bash
-git archive --format=zip --prefix=chevalet-note/ -o web-ext-artifacts/source-0.0.7.zip v0.0.7
+git archive --format=zip --prefix=chevalet-note/ -o web-ext-artifacts/source-0.0.8.zip v0.0.8
 ```
 
 `SOURCE.md` is already written for the reviewer and covers the toolchain, the exact commands,

@@ -109,7 +109,7 @@ thing in this listing.
 Answer **no** to every category. The manifest already declares
 `data_collection_permissions: { required: ['none'] }`, and this form has to agree with it.
 
-## Version notes for 0.0.7
+## Version notes for 0.0.8
 
 ```
 First public release.
