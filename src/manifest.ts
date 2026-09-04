@@ -25,6 +25,11 @@ export function manifest({ version }: ManifestInput): Record<string, unknown> {
     version,
     default_locale: 'en',
 
+    // AMO shows both of these on the listing page, and a listing with neither reads as
+    // abandoned before anyone has installed it.
+    author: 'Atur Dana',
+    homepage_url: 'https://github.com/Chevalet/chevaletStickNoteExtension',
+
     browser_specific_settings: {
       gecko: {
         id: 'chevalet-note@chevalet.dev',

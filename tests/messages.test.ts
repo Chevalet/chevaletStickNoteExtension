@@ -532,9 +532,11 @@ describe('the default note style', () => {
     await send({ t: 'settings/saveDefaults', style: { palette: 'cyan' } }, from7);
     const told = stub.sent.filter((m) => (m.message as { t?: string }).t === 'defaults/changed');
     expect(told.map((m) => m.tabId)).toContain(7);
-    expect((told[0]?.message as { style: Record<string, unknown> }).style).toMatchObject({
-      palette: 'cyan',
-    });
+    const first = told[0];
+    expect(first, 'nothing was broadcast').toBeDefined();
+    expect((first?.message as { style: Record<string, unknown> } | undefined)?.style).toMatchObject(
+      { palette: 'cyan' },
+    );
   });
 });
 

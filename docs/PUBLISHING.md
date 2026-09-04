@@ -48,7 +48,7 @@ What to upload as the source archive: a zip of the repository *without* `node_mo
 and `web-ext-artifacts`. The cleanest way is an archive of the tagged commit:
 
 ```bash
-git archive --format=zip --prefix=chevalet-note/ -o web-ext-artifacts/source-0.0.6.zip v0.0.6
+git archive --format=zip --prefix=chevalet-note/ -o web-ext-artifacts/source-0.0.7.zip v0.0.7
 ```
 
 `SOURCE.md` is already written for the reviewer and covers the toolchain, the exact commands,
@@ -57,7 +57,9 @@ derived from `name@version` by SHA-256). Point at it in the reviewer notes.
 
 ## Listing metadata
 
-Prepared text, so this is copy-and-paste rather than writing under pressure.
+**Every field is written out in `docs/LISTING.md`.** Copy from there rather than composing in
+the form — the description field in particular is long, and AMO does not save drafts reliably.
+The summary below is repeated here only so this page reads on its own.
 
 **Name** — Chevalet Note
 
@@ -140,10 +142,17 @@ Two things worth remembering:
 
 ## The one thing still worth doing first
 
-Spike R1 — whether a content script's `beforeunload` actually produces a dialog on tab close
-— is still unanswered, and the close-tab warning is described in the settings as best-effort
-because of it. That description is honest either way, so it does not block submission. But if
-the answer is no, the setting should probably be reworded before strangers read it.
+Spike R1 — whether a content script's `beforeunload` actually produces a dialog on tab close —
+is still open, and it cannot be automated. `spikes/firefox-r1.mjs` builds a probe add-on,
+installs it in a real Firefox and closes a tab, and reports **no dialog for both trials
+including the control**, where the page arms its own `beforeunload`. A failed control means a
+useless measurement: WebDriver's Close Window command does not run unload prompts at all. The
+spike stays in the repo, with its control, so nobody repeats the approach.
 
-`docs/spikes.md` has the runbook, and it takes a minute now that the extension installs: make a
-note, type in it, close the tab.
+So it needs thirty seconds of a human: make a note, type in it, press Ctrl+W — then repeat with
+a hand-armed `beforeunload` in the page's console as a control. `docs/spikes.md` has the
+procedure and a table for reading the result.
+
+This does **not** block submission. The setting already describes itself as best-effort, which
+is honest whichever way the answer falls. But if a content script's `beforeunload` turns out to
+be ignored, the wording should be firmed up before strangers read it.
