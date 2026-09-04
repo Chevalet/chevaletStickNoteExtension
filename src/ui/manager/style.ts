@@ -9,28 +9,9 @@
  * tokens the note layer uses.
  */
 
-export const MANAGER_CSS = /* css */ `
-:root {
-  --ink: #14110e;
-  --paper: #f2ece0;
-  --card: #fffdf6;
-  --hi: #ffe94a;
-  --accent: #ff2e63;
-  --cyan: #7ef0ff;
-  --dim: #6f665a;
-  --line: color-mix(in oklab, var(--ink) 18%, transparent);
-  --manila: #e8c98a;
-  --drawer: #23201b;
-  --shadow: 5px 5px 0 var(--ink);
-  --halftone: radial-gradient(var(--ink) .8px, transparent .9px);
+import { THEME_CSS } from '../chrome-theme.ts';
 
-  /* The page is set in mono throughout, which is the dev-hub/zine register. The display face
-     is the same stack at a heavier weight: no web font, so nothing is fetched and nothing can
-     fail to load. */
-  --mono: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
-  --display: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
-}
-
+export const MANAGER_CSS = /* css */ `${THEME_CSS}
 * { box-sizing: border-box; }
 
 body {
@@ -39,7 +20,7 @@ body {
   background:
     var(--halftone) 0 0 / 5px 5px,
     var(--paper);
-  background-blend-mode: multiply;
+  background-blend-mode: var(--halftone-blend);
   color: var(--ink);
   font: 14px/1.55 ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
 }
@@ -56,8 +37,8 @@ body[dir="rtl"] { direction: rtl; }
   gap: 14px;
   flex-wrap: wrap;
   padding: 10px 18px;
-  background: var(--ink);
-  color: var(--hi);
+  background: var(--bar);
+  color: var(--bar-fg);
   border-bottom: 3px solid var(--accent);
 }
 .brand { display: flex; align-items: center; gap: 9px; }
@@ -74,9 +55,9 @@ body[dir="rtl"] { direction: rtl; }
   min-width: 160px;
   max-width: 420px;
   padding: 6px 10px;
-  background: color-mix(in oklab, var(--hi) 14%, transparent);
-  color: var(--hi);
-  border: 2px solid color-mix(in oklab, var(--hi) 45%, transparent);
+  background: color-mix(in oklab, var(--bar-fg) 14%, transparent);
+  color: var(--bar-fg);
+  border: 2px solid color-mix(in oklab, var(--bar-fg) 45%, transparent);
   font: inherit;
 }
 .search::placeholder { color: color-mix(in oklab, var(--hi) 55%, transparent); }
@@ -89,17 +70,38 @@ body[dir="rtl"] { direction: rtl; }
   cursor: pointer;
   font: 700 12px/1.5 inherit;
   background: var(--hi);
-  color: var(--ink);
-  border: 2px solid var(--ink);
+  color: var(--on-hi);
+  border: 2px solid var(--on-hi);
   box-shadow: 3px 3px 0 var(--accent);
   white-space: nowrap;
 }
 .btn:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--accent); }
 .btn:active { transform: translate(3px, 3px); box-shadow: none; }
 .btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
-.btn.ghost { background: transparent; color: var(--hi); box-shadow: none; border-color: color-mix(in oklab, var(--hi) 50%, transparent); }
-.btn.ghost:hover { background: color-mix(in oklab, var(--hi) 18%, transparent); }
-.btn.danger { background: var(--accent); color: #fff; box-shadow: 3px 3px 0 var(--ink); }
+/*
+ * A ghost button is transparent, so it has to take its colour from whatever it is sitting on.
+ *
+ * It used to be color: var(--hi) everywhere -- acid yellow -- which is right on the dark top
+ * bar and close to invisible on the cream paper below it, where "Clear", "Restore" and "Move
+ * to trash" live. Roughly 1.3:1 against the paper.
+ *
+ * The first attempt at fixing that flipped the default to --ink, which MOVED the bug rather
+ * than fixing it: the Trash button lives at the foot of the cabinet, whose carcass is dark, so
+ * dark-on-dark made that one invisible instead. Caught by looking at the page; no test would
+ * have said a word about it.
+ *
+ * So the foreground is one token set by the CONTAINER -- paper by default, and the two dark
+ * surfaces override it -- rather than a rule per button.
+ */
+.btn.ghost {
+  --ghost-fg: var(--ink);
+  background: transparent; color: var(--ghost-fg); box-shadow: none;
+  border-color: color-mix(in oklab, var(--ghost-fg) 45%, transparent);
+}
+.btn.ghost:hover { background: color-mix(in oklab, var(--ghost-fg) 14%, transparent); }
+/* The two dark surfaces: the chrome bar across the top, the cabinet carcass down the side. */
+.top .btn.ghost, .cabinet .btn.ghost { --ghost-fg: var(--bar-fg); }
+.btn.danger { background: var(--accent); color: #fff; box-shadow: 3px 3px 0 var(--shadow-c); }
 .btn[aria-pressed="true"] { background: var(--accent); color: #fff; }
 .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
 
@@ -156,7 +158,7 @@ body[dir="rtl"] { direction: rtl; }
   background: color-mix(in oklab, var(--cyan) 45%, transparent);
 }
 .drawer:hover { background: color-mix(in oklab, var(--cyan) 12%, transparent); }
-.drawer[aria-current="true"] { background: var(--hi); color: var(--ink); }
+.drawer[aria-current="true"] { background: var(--hi); color: var(--on-hi); }
 .drawer[aria-current="true"]::before { background: var(--accent); }
 .drawer .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .drawer .count {
@@ -165,7 +167,7 @@ body[dir="rtl"] { direction: rtl; }
   background: color-mix(in oklab, #efe7d6 20%, transparent);
   border-radius: 2px;
 }
-.drawer[aria-current="true"] .count { background: var(--ink); color: var(--hi); }
+.drawer[aria-current="true"] .count { background: var(--bar); color: var(--bar-fg); }
 
 /* ------------------------------------------------------------------- main */
 
@@ -203,7 +205,7 @@ body[dir="rtl"] { direction: rtl; }
   cursor: pointer;
   list-style: none;
   background: var(--manila);
-  color: var(--ink);
+  color: var(--on-manila);
   border: 2px solid var(--ink);
   border-bottom: 0;
   clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 100%, 0 100%);
@@ -214,6 +216,8 @@ body[dir="rtl"] { direction: rtl; }
 .folder > summary .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .folder > summary .n { opacity: .65; font-weight: 400; }
 .folder[open] > summary { box-shadow: 0 2px 0 var(--ink); }
+/* The tab's own text colour must not leak into the folder's contents. */
+.folder > summary .n { color: inherit; }
 
 .cards {
   display: grid;
@@ -240,7 +244,7 @@ body[dir="rtl"] { direction: rtl; }
     ),
     var(--card);
   border: 2px solid var(--ink);
-  box-shadow: 3px 3px 0 color-mix(in oklab, var(--ink) 55%, transparent);
+  box-shadow: 3px 3px 0 color-mix(in oklab, var(--shadow-c) 55%, transparent);
   --lean: 0deg;
   transform: rotate(var(--lean));
   transition: transform 110ms ease, box-shadow 110ms ease;
@@ -253,9 +257,9 @@ body[dir="rtl"] { direction: rtl; }
   width: 2px;
   background: color-mix(in oklab, var(--accent) 55%, transparent);
 }
-.card:hover { transform: rotate(0deg) translate(-1px, -2px); box-shadow: 5px 6px 0 var(--ink); }
+.card:hover { transform: rotate(0deg) translate(-1px, -2px); box-shadow: 5px 6px 0 var(--shadow-c); }
 .card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-.card[aria-selected="true"] { box-shadow: 0 0 0 3px var(--accent), 3px 3px 0 var(--ink); }
+.card[aria-selected="true"] { box-shadow: 0 0 0 3px var(--accent), 3px 3px 0 var(--shadow-c); }
 
 .card .swatch {
   position: absolute;
@@ -308,10 +312,12 @@ body[dir="rtl"] { direction: rtl; }
 
 table.list { width: 100%; border-collapse: collapse; background: var(--card); border: 2px solid var(--ink); }
 table.list th, table.list td { padding: 5px 9px; text-align: start; border-bottom: 1px solid var(--line); font-size: 12.5px; }
-table.list th { position: sticky; top: 68px; background: var(--ink); color: var(--hi); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; }
+table.list th { position: sticky; top: 68px; background: var(--bar); color: var(--bar-fg); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; }
 table.list tbody tr { cursor: pointer; }
-table.list tbody tr:hover { background: color-mix(in oklab, var(--hi) 30%, transparent); }
-table.list tbody tr[aria-selected="true"] { background: var(--hi); }
+table.list tbody tr:hover { background: color-mix(in oklab, var(--hi) 30%, transparent); color: var(--on-hi); }
+/* Yellow row, so the text on it has to be the on-yellow colour rather than the theme's. */
+table.list tbody tr[aria-selected="true"] { background: var(--hi); color: var(--on-hi); }
+table.list tbody tr[aria-selected="true"] td.dim { color: color-mix(in oklab, var(--on-hi) 70%, transparent); }
 table.list td.t { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 table.list td.dim { color: var(--dim); }
 
@@ -323,10 +329,10 @@ dialog {
   background: var(--card);
   color: var(--ink);
   border: 3px solid var(--ink);
-  box-shadow: 7px 7px 0 var(--ink);
+  box-shadow: 7px 7px 0 var(--shadow-c);
 }
-dialog::backdrop { background: color-mix(in oklab, var(--ink) 55%, transparent); }
-dialog h3 { margin: 0; padding: 9px 14px; background: var(--ink); color: var(--hi); font-size: 13px; letter-spacing: .04em; }
+dialog::backdrop { background: var(--scrim); }
+dialog h3 { margin: 0; padding: 9px 14px; background: var(--bar); color: var(--bar-fg); font-size: 13px; letter-spacing: .04em; }
 dialog .content { padding: 14px; }
 dialog .content p { margin: 0 0 10px; }
 dialog .actions { display: flex; gap: 8px; justify-content: flex-end; padding: 0 14px 14px; }
@@ -344,7 +350,7 @@ dialog pre { max-height: 180px; overflow: auto; background: color-mix(in oklab, 
   gap: 14px;
   align-items: center;
   padding: 6px 18px;
-  background: var(--ink);
+  background: var(--bar);
   color: var(--cyan);
   border-top: 3px solid var(--hi);
   font-size: 12px;
@@ -355,14 +361,66 @@ dialog pre { max-height: 180px; overflow: auto; background: color-mix(in oklab, 
   .card, .btn { transition: none; }
 }
 
+/* ------------------------------------------------------- the cabinet's foot
+   Two groups, with air between them. The drawers and the trash are about WHERE
+   NOTES ARE and belong together; Settings and the theme are about the app, so
+   they sit at the bottom behind a rule, where a settings button belongs. */
+
+.cab-files { padding: 10px; }
+
+.cab-foot {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: stretch;
+  padding: 10px;
+  /* The air, and the rule that earns it. */
+  margin-top: 6px;
+  border-top: 2px solid color-mix(in oklab, var(--cyan) 26%, transparent);
+  background: color-mix(in oklab, var(--drawer) 88%, #000);
+}
+
 .drawer.is-settings {
-  margin-top: 14px; border-top: 2px solid color-mix(in oklab, var(--hi) 55%, transparent);
-  background: color-mix(in oklab, var(--drawer) 78%, var(--accent));
+  padding: 9px 11px;
+  border-bottom: 0;
+  background: color-mix(in oklab, var(--drawer) 74%, var(--accent));
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  font-size: 11.5px;
 }
-.drawer.is-settings .count {
-  background: var(--hi); color: var(--ink); font-weight: 700; letter-spacing: 0;
+.drawer.is-settings::before { background: var(--hi); }
+.drawer.is-settings[aria-current="true"] { background: var(--accent); color: #fff; }
+.drawer.is-settings[aria-current="true"]::before { background: #fff; }
+
+/* The theme control. Sized to the same rhythm as the settings button beside it, and
+   deliberately quiet: it is a preference, not an action. */
+.cab-theme {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: #efe7d6;
+  background: color-mix(in oklab, #efe7d6 10%, transparent);
+  border: 2px solid color-mix(in oklab, #efe7d6 26%, transparent);
+  font: 700 11.5px/1 var(--mono);
+  letter-spacing: .04em;
+  text-transform: uppercase;
 }
-.drawer.is-settings[aria-current="true"] { background: var(--accent); }
+.cab-theme:hover {
+  background: color-mix(in oklab, var(--cyan) 20%, transparent);
+  border-color: color-mix(in oklab, var(--cyan) 50%, transparent);
+}
+.cab-theme:focus-visible { outline: 3px solid var(--hi); outline-offset: 2px; }
+
+@media (max-width: 820px) {
+  /* Stacked, the two stop competing for a narrow row. */
+  .cab-foot { grid-template-columns: 1fr; }
+}
 
 /* ------------------------------------------------------------- settings pane
    The cabinet's own idiom rather than a form: manila tabs down the side, ruled
@@ -375,7 +433,7 @@ dialog pre { max-height: 180px; overflow: auto; background: color-mix(in oklab, 
 .stabs { display: flex; flex-direction: column; gap: 6px; padding-top: 18px; }
 .stab {
   font: 600 12.5px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase;
-  text-align: left; padding: 10px 10px 10px 12px; cursor: pointer; color: var(--ink);
+  text-align: left; padding: 10px 10px 10px 12px; cursor: pointer; color: var(--on-manila);
   background: var(--manila); border: 2px solid var(--ink); border-right: 0;
   /* A folder tab: cut on the leading edge, so the stack reads as a stack. */
   clip-path: polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px));
@@ -383,7 +441,8 @@ dialog pre { max-height: 180px; overflow: auto; background: color-mix(in oklab, 
 }
 .stab:hover { background: color-mix(in oklab, var(--manila) 84%, var(--hi)); }
 .stab[aria-selected="true"] {
-  background: var(--card); box-shadow: none; z-index: 2; position: relative;
+  /* The selected tab is card paper, not manila, so it takes the paper's foreground back. */
+  background: var(--card); color: var(--ink); box-shadow: none; z-index: 2; position: relative;
   padding-left: 16px;
 }
 .stab:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
@@ -406,6 +465,7 @@ dialog pre { max-height: 180px; overflow: auto; background: color-mix(in oklab, 
   margin: 22px 0 8px; font: 700 11.5px/1 var(--mono); letter-spacing: .12em;
   text-transform: uppercase; color: var(--dim);
 }
+.ssec-note.warn { color: var(--accent); font-weight: 600; }
 .ssec-note, .ssec-empty {
   margin: 12px 0 0; font-size: 13px; line-height: 1.55; color: var(--dim); max-width: 62ch;
 }
@@ -427,7 +487,7 @@ dialog pre { max-height: 180px; overflow: auto; background: color-mix(in oklab, 
 /* A paper tab that slides. */
 .sw {
   width: 54px; height: 28px; padding: 0; cursor: pointer; position: relative;
-  background: var(--paper); border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+  background: var(--paper); border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--shadow-c);
 }
 .sw-knob {
   position: absolute; inset: 3px auto 3px 3px; width: 20px;
@@ -448,16 +508,82 @@ dialog pre { max-height: 180px; overflow: auto; background: color-mix(in oklab, 
 .seg button:first-child { margin-left: 0; }
 .seg button:hover { background: color-mix(in oklab, var(--paper) 80%, var(--hi)); }
 .seg button[aria-checked="true"] {
-  background: var(--ink); color: var(--hi); position: relative; z-index: 1;
+  background: var(--bar); color: var(--bar-fg); position: relative; z-index: 1;
 }
 .seg button:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; z-index: 2; }
+
+/* A slider, drawn rather than borrowed. A native range input is the one control that looks
+   wrong in every palette, so the track and the thumb are both ours: a ruled channel with a
+   hard-edged block on it, and a readout that always says what the value actually is. */
+.rngwrap { display: flex; align-items: center; gap: 10px; width: 100%; justify-content: flex-end; }
+.rng {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1 1 auto;
+  min-width: 90px;
+  max-width: 210px;
+  height: 26px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.rng::-moz-range-track {
+  height: 8px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+}
+.rng::-moz-range-progress {
+  height: 8px;
+  background: var(--hi);
+  border: 2px solid var(--ink);
+  border-right: 0;
+}
+.rng::-moz-range-thumb {
+  width: 14px;
+  height: 22px;
+  border-radius: 0;
+  background: var(--accent);
+  border: 2px solid var(--ink);
+}
+.rng::-webkit-slider-runnable-track {
+  height: 8px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+}
+.rng::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 22px;
+  margin-top: -9px;
+  border-radius: 0;
+  background: var(--accent);
+  border: 2px solid var(--ink);
+}
+.rng:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.rngout {
+  font: 700 12px/1 var(--mono);
+  min-width: 6.5ch;
+  padding: 6px 7px;
+  text-align: center;
+  color: var(--ink);
+  background: var(--card);
+  border: 2px solid var(--ink);
+  white-space: nowrap;
+}
+
+/* The button that leads out to Firefox's own shortcut page. */
+.keyact { margin: 16px 0 4px; }
 
 .numwrap { display: flex; align-items: center; gap: 7px; }
 .num {
   font: 600 14px/1 var(--mono); width: 74px; padding: 7px 8px; color: var(--ink);
-  background: var(--card); border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+  background: var(--card); border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--shadow-c);
 }
 .num:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+/* A native number input takes its spinner and caret from the OS palette, which is wrong on a
+   dark card unless the element is told which scheme it is in. */
+.num { color-scheme: light dark; }
 .unit { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
 
 /* Palette swatches: the paper, with its accent showing as a marker stroke. */
@@ -494,12 +620,15 @@ dialog pre { max-height: 180px; overflow: auto; background: color-mix(in oklab, 
 /* Keyboard reference. */
 .keys { display: flex; flex-direction: column; }
 .keyrow {
-  display: grid; grid-template-columns: 122px 1fr; gap: 12px; align-items: baseline;
+  /* Wide enough for the longest chord in the reference, "Ctrl + Shift + Enter". At 122px it
+     wrapped onto two lines and the key cells stopped looking like keys. */
+  display: grid; grid-template-columns: 176px 1fr; gap: 12px; align-items: baseline;
   padding: 6px 0; font-size: 13px;
 }
 .keyrow kbd {
-  font: 700 11.5px/1 var(--mono); padding: 5px 7px; text-align: center; color: var(--ink);
-  background: var(--hi); border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink);
+  font: 700 11.5px/1 var(--mono); padding: 5px 7px; text-align: center; color: var(--on-hi);
+  background: var(--hi); border: 2px solid var(--on-hi); box-shadow: 2px 2px 0 var(--shadow-c);
+  white-space: nowrap;
 }
 
 @media (max-width: 720px) {
@@ -507,6 +636,8 @@ dialog pre { max-height: 180px; overflow: auto; background: color-mix(in oklab, 
   .stabs { flex-direction: row; flex-wrap: wrap; padding: 0 0 10px; }
   .stab { border-right: 2px solid var(--ink); margin-right: 0; clip-path: none; }
   .srow { grid-template-columns: 1fr; }
+  .keyrow { grid-template-columns: 1fr; gap: 4px; }
+  .keyrow kbd { justify-self: start; }
   .srow-ctl { justify-content: flex-start; }
   .swatches { justify-content: flex-start; }
 }

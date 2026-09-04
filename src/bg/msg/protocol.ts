@@ -9,6 +9,7 @@
  *  - Replies are a discriminated union, never a thrown exception across the boundary.
  */
 
+import type { InkStroke } from '~/bg/db/schema.ts';
 import type { NoteId, Scope, UrlKey } from '~/shared/types.ts';
 
 export const PROTOCOL_V = 1;
@@ -32,6 +33,15 @@ export interface NoteWire {
     opacity: number;
   };
   anchor: unknown; // shaped by ~/cs/anchor; the background stores it opaquely
+  /**
+   * The note's drawing, if it has one.
+   *
+   * This field was missing from the interface while the background was already sending
+   * it, so `mountNote` had nothing to pass to the NoteView and **every drawing was lost
+   * on reload** -- transmitted, then dropped on the floor one line short of the screen.
+   * The playground never showed it because it reads the record directly.
+   */
+  ink?: { strokes: InkStroke[]; w: number; h: number };
   style: Record<string, unknown>; // sparse diff against the user's defaults
   tags: string[];
   updatedAt: number;
@@ -92,8 +102,20 @@ export type BgToCs =
   | { t: 'tab/enabled'; enabled: boolean }
   | { t: 'command'; name: 'new-note' | 'cycle-notes' | 'toggle-ghost' }
   | { t: 'teardown'; reason: 'disabled' | 'update' | 'revoked' }
-  /** The default style changed, here or in another tab. Notes re-resolve against it. */
-  | { t: 'defaults/changed'; style: Record<string, unknown> };
+  /**
+   * Settings changed -- in the cabinet, in the options page, or in another tab. Notes
+   * re-resolve against them.
+   *
+   * Broadcast from `storage.onChanged` rather than only from the note panel's "save as my
+   * default", because the cabinet writes settings straight to storage. Without that,
+   * every change made in the cabinet's settings pane -- the whole pane -- did nothing at
+   * all in any tab that was already open.
+   */
+  | {
+      t: 'defaults/changed';
+      style: Record<string, unknown>;
+      motion: 'full' | 'reduced' | 'off';
+    };
 
 // --------------------------------------------------------------------------- replies
 
@@ -131,4 +153,10 @@ export interface HelloReply {
    * and again in the user's.
    */
   noteDefaults: Record<string, unknown>;
+  /**
+   * How much the paper is allowed to move, already resolved from the `auto` setting
+   * against the browser's own reduced-motion preference. A cap, not an override: a note
+   * that asked for less movement keeps it.
+   */
+  motion: 'full' | 'reduced' | 'off';
 }

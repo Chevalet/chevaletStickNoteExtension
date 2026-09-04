@@ -284,40 +284,10 @@ function merge(a: Edit, b: Edit): Edit {
 }
 
 /**
- * Character offset of the caret inside an element, counting a line break as one character.
+ * Caret offsets.
  *
- * Stored with every text edit so undo puts the caret back where it was. A plain offset rather
- * than a node/offset pair on purpose: undo replaces the text wholesale, so the old nodes are
- * gone by the time the caret has to be restored.
+ * The implementations live in `./selection.ts`, next to the shadow-root selection handling
+ * they exist to serve, and are re-exported here because history is what stores an offset with
+ * every text edit. Two copies of a tree walk is one copy too many.
  */
-export function caretOffset(root: Node, container: Node, offset: number): number {
-  let count = 0;
-  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
-  let node: Node | null = walk.currentNode;
-  while (node) {
-    if (node === container) {
-      return count + (node.nodeType === Node.TEXT_NODE ? offset : 0);
-    }
-    if (node.nodeType === Node.TEXT_NODE) count += (node.nodeValue ?? '').length;
-    else if ((node as Element).tagName === 'BR') count += 1;
-    node = walk.nextNode();
-  }
-  return count;
-}
-
-/** Turn a character offset back into a node and offset, clamped to what exists. */
-export function offsetToPosition(root: Node, target: number): { node: Node; offset: number } {
-  let remaining = Math.max(0, target);
-  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let node = walk.nextNode();
-  let last: Node | null = null;
-  while (node) {
-    const len = (node.nodeValue ?? '').length;
-    if (remaining <= len) return { node, offset: remaining };
-    remaining -= len;
-    last = node;
-    node = walk.nextNode();
-  }
-  if (last) return { node: last, offset: (last.nodeValue ?? '').length };
-  return { node: root, offset: 0 };
-}
+export { offsetOf as caretOffset, positionAt as offsetToPosition } from './selection.ts';

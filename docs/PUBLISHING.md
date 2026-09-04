@@ -25,6 +25,9 @@ extension AMO rejects it.
 - [x] `strict_min_version` is `140.0` and `strict_min_version_android` is `142.0`. Both are
       required by `data_collection_permissions`, and claiming a lower floor is what produced
       the two validator warnings on the 0.0.4 upload.
+- [x] Every control in the settings is traceable to code that reads it. 0.0.10 removed four
+      that were not — see the header of `src/ui/manager/settings.ts`. A reviewer who tries a
+      switch and sees nothing happen has every reason to distrust the rest of the listing.
 - [x] `web-ext lint --warnings-as-errors` reports 0 errors, 0 warnings, 0 notices.
 - [x] `optional_permissions` is empty and every declared permission is actually used. A
       permission you never call is the first thing a reviewer asks about.
@@ -48,7 +51,7 @@ What to upload as the source archive: a zip of the repository *without* `node_mo
 and `web-ext-artifacts`. The cleanest way is an archive of the tagged commit:
 
 ```bash
-git archive --format=zip --prefix=chevalet-note/ -o web-ext-artifacts/source-0.0.8.zip v0.0.8
+git archive --format=zip --prefix=chevalet-note/ -o web-ext-artifacts/source-0.0.10.zip v0.0.10
 ```
 
 `SOURCE.md` is already written for the reviewer and covers the toolchain, the exact commands,
@@ -72,9 +75,14 @@ The summary below is repeated here only so this page reads on its own.
 list. `PRIVACY.md` has the wording for the privacy paragraph; do not soften it, it is the
 strongest thing in the listing.
 
-**Categories** — Productivity; and Appearance as the second if two are allowed.
+**Categories** and **Tags** — see `docs/LISTING.md`, and only that file.
 
-**Tags** — notes, annotation, sticky notes, markdown, offline, privacy
+Two lines used to sit here saying "Productivity" and a comma-separated list of tags, and both
+were wrong against the actual form: AMO's category list for Firefox extensions contains no
+Productivity, and tags are a **fixed set of checkboxes**, not free text — none of the six
+suggested here existed on it. That is the second time this page has described a field it had
+not looked at. `docs/LISTING.md` has the real lists, checked against the form, with the
+reasoning for each pick; duplicating them here is what let them drift in the first place.
 
 **Support** — the GitHub repository's issues page.
 
@@ -121,6 +129,14 @@ Keep it short and factual. A draft:
 > Note content is rendered by a small markdown lexer in `src/cs/note/md-lex.ts` and built into
 > DOM with `createElement`/`textContent`. `innerHTML` is never assigned anywhere in the
 > codebase, so there is no HTML sanitiser to audit.
+
+## Signing a build for yourself, before the listing clears
+
+`tools/sign.mjs` puts a build through AMO's **unlisted** channel, which signs automatically in
+a couple of minutes with no human review, so it can be installed permanently in an ordinary
+Firefox while the store listing is still in the queue. An add-on can carry versions in both
+channels, so this does not disturb the listed submission — but AMO will not accept a version
+number it has already seen in *either* channel, so the two cannot share one.
 
 ## After it is listed
 

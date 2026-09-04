@@ -5,9 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chevalet Note — cabinet</title>
 <!-- Everything visual comes from src/ui/manager/style.ts, adopted as a constructed
-     stylesheet, so there is one stylesheet and no separate file to keep in step. -->
+     stylesheet, so there is one stylesheet and no separate file to keep in step.
+
+     These few rules are the exception, and they have to be here: they paint the page
+     before the bundle has run. `html { background: #f2ece0 }` alone meant a dark-theme
+     user got a flash of cream on every open, because the theme is not known until the
+     settings have been read. So the pre-paint follows the system preference, and the
+     `data-theme` attribute the script stamps on the root wins over it in both
+     directions — the same three-state arrangement as the stylesheet proper. -->
 <style>
-  html { background: #f2ece0; }
+  html { background: #f2ece0; color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) { background: #17150f; color-scheme: dark; }
+  }
+  html[data-theme="dark"] { background: #17150f; color-scheme: dark; }
+  html[data-theme="light"] { background: #f2ece0; color-scheme: light; }
   body:empty::after {
     content: "opening the cabinet…";
     display: block;
@@ -15,6 +27,10 @@
     font: 13px ui-monospace, monospace;
     color: #6f665a;
   }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) body:empty::after { color: #9c9284; }
+  }
+  html[data-theme="dark"] body:empty::after { color: #9c9284; }
 </style>
 </head>
 <body></body>

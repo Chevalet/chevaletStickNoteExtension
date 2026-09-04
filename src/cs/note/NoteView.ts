@@ -20,10 +20,22 @@ import {
   spring,
   step,
 } from '~/cs/physics/spring.ts';
-import { caretOffset, type Edit, type History, offsetToPosition } from './history.ts';
+import {
+  clearFormatting,
+  cycleHeading,
+  insertText,
+  makeLink,
+  type Sel,
+  toggleLinePrefix,
+  toggleTaskHere,
+  wrapInline,
+} from './format.ts';
+import type { Edit, History } from './history.ts';
 import { InkLayer } from './ink.ts';
+import { digitOf, isPunct, letterOf } from './keys.ts';
 import { renderMarkdown, toggleTaskInSource } from './markdown.ts';
 import { SettingsPanel } from './SettingsPanel.ts';
+import { offsetsIn, selectOffsets } from './selection.ts';
 import {
   DEFAULT_STYLE,
   fontById,
@@ -60,6 +72,16 @@ const TOOLBAR: ReadonlyArray<readonly [name: string, label: string, path: string
     'pen',
     'Draw (D)',
     'M3 17.3V21h3.7L17.6 10.1l-3.7-3.7L3 17.3zM20.7 7a1 1 0 0 0 0-1.4l-2.3-2.3a1 1 0 0 0-1.4 0l-1.8 1.8 3.7 3.7L20.7 7z',
+  ],
+  [
+    'settings',
+    'Settings (S)',
+    // Sliders rather than a cog: at 15px a cog's teeth turn into a grey blob, and this is now
+    // the ONLY route to a note's own settings that does not need the keyboard. It was missing
+    // from this list entirely -- `toggleSettings` has always looked for `.act-settings` and
+    // never found it -- so `S` was the sole way in, and on a non-Latin keyboard layout `S`
+    // did not work either. Between them that made per-note settings unreachable.
+    'M3 7H21V9H3ZM13 4H17V12H13ZM3 15H21V17H3ZM6 12H10V20H6Z',
   ],
   [
     'palette',
@@ -137,6 +159,14 @@ export interface NoteHost {
   onDelete?(note: NoteView): void;
   /** The page's undo history. Notes record into it; the page applies from it. */
   history?: History;
+  /**
+   * The global movement cap, read fresh each time it is needed.
+   *
+   * A function rather than a value because the Movement setting can change while notes are on
+   * screen, and a snapshot taken at construction would need every note re-created to pick the
+   * change up. Nothing calls this per frame.
+   */
+  motion?(): 'full' | 'reduced' | 'off';
   /** The note's markdown source changed by something other than typing. */
   onText?(note: NoteView, text: string): void;
   onStyle?(note: NoteView, overrides: Partial<NoteStyle>): void;
@@ -678,22 +708,14 @@ export class NoteView implements Animatable {
   /**
    * Where the caret is, as a character offset.
    *
-   * Falls back to the end of the text when the platform gives no shadow-aware selection --
-   * Firefox has no `ShadowRoot.getSelection()`, so an undo there restores the text exactly and
-   * the caret approximately. Better than refusing to record the edit.
+   * Goes through `selection.ts`, which knows that Firefox has no `ShadowRoot.getSelection()`
+   * and reads `document.getSelection()` instead. This used to call the shadow method with an
+   * optional chain, get `undefined`, and fall back to "the caret is at the end of the text"
+   * for every single edit -- invisible while undo was the only caller, because undoing a run
+   * of typing lands the caret at the end anyway.
    */
   private caretNow(): number {
-    const root = this.bodyEl.getRootNode() as ShadowRoot & {
-      getSelection?: () => Selection | null;
-    };
-    const sel = root.getSelection?.();
-    const anchor = sel?.anchorNode;
-    if (!sel || !anchor || !this.bodyEl.contains(anchor)) return this.text.length;
-    try {
-      return caretOffset(this.bodyEl, anchor, sel.anchorOffset);
-    } catch {
-      return this.text.length;
-    }
+    return offsetsIn(this.bodyEl)?.end ?? this.text.length;
   }
 
   /** Undo/redo of a text edit. Replaces the text and puts the caret back. */
@@ -707,21 +729,7 @@ export class NoteView implements Animatable {
   }
 
   private restoreCaret(caret: number): void {
-    const root = this.bodyEl.getRootNode() as ShadowRoot & {
-      getSelection?: () => Selection | null;
-    };
-    const sel = root.getSelection?.();
-    if (!sel) return;
-    try {
-      const pos = offsetToPosition(this.bodyEl, caret);
-      const range = document.createRange();
-      range.setStart(pos.node, Math.min(pos.offset, (pos.node.nodeValue ?? '').length));
-      range.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    } catch {
-      /* the text is restored, which is the part that matters */
-    }
+    selectOffsets(this.bodyEl, caret);
   }
 
   /** Undo/redo of a style change. Replaces the whole override set. */
@@ -814,6 +822,24 @@ export class NoteView implements Animatable {
     this.settings?.refresh();
   }
 
+  /**
+   * How much this note is allowed to move: the lower of its own choice and the global cap.
+   *
+   * The Movement setting in the cabinet was read by nothing at all before this -- the control
+   * was there, it wrote to storage, and no code anywhere looked at the value. Only the CSS
+   * `prefers-reduced-motion` query did anything, which is not the same thing and is not what
+   * the setting says.
+   *
+   * A cap rather than an override: someone who turned physics down on one note keeps that,
+   * and someone who turns movement off globally gets it everywhere regardless.
+   */
+  private physicsNow(): 'full' | 'reduced' | 'off' {
+    const own = this.style.physics;
+    const cap = this.host.motion?.() ?? 'full';
+    const rank = { off: 0, reduced: 1, full: 2 } as const;
+    return rank[cap] < rank[own] ? cap : own;
+  }
+
   /** The current ui, for recording the "before" side of a change. */
   private uiNow(): Record<string, unknown> {
     return {
@@ -826,18 +852,35 @@ export class NoteView implements Animatable {
     };
   }
 
+  /**
+   * Every key, for every keyboard layout.
+   *
+   * ## The bug this replaces
+   *
+   * Each shortcut used to be matched against `e.key`, which is the character the ACTIVE LAYOUT
+   * produces. On a Persian layout the physical S key reports `'s'`'s Persian counterpart, Z
+   * reports its own, and so `S`, `C`, `D`, `L`, `M`, `P`, `E` and `Ctrl+Z`/`Ctrl+Y` all
+   * silently did nothing -- while Backspace, Delete, Escape and the arrows carried on working,
+   * because their `key` values do not depend on the layout. Three separate "the shortcuts do
+   * not work" reports turned out to be that one line. `keys.ts` explains why the fix prefers
+   * `e.key` and falls back to `e.code` rather than simply using `e.code`, and
+   * `spikes/firefox-keys.mjs` measures it in a real Firefox.
+   */
   private readonly onKeyDown = (e: KeyboardEvent): void => {
-    // Never interfere with typing, and never with an IME composition.
+    // Never interfere with an IME composition.
     if (e.isComposing || e.keyCode === 229) return;
     const root = this.el.getRootNode();
     const active = root instanceof ShadowRoot ? root.activeElement : document.activeElement;
+    const inText = active === this.bodyEl;
+
+    const mod = e.ctrlKey || e.metaKey;
+    const letter = letterOf(e);
 
     // Undo and redo come first, and work wherever focus is inside the note -- in the text as
     // much as on the note. preventDefault is essential in the text: without it the native
     // editor undoes as well and the two histories fight.
-    const mod = e.ctrlKey || e.metaKey;
-    if (mod && !e.altKey && /^[zyZY]$/.test(e.key)) {
-      const redo = e.key.toLowerCase() === 'y' || e.shiftKey;
+    if (mod && !e.altKey && (letter === 'z' || letter === 'y')) {
+      const redo = letter === 'y' || e.shiftKey;
       e.preventDefault();
       e.stopPropagation();
       this.flushTextRun();
@@ -853,28 +896,30 @@ export class NoteView implements Animatable {
         this.enableInk(false);
         return;
       }
-      if (active === this.bodyEl) {
+      if (inText) {
         this.bodyEl.blur();
         this.el.focus({ preventScroll: true });
       }
       return;
     }
 
-    if (active === this.bodyEl) {
+    if (inText) {
       // Ctrl+Enter is the usual "I am done writing" chord, and it is the quickest route from
       // typing to the note-level shortcuts.
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      if (e.key === 'Enter' && mod && !e.shiftKey) {
         e.preventDefault();
         this.bodyEl.blur();
         this.el.focus({ preventScroll: true });
+        return;
       }
+      if (mod && this.onFormatKey(e, letter)) return;
       // Everything else belongs to the text. A plain "d" is a letter, not a drawing toggle.
       return;
     }
 
     // A note-level shortcut is ours and nobody else's, so it stops here. The host contains
     // keyboard events as well; this is belt and braces, and it costs nothing.
-    const CONSUMED = new Set([
+    const NAMED = new Set([
       'ArrowLeft',
       'ArrowRight',
       'ArrowUp',
@@ -883,24 +928,9 @@ export class NoteView implements Animatable {
       'F2',
       'Delete',
       'Backspace',
-      'd',
-      'D',
-      'c',
-      'C',
-      's',
-      'S',
-      'l',
-      'L',
-      'm',
-      'M',
-      'p',
-      'P',
-      'e',
-      'E',
-      'z',
-      'Z',
     ]);
-    if (CONSUMED.has(e.key)) e.stopPropagation();
+    const LETTERS = new Set(['d', 'c', 's', 'l', 'm', 'p', 'e', 'z']);
+    if (NAMED.has(e.key) || (letter !== null && LETTERS.has(letter))) e.stopPropagation();
 
     const step = e.ctrlKey ? 25 : e.shiftKey ? 10 : 1;
     switch (e.key) {
@@ -914,52 +944,149 @@ export class NoteView implements Animatable {
         if (e.altKey) this.resize(this.w + dx * 10, this.h + dy * 10);
         else this.moveTo(this.px.t + dx, this.py.t + dy);
         this.host.onChange?.(this);
-        break;
+        return;
       }
       case 'Enter':
       case 'F2':
         e.preventDefault();
         this.focusBody();
-        break;
+        return;
       case 'Delete':
       case 'Backspace':
         e.preventDefault();
         this.host.onDelete?.(this);
-        break;
+        return;
+    }
+
+    // Letters are resolved by physical position when the layout gives no Latin letter, which
+    // is the whole point of this rewrite -- so they are dispatched separately from `e.key`.
+    if (mod || e.altKey) return;
+    switch (letter) {
       case 'd':
-      case 'D':
         this.enableInk(!this.ink?.isEnabled);
         break;
       case 'c':
-      case 'C':
         this.cyclePalette();
         break;
       case 's':
-      case 'S':
         this.toggleSettings();
         break;
       case 'l':
-      case 'L':
         this.setLocked(!this.locked);
         break;
       case 'm':
-      case 'M':
         this.setCollapsed(!this.collapsed);
         break;
       case 'p':
-      case 'P':
         this.setInkTool('pen');
         break;
       case 'e':
-      case 'E':
         this.setInkTool('eraser');
         break;
       case 'z':
-      case 'Z':
         if (this.ink?.undo()) this.host.onInk?.(this, this.ink.toJSON());
         break;
     }
   };
+
+  // ------------------------------------------------------------- formatting
+
+  /**
+   * The Ctrl chords that edit the markdown source: bold, italic, lists, links.
+   *
+   * Returns true when the chord was ours, so the caller can stop.
+   *
+   * ## Choosing the chords
+   *
+   * They have to be chords Firefox itself does not swallow, and that could NOT be measured
+   * here: `spikes/firefox-chords.mjs` tries, and its control correctly reports that WebDriver
+   * never reaches browser chrome, so every chord looks available to it. Rather than print a
+   * confident table from a broken instrument, the set below follows what rich text editors on
+   * the web already demonstrate works in Firefox every day -- Ctrl+B, Ctrl+I and Ctrl+K are
+   * overridden by every editor there is, and Ctrl+Shift+7/8 are Google Docs' own list
+   * shortcuts. Chords Firefox definitely owns are avoided outright: Ctrl+Shift+M (responsive
+   * design mode), Ctrl+Shift+K (console), Ctrl+Shift+N, Ctrl+Shift+P.
+   *
+   * **There is no Ctrl+U.** Markdown has no underline, the note's lexer therefore cannot render
+   * one, and wiring the key to something that shows up as literal markup in the text would be
+   * worse than leaving it alone. The Keys reference in the settings says so rather than
+   * leaving someone to wonder.
+   */
+  private onFormatKey(e: KeyboardEvent, letter: string | null): boolean {
+    const shift = e.shiftKey;
+    const digit = digitOf(e);
+    const apply = (fn: (sel: Sel) => Sel): boolean => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.applyFormat(fn);
+      return true;
+    };
+
+    if (e.altKey) return false;
+
+    if (!shift) {
+      if (letter === 'b') return apply((sel) => wrapInline(sel, '**'));
+      if (letter === 'i') return apply((sel) => wrapInline(sel, '*'));
+      if (letter === 'e') return apply((sel) => wrapInline(sel, '`'));
+      if (letter === 'k') return apply(makeLink);
+      // Ctrl+Space, the way Word has cleared character formatting for thirty years.
+      if (e.key === ' ' || e.code === 'Space') return apply(clearFormatting);
+      return false;
+    }
+
+    if (letter === 'x') return apply((sel) => wrapInline(sel, '~~'));
+    if (letter === 'd') {
+      // ISO, because a date in a note is there to be unambiguous and to sort.
+      const t = new Date();
+      const iso =
+        `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}` +
+        `-${String(t.getDate()).padStart(2, '0')}`;
+      return apply((sel) => insertText(sel, iso));
+    }
+    if (isPunct(e, '.', 'Period')) return apply((sel) => toggleLinePrefix(sel, 'quote'));
+    if (digit === '7') return apply((sel) => toggleLinePrefix(sel, 'number'));
+    if (digit === '8') return apply((sel) => toggleLinePrefix(sel, 'bullet'));
+    if (digit === '9') return apply((sel) => toggleLinePrefix(sel, 'task'));
+    if (digit === '1') return apply(cycleHeading);
+    if (e.key === 'Enter') return apply(toggleTaskHere);
+    return false;
+  }
+
+  /**
+   * Run one formatting operation and record it as a single undo step.
+   *
+   * The body is set directly rather than through `execCommand`, so `beforeinput`/`input` never
+   * fire and the automatic recorder never sees it -- which is why the entry is written here by
+   * hand, with a null merge key. A formatting change is a deliberate act and should be its own
+   * step: three presses of Ctrl+B want three undos, not one.
+   */
+  private applyFormat(fn: (sel: Sel) => Sel): void {
+    const at = offsetsIn(this.bodyEl);
+    if (!at) return;
+    const before = this.text;
+    const caretBefore = at.end;
+    const next = fn({ text: before, start: at.start, end: at.end });
+    if (next.text === before) {
+      // A no-op still moves the selection (unwrapping, for instance), so honour that and stop.
+      selectOffsets(this.bodyEl, next.start, next.end);
+      return;
+    }
+
+    this.flushTextRun();
+    this.bodyEl.textContent = next.text;
+    selectOffsets(this.bodyEl, next.start, next.end);
+    this.el.setAttribute('aria-label', `Sticky note: ${next.text.slice(0, 40)}`);
+
+    this.note({
+      kind: 'text',
+      before,
+      after: next.text,
+      caretBefore,
+      caretAfter: next.end,
+    });
+    this.host.onText?.(this, next.text);
+    this.host.onChange?.(this);
+  }
 
   // --------------------------------------------------------------------- ink
 
@@ -1300,7 +1427,7 @@ export class NoteView implements Animatable {
       : '0';
     this.el.dataset.tape = this.style.tape;
     this.el.setAttribute('aria-label', `Sticky note: ${this.text.slice(0, 40)}`);
-    if (this.style.physics !== 'full') {
+    if (this.physicsNow() !== 'full') {
       const inert = { w: 1e6, z: 1 };
       for (const s of [this.rz, this.rx, this.ry, this.sk, this.curl]) retune(s, inert.w, inert.z);
     } else {
@@ -1532,7 +1659,7 @@ export class NoteView implements Animatable {
   // ------------------------------------------------------------------ frame
 
   step(dt: number): boolean {
-    if (this.style.physics === 'full') {
+    if (this.physicsNow() === 'full') {
       const pose = poseFromVelocity(this.vx, this.vy, this.lever, this.grabbed);
       this.rx.t = pose.rx;
       this.ry.t = pose.ry;

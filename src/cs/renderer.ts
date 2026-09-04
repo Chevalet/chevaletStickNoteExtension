@@ -47,6 +47,15 @@ let enabled = false;
  * fields it never touched itself.
  */
 let noteDefaults: NoteStyle = resolveStyle({});
+/**
+ * The global movement cap, from the Movement setting, with `auto` already resolved by
+ * the background.
+ *
+ * Held here rather than folded into `noteDefaults` because it is a CAP, not a default:
+ * a note that chose reduced physics of its own accord must keep them when the global
+ * setting says `full`.
+ */
+let motionCap: 'full' | 'reduced' | 'off' = 'full';
 
 /**
  * The revision each mounted note was last known to be at.
@@ -279,12 +288,17 @@ function mountNote(wire: NoteWire): NoteView {
       style: wire.style as never,
       collapsed: wire.ui.collapsed,
       locked: wire.ui.locked,
+      // Without this line every drawing was lost on reload. The background has always sent
+      // `ink` on the wire; the field was simply missing from `NoteWire` and from here, so it
+      // arrived and was dropped. See the comment on NoteWire.ink.
+      ...(wire.ink ? { ink: wire.ink } : {}),
     },
     {
       loop,
       layer,
       history,
       defaults: noteDefaults,
+      motion: () => motionCap,
       raise: () => ++topZ,
       onChange: (n) =>
         save(wire.id, {
@@ -478,6 +492,7 @@ async function boot(): Promise<void> {
   if (hello.protocolV !== PROTOCOL_V) return teardown('protocol mismatch');
   enabled = hello.enabled;
   noteDefaults = resolveStyle(hello.noteDefaults ?? {});
+  motionCap = hello.motion ?? 'full';
 
   if (!enabled) {
     // Stay resident but inert: no host element, no observers, no listeners on the page.
@@ -547,7 +562,9 @@ browser.runtime.onMessage.addListener((msg: unknown) => {
   if (type === 'defaults/changed') {
     // Re-resolve every mounted note. A note keeps its own overrides and only the fields it
     // never set follow the new default, which is the whole point of storing both sparsely.
-    noteDefaults = resolveStyle((msg as { style: Record<string, unknown> }).style);
+    const m = msg as { style: Record<string, unknown>; motion?: typeof motionCap };
+    noteDefaults = resolveStyle(m.style);
+    motionCap = m.motion ?? motionCap;
     for (const view of views.values()) view.setDefaults(noteDefaults);
     return Promise.resolve({ ok: true });
   }

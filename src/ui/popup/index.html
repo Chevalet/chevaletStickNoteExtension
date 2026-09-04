@@ -4,7 +4,20 @@
 <meta charset="utf-8">
 <title>Chevalet Note</title>
 <style>
-  html { background: #f2ece0; }
+  /*
+     These few rules are the exception to "everything visual lives in the stylesheet", and they
+     have to be: they paint the page BEFORE the bundle has run. A bare
+     `html { background: #f2ece0 }` meant a dark-theme user got a flash of cream on every open,
+     because the theme is not known until the settings have been read. So the pre-paint follows
+     the system preference, and the `data-theme` attribute the script stamps on the root beats
+     it in both directions -- the same arrangement as `ui/chrome-theme.ts`.
+  */
+  html { background: #f2ece0; color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) { background: #17150f; color-scheme: dark; }
+  }
+  html[data-theme="dark"] { background: #17150f; color-scheme: dark; }
+  html[data-theme="light"] { background: #f2ece0; color-scheme: light; }
   body:empty { width: 320px; height: 120px; }
 </style>
 </head>

@@ -20,6 +20,7 @@ import {
   createNote,
   getAsset,
   getNote,
+  listTrash,
   type NotePatch,
   notesForContext,
   patchNote,
@@ -32,6 +33,7 @@ import { openDb } from './db/open.ts';
 import type { NoteRecord } from './db/schema.ts';
 import { allocate, DISARM_DELAY_MS, type TabGuardState } from './guard/budget.ts';
 import { injectNow, mayAccess, syncRegistrations } from './inject.ts';
+import { RETENTION_ALARM, RETENTION_PERIOD_MINUTES, runRetentionSweep } from './jobs/retention.ts';
 import {
   checkForUpdate,
   UPDATE_ALARM,
@@ -84,6 +86,11 @@ browser.storage.onChanged.addListener((_changes, area) => {
   if (area === 'local') {
     settingsCache = null;
     void syncUpdateAlarm();
+    // ...and tell every open tab, because the cabinet's settings pane writes straight to
+    // storage rather than through a message. Without this the entire pane was inert in any
+    // tab that was already open: a changed default, a changed direction, a changed movement
+    // setting all sat in storage doing nothing until the page was reloaded.
+    void broadcastSettings();
   }
 });
 // No action.onClicked listener: the manifest declares a default_popup, so it never fires.
@@ -100,6 +107,31 @@ interface TabRuntime {
 
 const tabRuntime = new Map<number, TabRuntime>();
 const armedTabs = new Set<number>();
+/**
+ * How much movement is allowed, with `auto` resolved.
+ *
+ * `auto` has to consult the browser's reduced-motion preference, and the background is the
+ * only context that can answer for every tab at once -- a content script could read its own
+ * `matchMedia`, but then the answer would differ per page for no reason. `matchMedia` is
+ * unavailable in an event page on some builds, so a failure resolves to `full` rather than
+ * quietly pinning every note still.
+ */
+function resolveMotion(s: Settings): 'full' | 'reduced' | 'off' {
+  if (s.motion !== 'auto') return s.motion;
+  try {
+    return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'reduced' : 'full';
+  } catch {
+    return 'full';
+  }
+}
+
+/** Push the current settings to every tab that has a renderer in it. */
+async function broadcastSettings(): Promise<void> {
+  const s = await settings();
+  const payload = { t: 'defaults/changed', style: s.noteDefaults, motion: resolveMotion(s) };
+  for (const tabId of tabRuntime.keys()) void tell(tabId, payload as never);
+}
+
 let settingsCache: Settings | null = null;
 let readyPromise: Promise<void> | null = null;
 let allocationTimer: ReturnType<typeof setTimeout> | null = null;
@@ -451,10 +483,10 @@ async function onMessage(
       const next = { ...current.noteDefaults, ...style };
       await saveSettings({ ...current, noteDefaults: next });
       settingsCache = null;
-      // Every open tab, so a default set on one page reaches notes on another.
-      for (const tabId of tabRuntime.keys()) {
-        void tell(tabId, { t: 'defaults/changed', style: next });
-      }
+      // Every open tab, so a default set on one page reaches notes on another. The
+      // storage.onChanged listener would do this too; doing it here as well makes the
+      // round trip immediate rather than waiting on the storage event.
+      await broadcastSettings();
       return okReply({ noteDefaults: next });
     }
 
@@ -493,6 +525,7 @@ async function hello(
     noteCount: 0,
     notes: [],
     noteDefaults: {},
+    motion: 'full',
   };
   if (!ctx) return okReply(quiet);
 
@@ -518,6 +551,7 @@ async function hello(
     noteCount: records.length,
     notes: records.map(toWire),
     noteDefaults: s.noteDefaults,
+    motion: resolveMotion(s),
   });
 }
 
@@ -634,7 +668,7 @@ function toWire(r: NoteRecord): NoteWire {
     tags: r.tags,
     updatedAt: r.updatedAt,
     ...(r.ink ? { ink: r.ink } : {}),
-  } as NoteWire;
+  };
 }
 
 // --------------------------------------------------------------------- updates
@@ -665,22 +699,43 @@ async function runUpdateCheck(fromClick: boolean): Promise<UpdateInfo> {
   return info;
 }
 
-/** Arm or disarm the daily check to match the setting. */
+/**
+ * Arm or disarm the two periodic jobs to match the settings.
+ *
+ * Both are cleared when their setting is off rather than left armed and short-circuited in the
+ * handler, so an extension with everything turned off wakes for nothing at all.
+ */
 async function syncUpdateAlarm(): Promise<void> {
   const s = await settings();
-  if (!s.autoCheckUpdates) {
+
+  if (s.autoCheckUpdates) {
+    // create() replaces an existing alarm of the same name, so this is idempotent.
+    browser.alarms.create(UPDATE_ALARM, { periodInMinutes: UPDATE_PERIOD_MINUTES });
+  } else {
     await browser.alarms.clear(UPDATE_ALARM).catch(() => undefined);
-    return;
   }
-  // create() replaces an existing alarm of the same name, so this is idempotent.
-  browser.alarms.create(UPDATE_ALARM, { periodInMinutes: UPDATE_PERIOD_MINUTES });
+
+  if (s.retention.autoDelete) {
+    browser.alarms.create(RETENTION_ALARM, { periodInMinutes: RETENTION_PERIOD_MINUTES });
+  } else {
+    await browser.alarms.clear(RETENTION_ALARM).catch(() => undefined);
+  }
 }
 
 async function onAlarm(alarm: browser.alarms.Alarm): Promise<void> {
   await ready();
-  if (alarm.name !== UPDATE_ALARM) return;
-  // No click behind this, so it can only use a permission already granted.
-  await runUpdateCheck(false);
+  if (alarm.name === UPDATE_ALARM) {
+    // No click behind this, so it can only use a permission already granted.
+    await runUpdateCheck(false);
+    return;
+  }
+  if (alarm.name === RETENTION_ALARM) {
+    // The only thing in the extension that destroys a note without being asked to, which is
+    // why it is off by default and why `jobs/retention.ts` refuses to date a note it cannot.
+    const s = await settings();
+    const purged = await runRetentionSweep(s, { listTrash, purgeNote });
+    if (__DEV__ && purged > 0) console.warn(`[cn] retention sweep purged ${purged} note(s)`);
+  }
 }
 
 // ----------------------------------------------------------------------- menu

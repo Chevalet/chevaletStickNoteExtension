@@ -55,6 +55,14 @@ export interface Settings {
   ghostModifier: 'Alt' | 'Control' | 'Shift' | 'none';
   /** `auto` follows prefers-reduced-motion. */
   motion: 'auto' | 'full' | 'reduced' | 'off';
+  /**
+   * The colours of the extension's own pages -- the cabinet, the options page, the popup.
+   *
+   * `auto` follows the browser's `prefers-color-scheme`. Notes themselves are NOT affected:
+   * a note's colour is its paper, chosen per note or per default, and a sticky note that
+   * changed colour because the operating system went dark would be a different note.
+   */
+  theme: 'auto' | 'light' | 'dark';
   /** Empty means "follow the browser". */
   locale: '' | 'en' | 'fa';
 }
@@ -72,6 +80,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   persistPrivateNotes: false,
   ghostModifier: 'Alt',
   motion: 'auto',
+  theme: 'auto',
   locale: '',
 });
 

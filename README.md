@@ -8,9 +8,10 @@ next week and open the same URL: the note is still there, in the same place.
 
 Firefox extension. Offline, private, and yours to export.
 
-> **Status: in development.** Phase 0 de-risking spikes are runnable
-> ([`docs/spikes.md`](docs/spikes.md)); the product is being built on top of them.
-> Not yet on addons.mozilla.org.
+> **Status: 0.0.10, awaiting review on addons.mozilla.org.** A signed build is installable
+> now from the [releases page](https://github.com/Chevalet/chevaletStickNoteExtension/releases);
+> once the listing clears review, Firefox will update it for you on its own. The de-risking
+> spikes are still runnable — see [`docs/spikes.md`](docs/spikes.md).
 
 ---
 
@@ -43,15 +44,80 @@ offers to reattach — it is never silently misplaced and never deleted.
 
 **Your notes are not in the cache.** They live in the extension's own IndexedDB, which
 "Clear cookies and site data" does not touch, and `unlimitedStorage` keeps exempt from
-eviction. The two things that *would* lose them — Refresh Firefox, and uninstalling the
-extension — are covered by scheduled ZIP backups. The README of a notes app should be honest
-about this, so: [see the durability table](#durability).
+eviction. The two things that *would* lose them are Refresh Firefox and uninstalling the
+extension, and the answer to both is **Export ZIP** in the cabinet, which needs no permission
+at all and writes every note, its position, its style and its images to one archive.
+
+There is **no scheduled backup**, and an earlier version of this paragraph said there was —
+"are covered by scheduled ZIP backups", for a feature that does not exist. Exporting is
+something you have to do. The README of a notes app should be honest about this, so:
+[see the durability table](#durability).
 
 **It feels like paper.** Dragging a note runs a critically-damped spring on position and
 underdamped springs on rotation, tilt, skew and corner curl, driven by pointer velocity and by
 where on the note you grabbed it. Only `transform` and `opacity` ever change per frame; the
 release settle is baked into a Web Animations keyframe list so it runs on the compositor and
 stays smooth even when the page's own JavaScript is blocking.
+
+---
+
+## Keyboard
+
+Every shortcut is matched on the **physical key**, so they work on any keyboard layout. Until
+0.0.10 they were matched on the character the layout produces, which meant that on a Persian,
+Arabic, Cyrillic or Greek layout none of the letter shortcuts worked at all — while Backspace,
+Delete and the arrows did, because those do not depend on the layout. A Latin layout still
+wins where it has an opinion, so Dvorak behaves the way a Dvorak user expects.
+
+**Anywhere in Firefox** — rebindable in `about:addons` → the gear → Manage Extension Shortcuts.
+The Keys pane in the cabinet reads the *current* binding from the browser, so it never
+disagrees with what you set.
+
+| | |
+|---|---|
+| `Alt+Shift+A` | Stick a note in the middle of the page |
+| `Alt+Shift+S` | Turn notes off, or back on, for this tab |
+| `Alt+Shift+K` | Move focus to the next note |
+| unbound | Open the cabinet |
+
+**On a page** — `Alt`+double-click makes a note where you clicked. Right-click offers to add
+one, or to quote the text you have selected.
+
+**On a selected note** — grabbing the header, or the sliders button in it, selects the note.
+
+| | |
+|---|---|
+| `S` | This note's settings: colour, type, size, direction, paper |
+| `C` `D` `P` `E` | Next colour · draw · pen · eraser |
+| `Z` | Undo the last brush stroke |
+| `L` `M` | Lock · collapse |
+| `Enter` / `F2` | Start writing |
+| `Delete` | Send it to the trash |
+| arrows | Nudge — `Shift` ×10, `Ctrl` ×25. `Alt`+arrows resizes |
+
+**While writing** — the body of a note is markdown source, so `Ctrl+B` wraps the selection in
+`**` rather than styling it. Pressing it again unwraps.
+
+| | |
+|---|---|
+| `Ctrl+B` `Ctrl+I` | Bold · italic |
+| `Ctrl+Shift+X` `Ctrl+E` | Strikethrough · code |
+| `Ctrl+K` | Make a link |
+| `Ctrl+Shift+.` | Quote |
+| `Ctrl+Shift+8` `7` `9` | Bullet · numbered · task list |
+| `Ctrl+Shift+Enter` | Tick or untick this line's checkbox |
+| `Ctrl+Shift+1` | Heading — again for smaller, again for none |
+| `Ctrl+Shift+D` | Insert today's date |
+| `Ctrl+Space` | Clear formatting |
+| `Ctrl+Enter` | Finish writing and select the note |
+
+There is deliberately no `Ctrl+U`: markdown has no underline, so there is nothing for it to
+produce that a note could render. `Ctrl+Shift+M` and `Ctrl+Shift+K` are left alone because
+Firefox owns them.
+
+**Anywhere in a note** — `Ctrl+Z` and `Ctrl+Y` undo and redo *everything*, in the order you did
+it: typing, colour, moving, resizing, drawing, deleting. One stack for the whole page, so undo
+does not depend on finding the right note first.
 
 ---
 

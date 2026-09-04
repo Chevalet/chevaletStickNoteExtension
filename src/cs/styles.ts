@@ -301,14 +301,17 @@ export const SHEET_CSS = /* css */ `
 /* Below these widths the toolbar would crowd the drag handle, so the lower-priority
    buttons step aside. Everything they do is still on the keyboard, and widening the note
    brings them straight back. */
-@container note (max-width: 210px) {
+@container note (max-width: 235px) {
   .grip-dots { display: none; }
 }
-@container note (max-width: 178px) {
+@container note (max-width: 205px) {
   .act-lock { display: none; }
 }
-@container note (max-width: 155px) {
+@container note (max-width: 180px) {
   .act-collapse { display: none; }
+}
+@container note (max-width: 158px) {
+  .act-pen { display: none; }
 }
 
 /* -------------------------------------------------------------------- body */

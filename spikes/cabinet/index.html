@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>chevaletNote — cabinet harness</title>
+<!--
+  The cabinet, in an ordinary page, so it can be LOOKED AT.
+
+  The manager is an extension page: it needs `browser.storage`, `browser.commands` and
+  `browser.tabs`, none of which exist on http://, so it cannot simply be opened from the dev
+  server. Loading the real extension into Firefox and finding its internal moz-extension UUID
+  is possible but fiddly and not scriptable.
+
+  So this stubs exactly the four browser edges the cabinet touches -- storage.local, its change
+  event, commands.getAll and tabs.create -- and then loads the SHIPPED bundle. Everything
+  visual, every state transition and every setting is the real code; the only fakes are of
+  things whose real behaviour is a plain key-value store.
+
+  IndexedDB is not stubbed at all: it is the same API in a page as in an extension, so
+  `seed.ts` writes through the real store, the real index columns and the real scoping.
+
+  Dev-only. Never shipped.
+
+    pnpm serve
+    http://127.0.0.1:8731/spikes/cabinet/
+    ?theme=dark      force the dark theme without touching your own settings
+    ?seed=0          start empty, to see the empty states
+-->
+<style>
+  /* The same pre-paint the real page has, so a dark-theme flash would show up here too. */
+  html { background: #f2ece0; color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) { background: #17150f; color-scheme: dark; }
+  }
+  html[data-theme="dark"] { background: #17150f; color-scheme: dark; }
+  html[data-theme="light"] { background: #f2ece0; color-scheme: light; }
+
+  #harness {
+    position: fixed; right: 12px; bottom: 44px; z-index: 9999;
+    display: flex; gap: 8px; align-items: center; padding: 7px 10px;
+    background: #14110e; color: #ffe94a; border: 2px solid #ff2e63;
+    font: 11px/1 ui-monospace, Consolas, monospace;
+  }
+  #harness a { color: #7ef0ff; text-decoration: none; }
+  #harness a:hover { text-decoration: underline; }
+  #harness b { color: #ffe94a; font-weight: 400; opacity: .6; }
+</style>
+</head>
+<body></body>
+
+<div id="harness">
+  <b>harness</b>
+  <a href="?theme=auto">auto</a>
+  <a href="?theme=dark">dark</a>
+  <a href="?theme=light">light</a>
+  <b>|</b>
+  <a href="?seed=0">empty</a>
+  <a href="?seed=1">seeded</a>
+  <b>|</b>
+  <a href="?page=manager">cabinet</a>
+  <a href="?page=options">options</a>
+  <a href="?page=popup">popup</a>
+  <b>|</b>
+  <a href="#" id="wipe">wipe</a>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+
+/**
+ * One in-memory storage area, persisted to sessionStorage so a reload keeps your clicks.
+ *
+ * The change event fires asynchronously, the way the real one does. A listener that ran
+ * synchronously inside its own write would hide exactly the re-entrancy bugs this is here to
+ * catch.
+ */
+const area = (() => {
+  let data = {};
+  try {
+    data = JSON.parse(sessionStorage.getItem('cn-harness-storage') || '{}');
+  } catch {}
+  const listeners = [];
+  const persist = () => {
+    try {
+      sessionStorage.setItem('cn-harness-storage', JSON.stringify(data));
+    } catch {}
+  };
+  return {
+    listeners,
+    async get(keys) {
+      if (keys == null) return { ...data };
+      const wanted =
+        typeof keys === 'string' ? [keys] : Array.isArray(keys) ? keys : Object.keys(keys);
+      const out = {};
+      for (const k of wanted) if (k in data) out[k] = data[k];
+      return out;
+    },
+    async set(patch) {
+      const changes = {};
+      for (const [k, v] of Object.entries(patch)) {
+        changes[k] = { oldValue: data[k], newValue: v };
+        data[k] = v;
+      }
+      persist();
+      setTimeout(() => {
+        for (const fn of listeners) fn(changes, 'local');
+      }, 0);
+    },
+    async remove(k) {
+      delete data[k];
+      persist();
+    },
+  };
+})();
+
+window.browser = {
+  storage: {
+    local: area,
+    session: area,
+    onChanged: { addListener: (fn) => area.listeners.push(fn) },
+  },
+  commands: {
+    /*
+     * The real shape of what Firefox returns -- including a command with nothing bound, which
+     * is the case the Keys pane has to render as "not set", and a shortcut deliberately
+     * different from the manifest's suggestion so it is obvious the pane is reading the
+     * browser rather than reprinting the manifest.
+     */
+    async getAll() {
+      return [
+        { name: 'new-note', description: 'Add a note', shortcut: 'Alt+Shift+A' },
+        { name: 'toggle-tab', description: 'Notes on or off', shortcut: 'Ctrl+Alt+9' },
+        { name: 'cycle-notes', description: 'Next note', shortcut: 'Alt+Shift+K' },
+        { name: 'open-manager', description: 'Open the cabinet', shortcut: '' },
+      ];
+    },
+  },
+  tabs: {
+    async create({ url }) {
+      // about: pages cannot be opened from a page, which is the same refusal the real Firefox
+      // may give -- so the fallback message in the Keys pane can be seen working.
+      throw new Error(`the harness cannot open ${url}`);
+    },
+    // The popup asks which tab it is over. One plausible answer is enough to draw the panel.
+    async query() {
+      return [{ id: 1, url: 'https://demo.chevalet.dev/blog/xerox-and-the-zine', title: 'A page' }];
+    },
+    async sendMessage() {
+      return { ok: true, data: {} };
+    },
+  },
+  permissions: {
+    async contains() {
+      return true;
+    },
+    async request() {
+      return true;
+    },
+    async getAll() {
+      return { origins: ['*://demo.chevalet.dev/*'], permissions: [] };
+    },
+  },
+  runtime: {
+    getURL: (p) => `/${p}`,
+    id: 'chevalet-note@chevalet.dev',
+    getManifest: () => ({ version: '0.0.10' }),
+    // The popup and the options page both ask the background for things it alone knows.
+    async sendMessage(msg) {
+      if (msg && msg.t === 'popup/status') {
+        return { ok: true, data: { noteCount: 3, guardArmed: true, tabOverride: undefined } };
+      }
+      if (msg && msg.t === 'update/check') {
+        return { ok: true, data: { checkedAt: Date.now(), latest: null, current: '0.0.10' } };
+      }
+      return { ok: true, data: {} };
+    },
+  },
+};
+
+/*
+ * A theme forced from the query string.
+ *
+ * This has to be written into the STUBBED SETTINGS, not stamped on the root element. The first
+ * version of this harness stamped `data-theme` directly and the page came up dark whatever the
+ * query string said -- because `boot()` reads the real setting and applies it, so `auto` was
+ * correctly removing the attribute a moment later. The harness was wrong, not the page. Seeding
+ * the setting exercises the same path a real click does, which is the point.
+ */
+const forced = params.get('theme');
+if (forced === 'dark' || forced === 'light' || forced === 'auto') {
+  const KEY = 'settings.v1';
+  void area.get(KEY).then((got) => area.set({ [KEY]: { ...(got[KEY] || {}), theme: forced } }));
+  // ...and stamped now as well, so there is no flash of the other theme while storage is read.
+  if (forced === 'auto') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', forced);
+}
+
+document.getElementById('wipe').addEventListener('click', (e) => {
+  e.preventDefault();
+  sessionStorage.removeItem('cn-harness-storage');
+  indexedDB.deleteDatabase('chevaletNote');
+  location.reload();
+});
+</script>
+
+<!-- Seeds the database through the real store, then appends the real manager bundle. -->
+<script src="seed.js"></script>
+</html>

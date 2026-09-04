@@ -9,6 +9,7 @@
 import { explain } from '~/bg/guard/budget.ts';
 import { isEnabledFor, loadSettings, type Settings, setSiteRule } from '~/bg/settings.ts';
 import { isRtl, setLang, t } from '~/shared/i18n.ts';
+import { applyTheme, asThemeChoice, THEME_CSS } from '../chrome-theme.ts';
 
 declare const __VERSION__: string;
 
@@ -44,8 +45,7 @@ function btn(label: string, onClick: () => void, kind = ''): HTMLButtonElement {
   return b;
 }
 
-const POPUP_CSS = /* css */ `
-:root { --ink:#14110e; --paper:#f2ece0; --hi:#ffe94a; --accent:#ff2e63; --cyan:#7ef0ff; --dim:#6f665a; }
+const POPUP_CSS = /* css */ `${THEME_CSS}
 * { box-sizing: border-box; }
 body {
   margin: 0; width: 320px; background: var(--paper); color: var(--ink);
@@ -53,7 +53,7 @@ body {
 }
 header {
   display: flex; align-items: center; gap: 8px;
-  padding: 9px 12px; background: var(--ink); color: var(--hi);
+  padding: 9px 12px; background: var(--bar); color: var(--bar-fg);
   border-bottom: 3px solid var(--accent);
 }
 header img { width: 22px; height: 22px; display: block; }
@@ -66,13 +66,13 @@ header .v { margin-inline-start: auto; color: var(--cyan); font-size: 11px; }
 .note { margin: 0; font-size: 11.5px; color: var(--dim); line-height: 1.45; }
 .btn {
   all: unset; box-sizing: border-box; padding: 5px 10px; cursor: pointer;
-  font: 700 12px/1.5 inherit; background: var(--hi); color: var(--ink);
-  border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--accent); text-align: center;
+  font: 700 12px/1.5 inherit; background: var(--hi); color: var(--on-hi);
+  border: 2px solid var(--on-hi); box-shadow: 3px 3px 0 var(--accent); text-align: center;
 }
 .btn:hover { transform: translate(1px,1px); box-shadow: 2px 2px 0 var(--accent); }
 .btn:active { transform: translate(3px,3px); box-shadow: none; }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.btn.ghost { background: transparent; box-shadow: none; border-color: color-mix(in oklab, var(--ink) 35%, transparent); }
+.btn.ghost { background: transparent; color: var(--ink); box-shadow: none; border-color: color-mix(in oklab, var(--ink) 35%, transparent); }
 .btn.wide { width: 100%; }
 .toggle { display: flex; align-items: center; gap: 8px; }
 .toggle .lamp { width: 11px; height: 11px; border: 2px solid var(--ink); background: var(--dim); }
@@ -156,6 +156,9 @@ async function readTab(settings: Settings): Promise<TabInfo | null> {
 
 async function render(): Promise<void> {
   const settings = await loadSettings().catch(() => null);
+  // The theme is chosen in the cabinet, and the popup obeys it. Applied before anything is
+  // drawn, so the panel never opens light and then turns dark under the cursor.
+  applyTheme(asThemeChoice(settings?.theme));
   setLang(settings?.locale ?? '');
   document.body.dir = isRtl() ? 'rtl' : 'ltr';
 
@@ -224,14 +227,30 @@ async function render(): Promise<void> {
     ),
   );
 
+  /*
+   * The heading is the state; the line under it is why.
+   *
+   * When the guard IS armed those are the same sentence -- `guardWillWarn` and what `explain()`
+   * returns for an armed tab are word for word identical -- so the popup printed "Will warn
+   * before this tab closes." twice, once bold and once not. There is nothing to add in that
+   * case, so nothing is added.
+   *
+   * (`explain()` is English-only, so a reason under a Persian heading is still English. That is
+   * a wider gap than this release closes -- the strings inside a note are untranslated too --
+   * but it is at least no longer showing the same sentence twice.)
+   */
+  const guardBox = el(
+    'div',
+    { class: 'guard' },
+    el('b', {}, info.guardArmed ? t('guardWillWarn') : t('guardModeUnsaved')),
+  );
+  if (!info.guardArmed && info.guardReason) {
+    guardBox.append(el('span', { class: 'note' }, info.guardReason));
+  }
+
   body.append(
     el('hr'),
-    el(
-      'div',
-      { class: 'guard' },
-      el('b', {}, info.guardArmed ? t('guardWillWarn') : t('guardModeUnsaved')),
-      el('span', { class: 'note' }, info.guardReason),
-    ),
+    guardBox,
     // Said here, plainly, once -- rather than being implied by whether a warning appears.
     el('p', { class: 'note' }, t('guardBestEffort')),
   );

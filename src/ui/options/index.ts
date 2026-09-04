@@ -10,6 +10,7 @@ import type { GuardMode } from '~/bg/guard/budget.ts';
 import { RELEASES_PAGE, type UpdateInfo } from '~/bg/jobs/update.ts';
 import { DEFAULT_SETTINGS, loadSettings, type Settings, saveSettings } from '~/bg/settings.ts';
 import { isRtl, setLang, t } from '~/shared/i18n.ts';
+import { applyTheme, asThemeChoice, THEME_CSS } from '../chrome-theme.ts';
 
 declare const __VERSION__: string;
 const VERSION = __VERSION__;
@@ -28,8 +29,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-const OPTIONS_CSS = /* css */ `
-:root { --ink:#14110e; --paper:#f2ece0; --card:#fffdf6; --hi:#ffe94a; --accent:#ff2e63; --cyan:#7ef0ff; --dim:#6f665a; }
+const OPTIONS_CSS = /* css */ `${THEME_CSS}
 * { box-sizing: border-box; }
 body {
   margin: 0; padding: 0 0 60px;
@@ -38,15 +38,15 @@ body {
 }
 header {
   display: flex; align-items: center; gap: 10px;
-  padding: 12px 22px; background: var(--ink); color: var(--hi);
+  padding: 12px 22px; background: var(--bar); color: var(--bar-fg);
   border-bottom: 3px solid var(--accent);
 }
 header img { width: 26px; height: 26px; }
 header .v { margin-inline-start: auto; color: var(--cyan); font-size: 12px; }
 main { max-width: 720px; margin: 0 auto; padding: 22px; display: grid; gap: 18px; }
-section { background: var(--card); border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); }
+section { background: var(--card); border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--shadow-c); }
 section > h2 {
-  margin: 0; padding: 8px 14px; background: var(--ink); color: var(--hi);
+  margin: 0; padding: 8px 14px; background: var(--bar); color: var(--bar-fg);
   font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
 }
 section > .inner { padding: 14px; display: grid; gap: 12px; }
@@ -57,7 +57,7 @@ p.note { margin: 0; font-size: 12px; color: var(--dim); line-height: 1.55; }
 p.warn { margin: 0; font-size: 12px; color: var(--accent); line-height: 1.55; }
 select, input[type="number"] {
   all: unset; box-sizing: border-box; padding: 5px 8px; width: 100%;
-  background: color-mix(in oklab, var(--hi) 22%, #fff);
+  background: color-mix(in oklab, var(--hi) 22%, var(--card));
   border: 2px solid var(--ink); font: inherit; cursor: pointer;
 }
 input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
@@ -65,13 +65,24 @@ select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 table.facts { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 table.facts td { padding: 4px 6px; border-bottom: 1px solid color-mix(in oklab, var(--ink) 12%, transparent); }
 table.facts td:last-child { text-align: end; white-space: nowrap; }
-.yes { color: #0d7a3d; font-weight: 700; }
+.btn {
+  all: unset; box-sizing: border-box; padding: 5px 11px; cursor: pointer;
+  font: 700 12px/1.5 inherit; background: var(--hi); color: var(--on-hi);
+  border: 2px solid var(--on-hi); box-shadow: 3px 3px 0 var(--accent); white-space: nowrap;
+}
+.btn:hover { transform: translate(1px,1px); box-shadow: 2px 2px 0 var(--accent); }
+.btn:active { transform: translate(3px,3px); box-shadow: none; }
+.btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.yes { color: var(--ok); font-weight: 700; }
 .no { color: var(--accent); font-weight: 700; }
 a { color: inherit; text-decoration-color: var(--accent); }
-.saved { position: fixed; inset: auto 0 0 0; padding: 6px 22px; background: var(--ink); color: var(--cyan); font-size: 12px; }
+.saved { position: fixed; inset: auto 0 0 0; padding: 6px 22px; background: var(--bar); color: var(--cyan); font-size: 12px; }
 @media (forced-colors: active) {
   section { border: 1px solid CanvasText; box-shadow: none; }
   select, input { border: 1px solid ButtonBorder; background: Field; color: FieldText; }
+  .btn { border: 1px solid ButtonBorder; background: ButtonFace; color: ButtonText; box-shadow: none; }
 }
 `;
 
@@ -144,7 +155,14 @@ let checking = false;
 
 function updateRow(): HTMLElement {
   const status = el('span', { class: 'note' });
-  const button = el('button', { type: 'button' }, t('updatesCheck')) as HTMLButtonElement;
+  // Given the house button class: as a bare <button> it rendered as the operating system's own
+  // grey box in the middle of the page, which was merely out of place in the light theme and
+  // plainly broken once there was a dark one.
+  const button = el(
+    'button',
+    { type: 'button', class: 'btn' },
+    t('updatesCheck'),
+  ) as HTMLButtonElement;
   const link = el('a', {
     href: RELEASES_PAGE,
     target: '_blank',
@@ -343,13 +361,15 @@ function render(): void {
           365,
           (v) => void patch({ retention: { ...current.retention, trashDays: v } }),
         ),
-        numberField(
-          'Revisions kept per note',
-          current.retention.revisionsPerNote,
-          1,
-          200,
-          (v) => void patch({ retention: { ...current.retention, revisionsPerNote: v } }),
-        ),
+        /*
+         * "Revisions kept per note" used to be here and has been taken out.
+         *
+         * `addRevision` and `shouldSnapshot` are written and tested in `bg/db/notes.ts`, and
+         * **nothing calls either of them** -- no revision has ever been stored, so the number
+         * governed nothing. The field stays in `Settings` so the day version history lands it
+         * has somewhere to read from; the control goes, because a control that writes to
+         * storage and changes nothing makes a promise the app does not keep.
+         */
         checkField(
           'Let old notes be deleted automatically once their time is up',
           current.retention.autoDelete,
@@ -407,6 +427,18 @@ function render(): void {
   );
 
   // -------------------------------------------------------------- backup
+  /*
+   * Scheduled backup is NOT offered, and the two controls that used to be here are gone.
+   *
+   * They were a switch and an interval for something that does not exist: there is no alarm
+   * that writes a backup, and the `downloads` permission an unattended write would need was
+   * removed from the manifest precisely because nothing used it. The help text even promised
+   * that "Firefox will ask the first time" -- it could not have, the permission is not
+   * declared, not even optionally.
+   *
+   * So this section now says what is true. Manual export works, needs no permission at all,
+   * and is one click away in the cabinet.
+   */
   main.append(
     el(
       'section',
@@ -415,23 +447,20 @@ function render(): void {
       el(
         'div',
         { class: 'inner' },
-        checkField(
-          'Write a ZIP backup automatically',
-          current.backup.enabled,
-          (v) => void patch({ backup: { ...current.backup, enabled: v } }),
-        ),
-        numberField(
-          'Hours between backups',
-          current.backup.everyHours,
-          1,
-          168,
-          (v) => void patch({ backup: { ...current.backup, everyHours: v } }),
+        el(
+          'p',
+          { class: 'note' },
+          'Export ZIP in the cabinet writes every note, its position, its style and its ' +
+            'images to one archive, and needs no permission at all — the bytes are already ' +
+            'here, so Firefox is simply handed a file to save.',
         ),
         el(
           'p',
           { class: 'note' },
-          'Unattended backups need permission to write to your downloads folder; Firefox will ' +
-            'ask the first time. Exporting by hand from the cabinet needs no permission at all.',
+          'There is no scheduled backup yet. Writing one unattended needs permission to your ' +
+            'downloads folder, which this extension deliberately does not ask for while ' +
+            'nothing uses it, so there is nothing to switch on here rather than a switch that ' +
+            'does nothing.',
         ),
       ),
     ),
@@ -511,6 +540,9 @@ async function boot(): Promise<void> {
   // Fall back to the defaults rather than dying: the diagnostics section below is the reason
   // someone may be opening this page at all, and a storage error must not hide it.
   current = await loadSettings().catch(() => DEFAULT_SETTINGS);
+  // The theme is chosen in the cabinet, and this page has to obey it -- the setting says "the
+  // cabinet, the popup and this page", and a page that ignored it would make that a lie.
+  applyTheme(asThemeChoice(current.theme));
   setLang(current.locale);
   render();
 }

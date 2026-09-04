@@ -139,6 +139,32 @@ thing in this listing.
 Answer **no** to every category. The manifest already declares
 `data_collection_permissions: { required: ['none'] }`, and this form has to agree with it.
 
+## Version notes for 0.0.10
+
+```
+Every keyboard shortcut now works on every keyboard layout.
+
+They were matched on the character the active layout produces, so on a Persian, Arabic,
+Cyrillic or Greek keyboard none of the letter shortcuts worked at all -- S for a note's
+settings, C for colour, D to draw, and Ctrl+Z / Ctrl+Y for undo -- while Backspace, Delete
+and the arrows kept working, because those do not depend on the layout. They are matched on
+the physical key now, with the layout's own character still winning where it is a Latin
+letter, so Dvorak behaves the way a Dvorak user expects.
+
+New in a note's text: Ctrl+B, Ctrl+I, Ctrl+Shift+X, Ctrl+E, Ctrl+K, quotes, bullet, numbered
+and task lists, headings, insert-date, and clear-formatting. Each is one undo step.
+
+New in the cabinet: a dark theme, covering the cabinet, the popup and the options page, with
+the switch at the foot of the cabinet. And a settings button in each note's header -- the S
+key used to be the only way in, which was no way in at all on a non-Latin keyboard.
+
+Fixed: opening the settings in the cabinet trapped you there, because clicking any other item
+did not leave it. Drawings were lost on reload. The Movement setting was read by nothing. Two
+settings sliders showed the wrong values and could write values a note could not use. Three
+more controls that changed nothing have been removed. Undo now restores the caret where it
+actually was.
+```
+
 ## Version notes for 0.0.8
 
 ```

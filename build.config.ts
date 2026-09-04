@@ -63,6 +63,9 @@ export const TARGETS: readonly Target[] = [
 export const HARNESSES: readonly Target[] = [
   { in: '../spikes/paper/main.ts', out: '../spikes/paper/bundle', format: 'iife' },
   { in: '../spikes/playground/main.ts', out: '../spikes/playground/bundle', format: 'iife' },
+  // The cabinet, in an ordinary page. Seeds the real store, then loads the real manager
+  // bundle -- see spikes/cabinet/index.html for why the manager cannot just be opened.
+  { in: '../spikes/cabinet/seed.ts', out: '../spikes/cabinet/seed', format: 'iife' },
 ];
 
 export function sharedOptions(dev: boolean): esbuild.BuildOptions {
@@ -147,7 +150,7 @@ export async function copyStatic(): Promise<void> {
  * page's own scripts, and exists solely to hold a `beforeunload` listener. It has to stay
  * small enough that its cost is not measurable. Currently 0.3 kB.
  *
- * `cs/renderer.js` — 32 kB, raised three times, each with the measurement in hand.
+ * `cs/renderer.js` — 34 kB, raised four times, each with the measurement in hand.
  *
  * 24 -> 28 kB when anchoring moved onto this path (~3 kB gz for `anchor/` plus 1.7 kB
  * minified of `approx-string-match`). 28 -> 30 kB for undo/redo: `history.ts` is 3.1 kB
@@ -155,26 +158,40 @@ export async function copyStatic(): Promise<void> {
  * images, which have to decode bytes into a canvas on the page side, because a content
  * script's `<img src>` answers to the *page's* CSP and would silently fail on a strict site.
  *
- * 32 rather than the 30.1 kB the images actually cost, because moving this line by a hundred
- * bytes at a time is how a budget stops meaning anything. The next feature has headroom; the
- * one after it has to make the argument again.
+ * 32 -> 34 kB in 0.0.10, for the keyboard: the formatting shortcuts, layout-independent key
+ * matching, and a selection module that works in a browser with no `ShadowRoot.getSelection`.
+ * Measured with a metafile rather than estimated:
  *
- * The measured breakdown at 86.7 kB minified says there is no fat to cut instead — 24.2 kB is
- * NoteView, 16.2 kB is the stylesheet, and the rest is spread across the ink layer,
- * `perfect-freehand`, the settings panel, markdown, anchoring and history. Every one of those
- * is the feature itself.
+ *     src/cs/note/format.ts       3.30 kB minified   Ctrl+B and the rest, as text operations
+ *     src/cs/note/selection.ts    1.26 kB            reading and writing the caret
+ *     src/cs/note/keys.ts         0.54 kB            which key was pressed, on any layout
+ *                                 -------
+ *                                 5.10 kB minified, ~1.8 kB gz
+ *
+ * That lands the bundle at 31.9 kB gz against the old 32 kB ceiling — a hundred bytes of
+ * headroom, which is no headroom at all.
  *
  * The question this number exists to force is "is the new code needed on a page that has no
- * notes yet?", and for undo the answer is uncomfortable: it is not, but it cannot be split
- * off either. Recording has to be live from the first keystroke, and lazy-loading it would
- * mean a dynamic import of an extension URL, which needs `web_accessible_resources` — and
- * that lets any page on the web detect the extension. Trading a fingerprinting surface for
- * 3 kB is not a trade worth making, so the code stays and the budget moves.
+ * notes yet?" For `keys.ts` and `selection.ts` the answer is yes: recording has to be live
+ * from the first keystroke, and the caret is part of every recorded edit. For `format.ts` the
+ * honest answer is no — nothing needs it until someone is typing in a note — but it cannot be
+ * split off, for exactly the reason undo could not be: lazy-loading means a dynamic import of
+ * an extension URL, which needs `web_accessible_resources`, and that lets any page on the web
+ * detect the extension. Trading a fingerprinting surface for 3 kB is not a trade worth making.
  *
- * Before raising it again: re-measure with an esbuild metafile, ask the same question, and if
- * the answer is again "cannot be split", say so here rather than moving the number quietly.
+ * `selection.ts` is not purely additive, incidentally: `history.ts` re-exports its two tree
+ * walks instead of carrying its own copies, so the net cost is a little under the 5.10 kB.
+ *
+ * The measured breakdown at 94.0 kB minified says there is no fat to cut instead — 25.5 kB is
+ * NoteView, 16.3 kB is the stylesheet, and the rest is spread across the ink layer,
+ * `perfect-freehand`, the settings panel, markdown, anchoring, history and formatting. Every
+ * one of those is the feature itself.
+ *
+ * Before raising it again: re-measure with an esbuild metafile (see the tail of this comment's
+ * history for how), ask the same question, and if the answer is again "cannot be split", say so
+ * here rather than moving the number quietly.
  */
 export const BUDGETS_GZ: Readonly<Record<string, number>> = {
   'cs/guard.js': 1_024,
-  'cs/renderer.js': 32 * 1024,
+  'cs/renderer.js': 34 * 1024,
 };
