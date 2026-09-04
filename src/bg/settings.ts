@@ -35,6 +35,18 @@ export interface Settings {
     keepDaily: number;
     keepWeekly: number;
   };
+  /**
+   * How a new note looks, as a SPARSE diff against the built-in style.
+   *
+   * Sparse on purpose, and the same shape a note's own overrides take. A note stores only what
+   * it changed, and resolves against this; this stores only what the user changed, and resolves
+   * against `DEFAULT_STYLE`. So adding a style field in a later version reaches every existing
+   * note and every existing default, instead of being frozen out by a snapshot taken before it
+   * existed.
+   *
+   * Written by "Save as my default" in a note's settings panel, which is what the S key opens.
+   */
+  noteDefaults: Record<string, unknown>;
   /** Look for a new release once a day. Off by default: it is the only network call. */
   autoCheckUpdates: boolean;
   /** Notes in private windows are in-memory only unless this is turned on. */
@@ -55,6 +67,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   urlMatchDefault: { ...DEFAULT_URL_MATCH },
   retention: { trashDays: 30, detachedDays: 30, revisionsPerNote: 50, autoDelete: false },
   backup: { enabled: false, everyHours: 12, keepDaily: 7, keepWeekly: 4 },
+  noteDefaults: {},
   autoCheckUpdates: false,
   persistPrivateNotes: false,
   ghostModifier: 'Alt',

@@ -164,7 +164,7 @@ async function render(): Promise<void> {
   document.body.textContent = '';
 
   const logo = el('img');
-  logo.src = '../assets/logo-mark.svg';
+  logo.src = '../assets/logo.svg';
   logo.alt = '';
   document.body.append(
     el(

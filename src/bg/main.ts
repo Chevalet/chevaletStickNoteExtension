@@ -18,11 +18,13 @@ import type { NoteId } from '~/shared/types.ts';
 import {
   countForContext,
   createNote,
+  getAsset,
   getNote,
   type NotePatch,
   notesForContext,
   patchNote,
   purgeNote,
+  putAsset,
   restoreNote,
   trashNote,
 } from './db/notes.ts';
@@ -52,8 +54,13 @@ import {
   sanitizeUi,
 } from './msg/sanitize.ts';
 import { defaultScopeFor, matchContext } from './scope/match.ts';
-import { isEnabledFor, loadSettings, type Settings } from './settings.ts';
+import { isEnabledFor, loadSettings, type Settings, saveSettings } from './settings.ts';
 import { forgetTab, getTabFlags, resolveTabKey, setTabEnabled } from './tabs/identity.ts';
+
+/** Ten megabytes. Generous for a screenshot, far short of a video. */
+const ASSET_MAX_BYTES = 10 * 1024 * 1024;
+/** Raster images only, and only formats a canvas can decode without a codec of our own. */
+const ASSET_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif']);
 
 declare const __DEV__: boolean;
 declare const __VERSION__: string;
@@ -407,6 +414,50 @@ async function onMessage(
       return okReply({ trashed: m.soft });
     }
 
+    case 'asset/put': {
+      const m = msg as { noteId: NoteId; name: string; type: string; bytes: ArrayBuffer };
+      if (!(m.bytes instanceof ArrayBuffer))
+        return errReply('SCHEMA', 'bytes must be an ArrayBuffer');
+      // A hard ceiling. A note is not a photo album, and an unbounded paste is the easiest way
+      // to fill someone's profile directory without them noticing.
+      if (m.bytes.byteLength > ASSET_MAX_BYTES) return errReply('QUOTA', 'image too large');
+      if (!ASSET_TYPES.has(m.type)) return errReply('SCHEMA', `unsupported type: ${m.type}`);
+      if (!(await getNote(m.noteId))) return errReply('NOT_FOUND');
+      const id = await putAsset(
+        m.noteId,
+        new Blob([m.bytes], { type: m.type }),
+        m.name.slice(0, 200),
+      );
+      touch(sender.tab?.id);
+      return okReply({ id });
+    }
+
+    case 'asset/get': {
+      const record = await getAsset((msg as { id: string }).id as never);
+      if (!record) return errReply('NOT_FOUND');
+      // Back out as bytes, for the same cloning reason they came in that way.
+      return okReply({
+        id: record.id,
+        type: record.blob.type,
+        bytes: await record.blob.arrayBuffer(),
+      });
+    }
+
+    case 'settings/saveDefaults': {
+      const style = sanitizeStyle((msg as { style?: unknown }).style);
+      const current = await settings();
+      // Merged, not replaced: the panel sends the whole resolved style, and anything it does
+      // not mention should keep following the built-in default rather than being frozen.
+      const next = { ...current.noteDefaults, ...style };
+      await saveSettings({ ...current, noteDefaults: next });
+      settingsCache = null;
+      // Every open tab, so a default set on one page reaches notes on another.
+      for (const tabId of tabRuntime.keys()) {
+        void tell(tabId, { t: 'defaults/changed', style: next });
+      }
+      return okReply({ noteDefaults: next });
+    }
+
     case 'update/check': {
       const info = await runUpdateCheck((msg as { fromClick?: boolean }).fromClick === true);
       return okReply(info);
@@ -441,6 +492,7 @@ async function hello(
     urlKey: null,
     noteCount: 0,
     notes: [],
+    noteDefaults: {},
   };
   if (!ctx) return okReply(quiet);
 
@@ -465,6 +517,7 @@ async function hello(
     urlKey: null,
     noteCount: records.length,
     notes: records.map(toWire),
+    noteDefaults: s.noteDefaults,
   });
 }
 

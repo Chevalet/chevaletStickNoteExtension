@@ -208,7 +208,8 @@ export class NoteView implements Animatable {
     this.id = init.id;
     this.host = host;
     this.overrides = { ...init.style };
-    this.style = resolveStyle(this.overrides, host.defaults);
+    this.hostDefaults = host.defaults;
+    this.style = resolveStyle(this.overrides, this.hostDefaults);
     this.w = init.w;
     this.h = init.h;
     this.zIndex = init.z;
@@ -437,7 +438,7 @@ export class NoteView implements Animatable {
   setStyle(patch: Partial<NoteStyle>): void {
     const was = { ...this.overrides };
     this.overrides = { ...this.overrides, ...patch };
-    this.style = resolveStyle(this.overrides, this.host.defaults);
+    this.style = resolveStyle(this.overrides, this.hostDefaults);
     this.applyStyle();
     this.resizeArt();
     this.settings?.refresh();
@@ -451,7 +452,7 @@ export class NoteView implements Animatable {
     const was = { ...this.overrides };
     const { [key]: _dropped, ...rest } = this.overrides;
     this.overrides = rest;
-    this.style = resolveStyle(this.overrides, this.host.defaults);
+    this.style = resolveStyle(this.overrides, this.hostDefaults);
     this.applyStyle();
     this.resizeArt();
     this.settings?.refresh();
@@ -475,7 +476,7 @@ export class NoteView implements Animatable {
     this.settings = new SettingsPanel({
       style: () => this.style,
       overrides: () => this.overrides,
-      defaults: () => this.host.defaults ?? (DEFAULT_STYLE as NoteStyle),
+      defaults: () => this.hostDefaults ?? (DEFAULT_STYLE as NoteStyle),
       change: (patch) => this.setStyle(patch),
       reset: (key) => this.resetStyle(key),
       saveAsDefault: () => this.host.onSaveDefault?.(this, this.style),
@@ -646,6 +647,8 @@ export class NoteView implements Animatable {
    * shortcut belonging to the host page.
    */
   /** The ui as it was when the current gesture started. */
+  /** Overridden by setDefaults; starts as whatever the host handed over at construction. */
+  private hostDefaults: NoteStyle | undefined;
   private uiFrom: Record<string, unknown> | null = null;
   /** Snapshot taken on beforeinput, so the recorder knows what the text WAS. */
   private pendingText: { text: string; caret: number } | null = null;
@@ -724,7 +727,7 @@ export class NoteView implements Animatable {
   /** Undo/redo of a style change. Replaces the whole override set. */
   applyStyleSet(overrides: Record<string, unknown>): void {
     this.overrides = { ...overrides } as Partial<NoteStyle>;
-    this.style = resolveStyle(this.overrides, this.host.defaults);
+    this.style = resolveStyle(this.overrides, this.hostDefaults);
     this.applyStyle();
     this.resizeArt();
     this.settings?.refresh();
@@ -794,6 +797,21 @@ export class NoteView implements Animatable {
       after.h = to.h;
     }
     this.note({ kind: 'ui', before, after });
+  }
+
+  /**
+   * Adopt a new default style.
+   *
+   * The note keeps its own overrides; only the fields it never touched move. That is what
+   * makes "Save as my default" useful rather than destructive: it changes what every note
+   * inherits without overwriting a single deliberate choice anyone made.
+   */
+  setDefaults(defaults: NoteStyle): void {
+    this.hostDefaults = defaults;
+    this.style = resolveStyle(this.overrides, defaults);
+    this.applyStyle();
+    this.resizeArt();
+    this.settings?.refresh();
   }
 
   /** The current ui, for recording the "before" side of a change. */

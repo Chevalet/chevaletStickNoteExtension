@@ -1,65 +1,57 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Chevalet Note">
   <title>Chevalet Note</title>
   <!--
-    The hero mark. Used at 32px and up: the toolbar icon, the manager header, the store
-    listing. Below 32px it collapses into logo-mark.svg, which drops everything that turns to
-    mud at that size.
+    THE logo. One mark, at every size and in every place: the toolbar button, the tab favicon,
+    the popup, the settings page, the cabinet header, and the store listing. There is no
+    second, simplified file any more; a single identity was asked for and this is it.
 
-    This is the same sheet the extension draws on a page, reduced to what survives as a logo:
-      torn top edge   a note ripped off the pad, not a rounded rectangle
-      halftone        the risograph texture, faint enough to read as tone
-      marker strokes  tapered paths, the shape a real marker leaves, not stroked lines
-      hard shadow     unblurred and offset, the way a two-colour print misregisters
-      thin keyline    1.6px at 64. Thick outlines read as a cartoon; the house style is sharp.
+    Two things drove the drawing.
 
-    Slapped on at a slight angle, because that is how a sticker lands.
+    Presence at 16px. The previous mark spanned 7..53 of a 64 box, so barely 72% of the frame
+    carried any ink and the toolbar button looked like a small stamp adrift in a large empty
+    square. This one runs 3..61 in both directions, about 92% coverage, and it fills the button.
+
+    The arithmetic of small sizes. At 16px one viewBox unit is a quarter of a pixel, so the old
+    1.6-unit keyline rendered at 0.4px and vanished. Nothing here is thinner than 3 units, and
+    the marker strokes are 9 and 6.5, which land at 2.25px and 1.6px in the toolbar.
+
+    That pushes toward heavy black, which was the exact criticism of an earlier attempt. So the
+    weight is carried by an offset flat shadow rather than by a fat outline: the keyline stays a
+    sharp 3, the ink mass sits behind the sheet as the register offset a screen print misses by,
+    and the accent stroke does the shouting. The halftone and the five-degree tilt are gone.
+    Both read as texture at 128px and as dirt at 16px, and neither survives being asked to be
+    the only logo.
   -->
   <defs>
-    <linearGradient id="cnPaper" x1="0.05" y1="0" x2="0.5" y2="1">
-      <stop offset="0" stop-color="#FFF48F"/>
-      <stop offset="0.55" stop-color="#FFE741"/>
+    <linearGradient id="cnPaper" x1="0.15" y1="0" x2="0.55" y2="1">
+      <stop offset="0" stop-color="#FFF06A"/>
       <stop offset="1" stop-color="#FFD400"/>
     </linearGradient>
-    <linearGradient id="cnFlap" x1="1" y1="0" x2="0.1" y2="1">
-      <stop offset="0" stop-color="#FFEE9A"/>
-      <stop offset="1" stop-color="#B98A00"/>
+    <linearGradient id="cnFold" x1="1" y1="0" x2="0.1" y2="1">
+      <stop offset="0" stop-color="#FFE87A"/>
+      <stop offset="1" stop-color="#C08F00"/>
     </linearGradient>
-    <pattern id="cnTone" patternUnits="userSpaceOnUse" width="3.2" height="3.2">
-      <circle cx="0.8" cy="0.8" r="0.62" fill="#14110E"/>
-      <circle cx="2.4" cy="2.4" r="0.62" fill="#14110E"/>
-    </pattern>
-
-    <!-- One sheet outline, reused by the shadow, the fill, the tone and the clip. -->
+    <!--
+      The sheet: a torn top edge in sharp teeth, and the bottom right corner turned up. Drawn
+      once and referenced, so the shadow can never drift out of register with the paper.
+    -->
     <path id="cnSheet"
-      d="M8.2 12.6 L13.4 10.2 L18.8 12.1 L24.6 9.9 L30.4 11.9 L36.6 10.0 L42.6 12.0 L48.8 10.1 L54.4 12.2
-         L54.9 20 L54.2 27.4 L54.8 33 L54.5 37.4 L37.4 54.6
-         L30 54.2 L23 54.9 L16 54.3 L11.9 54.8
-         L8.6 48.6 L9.4 42 L8.1 35.4 L9.2 28.8 L7.9 22.4 Z"/>
-    <clipPath id="cnClip"><use href="#cnSheet"/></clipPath>
+          d="M3 9.5 L10 6.2 L16.5 10 L23.5 6.4 L30.5 10 L37.5 6.2 L45 10 L52.5 6.4 L61 9.5
+             L61 43.5 L43.5 61 L3 61 Z"/>
   </defs>
 
-  <g transform="rotate(-5 32 32)">
-    <!-- Hard offset shadow. Ink, not grey: a riso misregistration, not a drop shadow. -->
-    <use href="#cnSheet" fill="#14110E" transform="translate(2.6 3)"/>
+  <!-- The register offset. This is the mark's weight, in place of a thick outline. -->
+  <use href="#cnSheet" x="2.6" y="3" fill="#14110E"/>
 
-    <use href="#cnSheet" fill="url(#cnPaper)"/>
-    <g clip-path="url(#cnClip)">
-      <rect x="0" y="0" width="64" height="64" fill="url(#cnTone)" opacity="0.13"/>
-    </g>
-    <use href="#cnSheet" fill="none" stroke="#14110E" stroke-width="1.6" stroke-linejoin="round"/>
+  <use href="#cnSheet" fill="url(#cnPaper)" stroke="#14110E" stroke-width="3"
+       stroke-linejoin="miter"/>
 
-    <!-- The turned-up corner, filling the cut the sheet path leaves behind. -->
-    <path d="M37.4 54.6 L37.4 37.4 L54.6 37.4 Z"
-          fill="url(#cnFlap)" stroke="#14110E" stroke-width="1.6" stroke-linejoin="round"/>
-    <path d="M37.4 37.4 L54.6 37.4" stroke="#14110E" stroke-width="1.6" opacity="0.35"/>
+  <!-- The turned corner, filling the cut the sheet path leaves behind. -->
+  <path d="M43.5 61 L43.5 43.5 L61 43.5 Z"
+        fill="url(#cnFold)" stroke="#14110E" stroke-width="3" stroke-linejoin="miter"/>
 
-    <!-- Marker strokes as tapered filled paths: thin at the start, swelling, thin at the lift.
-         A stroked line with round caps looks printed; this looks written. -->
-    <path d="M15.6 22.4 C22 20.2 33 19.6 45.4 20.6 C33.6 23.4 22.8 24.2 15.6 22.4 Z"
-          fill="#FF2E63"/>
-    <path d="M15.9 32.2 C20.6 30.9 27.4 30.6 34.6 31.1 C27.8 33.2 20.7 33.5 15.9 32.2 Z"
-          fill="#14110E" opacity="0.86"/>
-    <path d="M16.2 41.1 C19.4 40.3 23.2 40.2 27.1 40.6 C23.3 42 19.4 42 16.2 41.1 Z"
-          fill="#14110E" opacity="0.5"/>
-  </g>
+  <!-- Two marker strokes: one shouting, one quiet. Both thick enough to read at 16px. -->
+  <path d="M12.5 24.5 H47" stroke="#FF2E63" stroke-width="9" stroke-linecap="round"/>
+  <path d="M12.5 38 H36" stroke="#14110E" stroke-width="6.5" stroke-linecap="round"
+        opacity="0.8"/>
 </svg>

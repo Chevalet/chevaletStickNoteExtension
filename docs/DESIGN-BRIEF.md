@@ -114,25 +114,40 @@ to Persian, or pick a face that covers both.
 
 ## 6. The logo
 
-A silhouette in the spirit of the Windows Sticky Notes icon — a sheet of paper with writing on
-it — but in this project's own language. Current construction, in `assets/logo.svg`:
+A sheet of paper with writing on it — the silhouette everyone already reads as "sticky note" —
+in this project's own language. **One file, `assets/logo.svg`, used at every size and in every
+place**: the toolbar button, the tab favicon, the popup, the settings page, the cabinet header,
+the store listing. There is no separate simplified mark; that arrangement existed until 0.0.6
+and was replaced when a single identity was asked for.
 
-- 64 × 64 viewBox, the sheet rotated `-5°` about its centre
-- Torn top edge; halftone `<pattern>` fill over a flat paper fill; a folded flap
-- Ink `#14110E`, accent `#FF2E63`, keyline `1.6px`
-- Marker strokes drawn as **tapered filled paths**, not stroked lines, so they read as a
-  chisel marker rather than a pen
-- An offset flat ink shadow — the screen-print register offset again
+Current construction:
 
-There is a second file, `assets/logo-mark.svg`, simplified for ≤24px: no tear, no halftone,
-no tilt, and a heavier `2.6px` keyline. **Both are needed.** A mark that is only beautiful at
-512px is not finished.
+- 64 × 64 viewBox, the artwork spanning 3..61 in both directions — about **92% coverage**
+- Torn top edge in sharp teeth; the bottom-right corner turned up
+- Paper `#FFF06A` → `#FFD400`, ink `#14110E`, accent `#FF2E63`
+- Keyline 3 units; marker strokes 9 (accent) and 6.5 (ink at 80%)
+- An offset flat ink shadow at (2.6, 3), sharing the same path as the paper
+- No tilt and no halftone
 
-Known critique to work with: an earlier version had black lines that were too thick and heavy
-and lost the sharp, cut quality of the rest of the design. The wanted direction is **sharper,
-more graffiti/stencil, more cut-paper — less "bold icon set"**.
+**The arithmetic that shapes it.** At 16px one viewBox unit is a quarter of a pixel. The
+previous mark spanned 7..53 with a 1.6-unit keyline, so 72% of the frame carried ink and the
+outline rendered at 0.4px — which is why the toolbar button looked like a small stamp adrift in
+an empty square. Nothing is now thinner than 3 units, and the strokes land at 2.25px and 1.6px
+in the toolbar.
 
-Sizes that must each look deliberate, not merely scaled: **16, 32, 48, 64, 96, 128, 512**.
+That pressure toward heavy black is real, and heavy black was the exact criticism of an earlier
+attempt. The resolution is that **weight comes from the offset shadow, not from a fat outline**:
+a sharp 3-unit keyline, the ink mass sitting behind the sheet as a register miss, and the accent
+stroke doing the shouting. The halftone and the tilt were dropped for the same reason — texture
+at 128px, dirt at 16px, and neither survives being the only logo.
+
+Sizes that must each look deliberate rather than merely scaled: **16, 24, 32, 48, 64, 96, 128,
+256, 512**. `spikes/make-icons.mjs` rasterises all of them from the SVG in a real Firefox, so
+the PNGs in the repo cannot drift away from the source. Run it and commit the output whenever
+the SVG changes.
+
+Direction for any replacement: **sharper, more graffiti and stencil, more cut-paper — less
+"bold icon set"**, and it has to fill its frame and read at 16px.
 
 ## 7. Hard constraints — read these before drawing
 

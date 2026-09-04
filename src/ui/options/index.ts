@@ -10,7 +10,6 @@ import type { GuardMode } from '~/bg/guard/budget.ts';
 import { RELEASES_PAGE, type UpdateInfo } from '~/bg/jobs/update.ts';
 import { DEFAULT_SETTINGS, loadSettings, type Settings, saveSettings } from '~/bg/settings.ts';
 import { isRtl, setLang, t } from '~/shared/i18n.ts';
-import { diagnosticsSection } from './diagnostics.ts';
 
 declare const __VERSION__: string;
 const VERSION = __VERSION__;
@@ -378,16 +377,6 @@ function render(): void {
     ),
   );
 
-  // ---------------------------------------------------------- diagnostics
-  main.append(
-    el(
-      'section',
-      {},
-      el('h2', {}, 'Diagnostics'),
-      el('div', { class: 'inner' }, diagnosticsSection()),
-    ),
-  );
-
   // -------------------------------------------------------------- updates
   main.append(
     el(
@@ -516,7 +505,7 @@ async function boot(): Promise<void> {
   const icon = el('link');
   icon.rel = 'icon';
   icon.type = 'image/svg+xml';
-  icon.href = '../assets/logo-mark.svg';
+  icon.href = '../assets/logo.svg';
   document.head.append(icon);
 
   // Fall back to the defaults rather than dying: the diagnostics section below is the reason

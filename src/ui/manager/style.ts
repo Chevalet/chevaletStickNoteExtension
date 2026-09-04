@@ -23,6 +23,12 @@ export const MANAGER_CSS = /* css */ `
   --drawer: #23201b;
   --shadow: 5px 5px 0 var(--ink);
   --halftone: radial-gradient(var(--ink) .8px, transparent .9px);
+
+  /* The page is set in mono throughout, which is the dev-hub/zine register. The display face
+     is the same stack at a heavier weight: no web font, so nothing is fetched and nothing can
+     fail to load. */
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+  --display: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
 }
 
 * { box-sizing: border-box; }
@@ -347,5 +353,161 @@ dialog pre { max-height: 180px; overflow: auto; background: color-mix(in oklab, 
 
 @media (prefers-reduced-motion: reduce) {
   .card, .btn { transition: none; }
+}
+
+.drawer.is-settings {
+  margin-top: 14px; border-top: 2px solid color-mix(in oklab, var(--hi) 55%, transparent);
+  background: color-mix(in oklab, var(--drawer) 78%, var(--accent));
+}
+.drawer.is-settings .count {
+  background: var(--hi); color: var(--ink); font-weight: 700; letter-spacing: 0;
+}
+.drawer.is-settings[aria-current="true"] { background: var(--accent); }
+
+/* ------------------------------------------------------------- settings pane
+   The cabinet's own idiom rather than a form: manila tabs down the side, ruled
+   index-card paper for the content, one hard offset shadow, the accent spent
+   once per row. No native control survives contact with this palette, so none
+   of them is used. */
+
+.settings { display: grid; grid-template-columns: 132px 1fr; gap: 0; align-items: start; }
+
+.stabs { display: flex; flex-direction: column; gap: 6px; padding-top: 18px; }
+.stab {
+  font: 600 12.5px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase;
+  text-align: left; padding: 10px 10px 10px 12px; cursor: pointer; color: var(--ink);
+  background: var(--manila); border: 2px solid var(--ink); border-right: 0;
+  /* A folder tab: cut on the leading edge, so the stack reads as a stack. */
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  margin-right: -2px; box-shadow: inset -6px 0 0 rgba(20,17,14,.14);
+}
+.stab:hover { background: color-mix(in oklab, var(--manila) 84%, var(--hi)); }
+.stab[aria-selected="true"] {
+  background: var(--card); box-shadow: none; z-index: 2; position: relative;
+  padding-left: 16px;
+}
+.stab:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+
+.scard {
+  background: var(--card); border: 2px solid var(--ink); box-shadow: var(--shadow);
+  padding: 18px 20px 22px; min-height: 300px;
+  /* Ruled paper, the same rule the index cards use. */
+  background-image: repeating-linear-gradient(
+    to bottom, transparent 0 27px, color-mix(in oklab, var(--ink) 8%, transparent) 27px 28px);
+}
+.ssec-title {
+  margin: 0 0 4px; font: 800 21px/1.15 var(--display); letter-spacing: -.02em;
+}
+.ssec-title::after {
+  content: ''; display: block; width: 58px; height: 5px; margin-top: 7px;
+  background: var(--accent);
+}
+.ssec-sub {
+  margin: 22px 0 8px; font: 700 11.5px/1 var(--mono); letter-spacing: .12em;
+  text-transform: uppercase; color: var(--dim);
+}
+.ssec-note, .ssec-empty {
+  margin: 12px 0 0; font-size: 13px; line-height: 1.55; color: var(--dim); max-width: 62ch;
+}
+.ssec-body { display: flex; flex-direction: column; }
+
+.srow {
+  /* Both tracks are minmax(0, ...) so a wide control cannot squeeze the label out of its own
+     column -- the segmented strip for Type has eight options and did exactly that. */
+  display: grid; grid-template-columns: minmax(11ch, 1fr) minmax(0, 22rem);
+  gap: 14px 18px; align-items: start;
+  padding: 14px 0; border-bottom: 1px dashed var(--line);
+}
+.srow:last-child { border-bottom: 0; }
+.srow-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.srow-label { font-weight: 600; font-size: 14px; }
+.srow-note { font-size: 12.5px; line-height: 1.5; color: var(--dim); max-width: 60ch; }
+.srow-ctl { display: flex; justify-content: flex-end; }
+
+/* A paper tab that slides. */
+.sw {
+  width: 54px; height: 28px; padding: 0; cursor: pointer; position: relative;
+  background: var(--paper); border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+}
+.sw-knob {
+  position: absolute; inset: 3px auto 3px 3px; width: 20px;
+  background: var(--card); border: 2px solid var(--ink);
+  transition: transform .13s cubic-bezier(.2,.9,.2,1);
+}
+.sw[aria-checked="true"] { background: var(--hi); }
+.sw[aria-checked="true"] .sw-knob { transform: translateX(24px); background: var(--accent); }
+.sw:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .sw-knob { transition: none; } }
+
+/* Segmented choice, as a strip of little tabs. */
+.seg { display: flex; flex-wrap: wrap; gap: 0; justify-content: flex-end; }
+.seg button {
+  font: 600 12px/1 var(--mono); padding: 7px 11px; cursor: pointer; color: var(--ink);
+  background: var(--paper); border: 2px solid var(--ink); margin-left: -2px;
+}
+.seg button:first-child { margin-left: 0; }
+.seg button:hover { background: color-mix(in oklab, var(--paper) 80%, var(--hi)); }
+.seg button[aria-checked="true"] {
+  background: var(--ink); color: var(--hi); position: relative; z-index: 1;
+}
+.seg button:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; z-index: 2; }
+
+.numwrap { display: flex; align-items: center; gap: 7px; }
+.num {
+  font: 600 14px/1 var(--mono); width: 74px; padding: 7px 8px; color: var(--ink);
+  background: var(--card); border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+}
+.num:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.unit { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+
+/* Palette swatches: the paper, with its accent showing as a marker stroke. */
+/* Four across, so eight palettes make two even rows instead of seven and an orphan. */
+.swatches { display: grid; grid-template-columns: repeat(4, 34px); gap: 7px; justify-content: end; }
+.swatch {
+  width: 34px; height: 34px; cursor: pointer; position: relative; padding: 0;
+  background: var(--sw-paper); border: 2px solid var(--ink);
+}
+.swatch::after {
+  content: ''; position: absolute; left: 5px; right: 5px; top: 12px; height: 5px;
+  background: var(--sw-accent);
+}
+.swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--card), 0 0 0 5px var(--accent); }
+.swatch:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+
+/* Per-site rules. */
+.rules { display: flex; flex-direction: column; gap: 0; }
+.rule {
+  display: grid; grid-template-columns: 12px 1fr auto auto; gap: 10px; align-items: center;
+  padding: 9px 0; border-bottom: 1px dashed var(--line); font-size: 13px;
+}
+.rule-dot { width: 10px; height: 10px; border: 2px solid var(--ink); }
+.rule-dot.is-on { background: var(--hi); }
+.rule-dot.is-off { background: var(--card); }
+.rule-origin { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.rule-state { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.rule-drop {
+  font: 600 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; cursor: pointer;
+  padding: 5px 8px; color: var(--ink); background: var(--card); border: 2px solid var(--ink);
+}
+.rule-drop:hover { background: var(--accent); color: var(--card); }
+
+/* Keyboard reference. */
+.keys { display: flex; flex-direction: column; }
+.keyrow {
+  display: grid; grid-template-columns: 122px 1fr; gap: 12px; align-items: baseline;
+  padding: 6px 0; font-size: 13px;
+}
+.keyrow kbd {
+  font: 700 11.5px/1 var(--mono); padding: 5px 7px; text-align: center; color: var(--ink);
+  background: var(--hi); border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink);
+}
+
+@media (max-width: 720px) {
+  .settings { grid-template-columns: 1fr; }
+  .stabs { flex-direction: row; flex-wrap: wrap; padding: 0 0 10px; }
+  .stab { border-right: 2px solid var(--ink); margin-right: 0; clip-path: none; }
+  .srow { grid-template-columns: 1fr; }
+  .srow-ctl { justify-content: flex-start; }
+  .swatches { justify-content: flex-start; }
 }
 `;

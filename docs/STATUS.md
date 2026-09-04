@@ -1,4 +1,4 @@
-# Status — v0.0.4, 4 September 2026
+# Status — v0.0.6 (LTS), 4 September 2026
 
 Backspace works. It took three wrong fixes to find that the cause was one line — the shadow
 host was attached outside `<body>`, where Gecko refuses to run editing commands. See the
@@ -12,7 +12,7 @@ can mean the real browser rather than a Chromium approximation:
 - **Built** — compiles and lints; never exercised
 - **Firefox** — driven in a real Firefox through geckodriver, with real key events
 
-404 tests · content script 29.6 kB gz of a 30.0 budget · `web-ext lint` 0 errors / 0 warnings
+414 tests · content script 30.1 kB gz of a 32.0 budget · `web-ext lint` 0 errors / 0 warnings
 / 0 notices.
 
 ## Works
@@ -36,15 +36,13 @@ can mean the real browser rather than a Chromium approximation:
 | Nothing injected until a site is granted — no `content_scripts` in the manifest | Tested |
 | **Undo and redo** (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z) across typing, colour, style, move, resize, collapse, lock, drawing, erasing, create and delete — one ordered history for the whole page | Tested + Seen |
 | **Update check** — a button in settings, and an opt-in daily check. Off by default; it is the only network request the extension can make | Tested |
+| **Pasted and dropped images**, stored per note and painted to a canvas so no page CSP can block them | Tested |
+| **Your own default note style** — "Save as my default" on any note (press **S**), applied live to every note in the fields it never set itself | Tested |
+| **All settings inside the cabinet**, in the cabinet's own idiom: manila section tabs, ruled paper, paper switches, palette swatches, a keyboard reference | Seen |
+| One logo at every size, rasterised from the single SVG by `spikes/make-icons.mjs` | Seen |
 
 ## Half-built — the storage exists, the wire to the user does not
 
-- **Pasted images.** `putAsset`/`getAsset` and canvas painting work in the harness, but
-  `src/cs/renderer.ts` passes no `onAsset`/`resolveAsset` hook to `NoteView`. In the extension a
-  pasted image is not saved and a stored one does not draw. ~12 lines.
-- **Your global default style.** Per-note overrides work and "save as my default" exists in the
-  panel, but `Settings` has no default-style field and the renderer is never told one — so
-  overrides sit on the built-in default, not yours.
 - **ZIP import.** Reads, validates the checksum, shows a dry-run merge plan. Does not write; the
   dialog says so.
 - **Trash retention.** Settings exist and default to never destroying anything. Nothing purges on
@@ -80,12 +78,11 @@ no, the design changes, probably to a badge and a manager prompt. Runbook in `do
 
 | Work | Size | Why |
 |---|---|---|
-| Answer R1 — load 0.0.2, make a note, close the tab | minutes | Decides whether the guard design survives |
-| Wire images and the default style | small | Two original requirements, one hook away |
+| Answer R1 — load 0.0.6, make a note, close the tab | minutes | Decides whether the guard design survives |
 | Apply an import plan | medium | Backup you cannot restore is not backup |
 | Scheduled backup on an alarm | medium | Asked for; makes the trash safe to empty |
 | Bundle the Persian faces (OFL, as bytes) | medium | Persian currently depends on the OS |
 | Version history | medium | Undo is session-scoped; this is the one that survives a restart |
 | Export to Markdown and HTML | medium | Makes notes readable outside the extension |
-| AMO submission | large | The only route to a permanent install |
+| AMO submission | large | The only route to a permanent install. `docs/PUBLISHING.md` has every step, the listing copy and the source-archive requirement |
 | Sync across machines | large | Parked at your request; needs a server, changes the privacy story |

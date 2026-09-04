@@ -486,3 +486,123 @@ describe('guard state', () => {
     expect(armed).toHaveLength(0);
   });
 });
+
+describe('the default note style', () => {
+  it('comes back with the handshake, so notes never render twice', async () => {
+    const hello = (await send(
+      { t: 'hello', url: 'https://example.com/article', protocolV: 1 },
+      from7,
+    )) as Reply<{ noteDefaults: Record<string, unknown> }>;
+    expect(hello.ok).toBe(true);
+    if (!hello.ok) return;
+    expect(hello.data.noteDefaults).toEqual({});
+  });
+
+  it('merges what is saved rather than replacing it', async () => {
+    await send({ t: 'settings/saveDefaults', style: { palette: 'acid' } }, from7);
+    await send({ t: 'settings/saveDefaults', style: { fontSize: 18 } }, from7);
+    const hello = (await send(
+      { t: 'hello', url: 'https://example.com/article', protocolV: 1 },
+      from7,
+    )) as Reply<{ noteDefaults: Record<string, unknown> }>;
+    if (!hello.ok) return;
+    // Sparse and cumulative: setting one field must not forget the other.
+    expect(hello.data.noteDefaults).toEqual({ palette: 'acid', fontSize: 18 });
+  });
+
+  it('sanitises the style, since it arrives from a page process', async () => {
+    await send(
+      {
+        t: 'settings/saveDefaults',
+        style: { fontSize: Number.NaN, nested: { a: 1 }, palette: 'acid' },
+      },
+      from7,
+    );
+    const hello = (await send(
+      { t: 'hello', url: 'https://example.com/article', protocolV: 1 },
+      from7,
+    )) as Reply<{ noteDefaults: Record<string, unknown> }>;
+    if (!hello.ok) return;
+    expect(hello.data.noteDefaults).toEqual({ palette: 'acid' });
+  });
+
+  it('tells every open tab, so a default set on one page reaches another', async () => {
+    await send({ t: 'guard/state', hasUnsaved: false, noteCount: 1 }, from7);
+    stub.sent.length = 0;
+    await send({ t: 'settings/saveDefaults', style: { palette: 'cyan' } }, from7);
+    const told = stub.sent.filter((m) => (m.message as { t?: string }).t === 'defaults/changed');
+    expect(told.map((m) => m.tabId)).toContain(7);
+    expect((told[0]?.message as { style: Record<string, unknown> }).style).toMatchObject({
+      palette: 'cyan',
+    });
+  });
+});
+
+describe('pasted images', () => {
+  const png = (bytes = 64): ArrayBuffer => new Uint8Array(bytes).fill(7).buffer;
+
+  it('stores an image against a note and reads it back as bytes', async () => {
+    const note = await createOne();
+    const put = (await send(
+      { t: 'asset/put', noteId: note.id, name: 'shot.png', type: 'image/png', bytes: png() },
+      from7,
+    )) as Reply<{ id: string }>;
+    expect(put.ok).toBe(true);
+    if (!put.ok) return;
+
+    const got = (await send({ t: 'asset/get', id: put.data.id }, from7)) as Reply<{
+      type: string;
+      bytes: ArrayBuffer;
+    }>;
+    expect(got.ok).toBe(true);
+    if (!got.ok) return;
+    expect(got.data.type).toBe('image/png');
+    expect(new Uint8Array(got.data.bytes)).toEqual(new Uint8Array(png()));
+  });
+
+  /** A note is not a photo album, and an unbounded paste fills a profile directory quietly. */
+  it('refuses an image over the ceiling', async () => {
+    const note = await createOne();
+    const huge = new ArrayBuffer(11 * 1024 * 1024);
+    const reply = await send(
+      { t: 'asset/put', noteId: note.id, name: 'huge.png', type: 'image/png', bytes: huge },
+      from7,
+    );
+    expect(reply).toMatchObject({ ok: false, code: 'QUOTA' });
+  });
+
+  it('refuses a type a canvas cannot decode', async () => {
+    const note = await createOne();
+    for (const type of ['image/svg+xml', 'text/html', 'application/pdf', '']) {
+      const reply = await send(
+        { t: 'asset/put', noteId: note.id, name: 'x', type, bytes: png() },
+        from7,
+      );
+      expect(reply, type).toMatchObject({ ok: false, code: 'SCHEMA' });
+    }
+  });
+
+  it('refuses anything that is not actually bytes', async () => {
+    const note = await createOne();
+    const reply = await send(
+      { t: 'asset/put', noteId: note.id, name: 'x', type: 'image/png', bytes: 'not bytes' },
+      from7,
+    );
+    expect(reply).toMatchObject({ ok: false, code: 'SCHEMA' });
+  });
+
+  it('refuses to attach to a note that does not exist', async () => {
+    const reply = await send(
+      { t: 'asset/put', noteId: 'n_nope' as NoteId, name: 'x', type: 'image/png', bytes: png() },
+      from7,
+    );
+    expect(reply).toMatchObject({ ok: false, code: 'NOT_FOUND' });
+  });
+
+  it('reports a missing image rather than throwing', async () => {
+    expect(await send({ t: 'asset/get', id: 'a_nope' }, from7)).toMatchObject({
+      ok: false,
+      code: 'NOT_FOUND',
+    });
+  });
+});

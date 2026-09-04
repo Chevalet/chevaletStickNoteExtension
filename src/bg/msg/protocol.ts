@@ -61,7 +61,19 @@ export type CsToBg =
   | { t: 'guard/state'; hasUnsaved: boolean; noteCount: number }
   | { t: 'tab/setEnabled'; enabled: boolean }
   | { t: 'editing/begin' }
-  | { t: 'editing/end' };
+  | { t: 'editing/end' }
+  /** "Save as my default" in a note's settings panel. Sparse, and merged over what is stored. */
+  | { t: 'settings/saveDefaults'; style: Record<string, unknown> }
+  /**
+   * A pasted or dropped image.
+   *
+   * Bytes rather than a Blob: `ArrayBuffer` is structured-cloneable across every extension
+   * message boundary, and a content script cannot reach the extension's IndexedDB itself
+   * because it runs in the page's origin.
+   */
+  | { t: 'asset/put'; noteId: NoteId; name: string; type: string; bytes: ArrayBuffer }
+  /** Read one back, to paint into a canvas. No network is involved at any point. */
+  | { t: 'asset/get'; id: string };
 
 /** Sent by the options page, not by a content script. */
 export type UiToBg = { t: 'update/check'; fromClick: boolean };
@@ -79,7 +91,9 @@ export type BgToCs =
   | { t: 'guard/set'; armed: boolean; reason: 'budget' | 'policy' | 'clean' }
   | { t: 'tab/enabled'; enabled: boolean }
   | { t: 'command'; name: 'new-note' | 'cycle-notes' | 'toggle-ghost' }
-  | { t: 'teardown'; reason: 'disabled' | 'update' | 'revoked' };
+  | { t: 'teardown'; reason: 'disabled' | 'update' | 'revoked' }
+  /** The default style changed, here or in another tab. Notes re-resolve against it. */
+  | { t: 'defaults/changed'; style: Record<string, unknown> };
 
 // --------------------------------------------------------------------------- replies
 
@@ -110,4 +124,11 @@ export interface HelloReply {
   /** Zero means "do nothing at all" -- the common case, and the reason startup is free. */
   noteCount: number;
   notes: NoteWire[];
+  /**
+   * The user's own default note style, sparse. Sent with the handshake rather than fetched
+   * separately, because every note on the page needs it before it can resolve its own
+   * overrides, and a second round trip would mean notes rendering once in the built-in style
+   * and again in the user's.
+   */
+  noteDefaults: Record<string, unknown>;
 }

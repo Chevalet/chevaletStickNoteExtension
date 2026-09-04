@@ -28,6 +28,7 @@ import { createSharedDefs } from './art/defs.ts';
 import { createHost, type Host } from './host.ts';
 import { History } from './note/history.ts';
 import { NoteView } from './note/NoteView.ts';
+import { type NoteStyle, resolveStyle } from './note/theme.ts';
 import { Loop } from './physics/spring.ts';
 import { SHEET_CSS } from './styles.ts';
 
@@ -38,6 +39,14 @@ const loop = new Loop();
 const views = new Map<NoteId, NoteView>();
 let topZ = 10;
 let enabled = false;
+/**
+ * The user's own default style, sparse, as sent with the handshake.
+ *
+ * Every note resolves its own sparse overrides against this. Holding it here rather than in
+ * each note is what lets "Save as my default" change how every existing note looks in the
+ * fields it never touched itself.
+ */
+let noteDefaults: NoteStyle = resolveStyle({});
 
 /**
  * The revision each mounted note was last known to be at.
@@ -64,6 +73,61 @@ const history = new History({
   restoreNote: (id) => void restoreFromTrash(id as NoteId),
   trashNote: (id) => void trashAndUnmount(id as NoteId),
 });
+
+// ---------------------------------------------------------------- images
+
+/**
+ * Decoded images, by asset id.
+ *
+ * A note references an image as `att:<id>` in its markdown, and the renderer paints it into a
+ * canvas rather than pointing an `<img>` at a URL. That is not fussiness: a content script's
+ * `<img src>` is subject to the *page's* CSP, so on a site with a strict `img-src` the picture
+ * would silently fail to appear. A canvas paint is not a fetch, so nothing can block it.
+ */
+const assetCanvases = new Map<string, HTMLCanvasElement>();
+/** Ids already asked for, so a note with the same image twice does not fetch it twice. */
+const assetsAsked = new Set<string>();
+
+/** Pull in any image a note's text references, then re-render the notes that use them. */
+async function ensureAssets(text: string): Promise<void> {
+  const ids = [...text.matchAll(/!\[[^\]]*\]\(att:([A-Za-z0-9_-]+)\)/g)].map((m) => m[1] as string);
+  let gained = false;
+  for (const id of ids) {
+    if (assetsAsked.has(id)) continue;
+    assetsAsked.add(id);
+    const reply = await ask<{ type: string; bytes: ArrayBuffer }>({ t: 'asset/get', id });
+    if (!reply.ok) continue;
+    try {
+      const bmp = await createImageBitmap(new Blob([reply.data.bytes], { type: reply.data.type }));
+      const c = document.createElement('canvas');
+      c.width = bmp.width;
+      c.height = bmp.height;
+      c.getContext('2d')?.drawImage(bmp, 0, 0);
+      bmp.close();
+      assetCanvases.set(id, c);
+      gained = true;
+    } catch {
+      // An image we cannot decode simply stays missing, and the note shows its source text.
+    }
+  }
+  if (gained) for (const v of views.values()) v.refreshPreview();
+}
+
+/**
+ * Hand the markdown renderer something to draw.
+ *
+ * A fresh canvas each time, copied from the cached one: the same image may appear in two notes,
+ * and a DOM node can only be in one place.
+ */
+function assetCanvas(id: string): HTMLElement | null {
+  const cached = assetCanvases.get(id);
+  if (!cached) return null;
+  const c = document.createElement('canvas');
+  c.width = cached.width;
+  c.height = cached.height;
+  c.getContext('2d')?.drawImage(cached, 0, 0);
+  return c;
+}
 
 /** Undo of a delete: the note is in the trash, so bring it back and re-mount it. */
 async function restoreFromTrash(id: NoteId): Promise<void> {
@@ -220,6 +284,7 @@ function mountNote(wire: NoteWire): NoteView {
       loop,
       layer,
       history,
+      defaults: noteDefaults,
       raise: () => ++topZ,
       onChange: (n) =>
         save(wire.id, {
@@ -228,6 +293,31 @@ function mountNote(wire: NoteWire): NoteView {
         }),
       onText: (_n, text) => save(wire.id, { body: { text } }),
       onStyle: (_n, overrides) => save(wire.id, { style: overrides }),
+      onAsset: async (_n, file, name) => {
+        const bytes = await file.arrayBuffer();
+        const reply = await ask<{ id: string }>({
+          t: 'asset/put',
+          noteId: wire.id,
+          name,
+          type: file.type || 'image/png',
+          bytes,
+        });
+        if (!reply.ok) {
+          if (__DEV__) console.warn('[cn] image refused:', reply.code, reply.detail);
+          return null;
+        }
+        // Decode it now so the note can draw it without waiting for a round trip.
+        assetsAsked.delete(reply.data.id);
+        await ensureAssets(`![](att:${reply.data.id})`);
+        return reply.data.id;
+      },
+      resolveAsset: (id) => assetCanvas(id),
+      onSaveDefault: (_n, style) => {
+        void ask({
+          t: 'settings/saveDefaults',
+          style: style as unknown as Record<string, unknown>,
+        });
+      },
       onInk: (_n, ink) => save(wire.id, { ink }),
       onDelete: (n) => {
         // Recorded before the note goes, so Ctrl+Z brings it back.
@@ -387,6 +477,7 @@ async function boot(): Promise<void> {
   const hello = reply.data;
   if (hello.protocolV !== PROTOCOL_V) return teardown('protocol mismatch');
   enabled = hello.enabled;
+  noteDefaults = resolveStyle(hello.noteDefaults ?? {});
 
   if (!enabled) {
     // Stay resident but inert: no host element, no observers, no listeners on the page.
@@ -395,6 +486,8 @@ async function boot(): Promise<void> {
   }
 
   for (const wire of hello.notes) mountNote(wire);
+  // Images the notes already reference, fetched once and painted when they arrive.
+  void Promise.all(hello.notes.map((w) => ensureAssets(w.body.text)));
   // The host is created lazily, so a page with no notes still costs nothing until the first
   // one is made -- but the keyboard shortcut has to work there, which is why this is no
   // longer an early return.
@@ -448,6 +541,14 @@ browser.runtime.onMessage.addListener((msg: unknown) => {
   if (type === 'tab/enabled') {
     if ((msg as { enabled: boolean }).enabled) void boot();
     else teardown('disabled');
+    return Promise.resolve({ ok: true });
+  }
+
+  if (type === 'defaults/changed') {
+    // Re-resolve every mounted note. A note keeps its own overrides and only the fields it
+    // never set follow the new default, which is the whole point of storing both sparsely.
+    noteDefaults = resolveStyle((msg as { style: Record<string, unknown> }).style);
+    for (const view of views.values()) view.setDefaults(noteDefaults);
     return Promise.resolve({ ok: true });
   }
 

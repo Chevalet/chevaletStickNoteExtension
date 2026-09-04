@@ -147,11 +147,17 @@ export async function copyStatic(): Promise<void> {
  * page's own scripts, and exists solely to hold a `beforeunload` listener. It has to stay
  * small enough that its cost is not measurable. Currently 0.3 kB.
  *
- * `cs/renderer.js` — 30 kB, raised twice, each time with the measurement in hand.
+ * `cs/renderer.js` — 32 kB, raised three times, each with the measurement in hand.
  *
  * 24 -> 28 kB when anchoring moved onto this path (~3 kB gz for `anchor/` plus 1.7 kB
  * minified of `approx-string-match`). 28 -> 30 kB for undo/redo: `history.ts` is 3.1 kB
- * minified and the recorders took NoteView from 19.9 to 24.2 kB.
+ * minified and the recorders took NoteView from 19.9 to 24.2 kB. 30 -> 32 kB for pasted
+ * images, which have to decode bytes into a canvas on the page side, because a content
+ * script's `<img src>` answers to the *page's* CSP and would silently fail on a strict site.
+ *
+ * 32 rather than the 30.1 kB the images actually cost, because moving this line by a hundred
+ * bytes at a time is how a budget stops meaning anything. The next feature has headroom; the
+ * one after it has to make the argument again.
  *
  * The measured breakdown at 86.7 kB minified says there is no fat to cut instead — 24.2 kB is
  * NoteView, 16.2 kB is the stylesheet, and the rest is spread across the ink layer,
@@ -170,5 +176,5 @@ export async function copyStatic(): Promise<void> {
  */
 export const BUDGETS_GZ: Readonly<Record<string, number>> = {
   'cs/guard.js': 1_024,
-  'cs/renderer.js': 30 * 1024,
+  'cs/renderer.js': 32 * 1024,
 };

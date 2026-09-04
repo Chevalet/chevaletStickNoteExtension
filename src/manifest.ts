@@ -28,12 +28,23 @@ export function manifest({ version }: ManifestInput): Record<string, unknown> {
     browser_specific_settings: {
       gecko: {
         id: 'chevalet-note@chevalet.dev',
-        // 128 is the floor for scripting `world: "MAIN"`, which is the fallback path for the
-        // close guard if spike R1 shows isolated-world beforeunload cancellation is ignored.
-        strict_min_version: '128.0',
-        // Nothing leaves the machine. No telemetry, no analytics, no network requests at all.
-        // Declaring this explicitly is both an AMO requirement-in-waiting and the strongest
-        // line in the store listing.
+        /**
+         * 140 desktop, 142 Android, because of `data_collection_permissions` below.
+         *
+         * The floor was 128 (which is what `scripting` with `world: "MAIN"` needs, the fallback
+         * path for the close guard). AMO's validator warned about it, correctly: the key that
+         * declares we collect nothing did not exist until Firefox 140, and until 142 on Android,
+         * so claiming 128 promised support we could not deliver on old builds.
+         *
+         * Raising the floor is the right way to resolve that rather than dropping the
+         * declaration. "This add-on collects no data", stated in the manifest where the browser
+         * itself can show it, is the single strongest line in the listing, and Firefox 140 is
+         * old enough that nobody is stranded.
+         */
+        strict_min_version: '140.0',
+        strict_min_version_android: '142.0',
+        // Nothing leaves the machine except the update check, which is off by default and asks
+        // first. Declaring it explicitly is what lets Firefox show "collects no data".
         data_collection_permissions: { required: ['none'] },
       },
     },
@@ -57,8 +68,14 @@ export function manifest({ version }: ManifestInput): Record<string, unknown> {
       },
     },
 
-    // 16-32 come from assets/logo-mark.svg, 48 and up from assets/logo.svg -- below 32px the
-    // torn edge, the halftone and the tilt turn to mud, so the small mark drops them.
+    /**
+     * One logo, every size, rasterised from `assets/logo.svg` by `spikes/make-icons.mjs`.
+     *
+     * There used to be a second simplified file for small sizes. A single identity was asked
+     * for, so the logo itself was redrawn to fill 92% of its frame with nothing thinner than
+     * 3 of 64 units, which is what makes it read at 16px without a separate drawing. Run the
+     * script and commit the PNGs whenever the SVG changes; the two must not drift apart.
+     */
     icons: {
       16: 'assets/icon-16.png',
       32: 'assets/icon-32.png',
