@@ -1,16 +1,18 @@
-# Status — v0.0.2, 4 September 2026
+# Status — v0.0.4, 4 September 2026
 
-Second installable build. 0.0.1 shipped with a caret bug that made Backspace do nothing, a
-close warning that could never fire, and no undo; all three are fixed here.
+Backspace works. It took three wrong fixes to find that the cause was one line — the shadow
+host was attached outside `<body>`, where Gecko refuses to run editing commands. See the
+Backspace section of `docs/perf.md`.
 
-**It has still never been run in a real Firefox by its author**, so every line below carries
-how it was actually verified:
+**There is now a real-Firefox harness** (`spikes/firefox-*.mjs`, geckodriver), so "Seen" below
+can mean the real browser rather than a Chromium approximation:
 
 - **Tested** — unit or integration tests cover it
 - **Seen** — watched running in the browser harness (`tools/dev.ts`, port 8731)
 - **Built** — compiles and lints; never exercised
+- **Firefox** — driven in a real Firefox through geckodriver, with real key events
 
-398 tests · content script 29.5 kB gz of a 30.0 budget · `web-ext lint` 0 errors / 0 warnings
+404 tests · content script 29.6 kB gz of a 30.0 budget · `web-ext lint` 0 errors / 0 warnings
 / 0 notices.
 
 ## Works
@@ -22,6 +24,7 @@ how it was actually verified:
 | IndexedDB store — clearing the cache does not touch it | Tested |
 | Making a note: Alt + double-click, keyboard shortcut, context menu | Tested (messages) + Built (gestures) |
 | Markdown incl. task lists, via a 3.1 kB own lexer; never touches `innerHTML` | Tested + Seen |
+| Typing, Backspace and Delete inside a note | **Firefox** |
 | RTL/LTR in both the editor and the rendered view; per-block under `auto`; code stays LTR | Seen |
 | Freehand drawing, pen and eraser | Seen |
 | Per-note styling: 8 palettes + custom colours, font, size, direction, alignment, torn edges, grain, tape, shadow, physics | Seen |

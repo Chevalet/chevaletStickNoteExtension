@@ -854,10 +854,8 @@ export class NoteView implements Animatable {
       return;
     }
 
-    // The host no longer stops keyboard events -- see CONTAINED_EVENTS in host.ts, and the
-    // Backspace bug that comment exists to prevent returning. Containment for the keys we
-    // actually consume happens here instead, which is exactly the set where a page must not
-    // also react: a note-level shortcut is ours, and nobody else's.
+    // A note-level shortcut is ours and nobody else's, so it stops here. The host contains
+    // keyboard events as well; this is belt and braces, and it costs nothing.
     const CONSUMED = new Set([
       'ArrowLeft',
       'ArrowRight',

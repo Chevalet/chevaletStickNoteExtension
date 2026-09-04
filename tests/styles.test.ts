@@ -36,42 +36,32 @@ describe('shadow-root stylesheet', () => {
 
 describe('event containment', () => {
   /**
-   * The most expensive bug in this project's history, pinned so it cannot come back.
-   *
-   * Keyboard and input events used to be stopped at the shadow host. In Gecko the editor's
-   * handling of command keys sits above the editing host in the propagation path, so that
-   * stopped Backspace and Delete from ever reaching it -- while text insertion, which travels
-   * a different path, kept working. A note you could write in and could not erase in, reported
-   * three times before the mechanism was found, and invisible to every test available because
-   * the harness is Chromium-based and Blink handles those keys at the editing host itself.
+   * The pointer half, which is the half that matters for the page relationship: a site's
+   * `document.addEventListener('click', closeMenus)` must not fire when someone clicks a note.
    */
-  it('never contains keyboard, input or composition events at the host', async () => {
+  it('contains the pointer and mouse events', async () => {
     const { CONTAINED_EVENTS } = await import('~/cs/host.ts');
-    const forbidden = [
-      'keydown',
-      'keyup',
-      'keypress',
-      'input',
-      'beforeinput',
-      'compositionstart',
-      'compositionend',
-      'compositionupdate',
-      'textInput',
-    ];
-    for (const type of forbidden) {
-      expect(
-        CONTAINED_EVENTS as readonly string[],
-        `containing "${type}" at the host breaks editing in Firefox`,
-      ).not.toContain(type);
+    for (const type of ['pointerdown', 'mousedown', 'click', 'dblclick', 'contextmenu']) {
+      expect(CONTAINED_EVENTS as readonly string[]).toContain(type);
     }
   });
 
-  it('still contains the pointer and mouse events, which is what the page must not see', () => {
-    // Those are safe: Blink and Gecko both handle pointer interaction at the target.
-    return import('~/cs/host.ts').then(({ CONTAINED_EVENTS }) => {
-      for (const type of ['pointerdown', 'mousedown', 'click', 'dblclick', 'contextmenu']) {
-        expect(CONTAINED_EVENTS as readonly string[]).toContain(type);
-      }
-    });
+  /**
+   * And the keyboard half, which 0.0.3 removed on a mistaken theory.
+   *
+   * Backspace doing nothing inside a note was blamed on this list, on the reasoning that Gecko
+   * handles editing commands above the editing host and so containment starved the editor.
+   * Measurement disproved it: `spikes/firefox-backspace.mjs` drives a real Firefox through a
+   * host containing every one of these and Backspace deletes correctly. The real cause was the
+   * host being attached outside `<body>` -- see tests/host.test.ts.
+   *
+   * Containing them is what keeps a site's "/" or "j/k" shortcut from firing while someone
+   * types in a note, so they stay.
+   */
+  it('contains the keyboard and input events too', async () => {
+    const { CONTAINED_EVENTS } = await import('~/cs/host.ts');
+    for (const type of ['keydown', 'keyup', 'keypress', 'input', 'beforeinput']) {
+      expect(CONTAINED_EVENTS as readonly string[]).toContain(type);
+    }
   });
 });

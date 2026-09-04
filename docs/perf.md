@@ -186,3 +186,57 @@ Each of these was invisible in code review and obvious the moment it rendered.
    characters into a note reports `caretOffset: 5` inside the body and `execCommand('delete')`
    removes the character *at* the caret rather than at the end. Before the fix the same probe
    reported the selection anchored on `HTML` with `rangeCount: 0`.
+
+## The Backspace bug, and three wrong fixes
+
+Worth writing out in full, because the mistakes were more instructive than the fix.
+
+**The symptom.** Inside a note, in Firefox, typing worked and Backspace did nothing. Reported
+three times.
+
+**The fix, in the end, is one line.** The shadow host was appended to
+`document.documentElement` — a sibling of `<body>`, outside it — on the reasoning that a child
+of `<html>` is the hardest place for a page to disturb. Gecko will not perform an editing
+command for an editing host outside `<body>`: it dispatches `beforeinput` with
+`deleteContentBackward`, does not cancel it, and then declines to edit. No `input` event, no
+change, no error. Text insertion takes a different path and kept working, which is exactly why
+the symptom was so lopsided.
+
+**Why it took three releases.** Every instrument available was wrong for the job.
+
+- The in-app browser is Blink, and Blink does not have this restriction, so the bug is
+  invisible there.
+- Injected key events carry no physical `code`, so the browser delivers them as events and
+  performs *no editing action*. Under a synthetic Backspace every `contenteditable` looks
+  broken — so the first "reproduction" proved nothing, and the fix that followed it was
+  addressing an artefact of the test.
+- Two real bugs were found on the way and fixed, which made each release feel like progress: a
+  caret destroyed by `removeAllRanges()` and never replaced, and `dir` set on the editor but
+  not the rendered view. Neither was this.
+
+**What actually found it**, once Atur pointed out that a real browser could be driven: real
+Firefox through geckodriver, with real key events, varying one thing at a time.
+
+    spikes/firefox-backspace.mjs   the structure, seven variants   -> all innocent
+    spikes/firefox-note.mjs        the real note, instrumented     -> beforeinput, then nothing
+    spikes/firefox-bisect.mjs      one intervention at a time      -> only reparenting helped
+    spikes/firefox-where.mjs       host position and tag name      -> position is everything
+
+The last one is the whole answer:
+
+| host | Backspace |
+|---|---|
+| `<div>` inside `<body>` | deletes |
+| custom tag inside `<body>` | deletes |
+| `<div>` on `<html>` | nothing |
+| custom tag on `<html>` | nothing |
+
+Eliminated the same way first, and all innocent: the closed shadow root, `all: initial`,
+`pointer-events: none`, `contain: style`, `plaintext-only` versus `true`, ancestor transforms,
+the adopted stylesheet, four levels of nesting, and stopping keyboard events at the host.
+
+**The lesson worth keeping.** Playwright's own Firefox would not start on this machine
+("side-by-side configuration is incorrect" — it wants the MSVC redistributable), and
+geckodriver drives the *installed* Firefox instead, which is better anyway. Both are now
+devDependencies. Reach for them before theorising about engine behaviour: the four scripts
+above cost less than any one of the three wrong fixes.

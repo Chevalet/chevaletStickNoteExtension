@@ -1,6 +1,6 @@
 {
   "name": "chevalet-note",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "description": "Sticky notes stuck to the page, not the browser. Firefox extension.",
   "license": "MPL-2.0",
@@ -29,7 +29,10 @@
     "@types/node": "^24.10.0",
     "esbuild": "^0.25.10",
     "fake-indexeddb": "^6.2.5",
+    "geckodriver": "^6.1.1",
     "happy-dom": "^20.13.1",
+    "playwright": "^1.62.1",
+    "selenium-webdriver": "^4.48.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "web-ext": "^8.10.0"
