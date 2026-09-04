@@ -26,6 +26,23 @@ interface Stub {
 
 let stub: Stub;
 
+/**
+ * The stubbed `browser`, typed loosely enough to read mock calls off it but not so loosely
+ * that a typo in a path goes unnoticed.
+ */
+type Sender = { tab?: { id: number; url?: string; incognito?: boolean } };
+type OnMessage = (msg: unknown, sender: Sender) => Promise<Reply<unknown>>;
+type BrowserStub = {
+  runtime: {
+    onMessage: { addListener: { mock: Array<[OnMessage]> & { calls: Array<[OnMessage]> } } };
+  };
+  scripting: {
+    registerContentScripts: { mock: { calls: unknown[][] } };
+    unregisterContentScripts: { mock: { calls: unknown[][] } };
+  };
+};
+const stubbed = (): BrowserStub => (globalThis as unknown as { browser: BrowserStub }).browser;
+
 function installBrowserStub(): void {
   stub = {
     tabs: new Map([[7, { id: 7, url: 'https://example.com/article', title: 'An article' }]]),
@@ -117,11 +134,12 @@ async function loadBackground(): Promise<
   vi.resetModules();
   installBrowserStub();
   const { resetDb } = await import('~/bg/db/open.ts');
-  indexedDB = new IDBFactory();
+  // A fresh database per test, so one test's notes cannot be another's fixture.
+  globalThis.indexedDB = new IDBFactory();
   resetDb();
   const mod = await import('~/bg/main.ts');
   // `onMessage` is not exported; it is registered. Pull it back off the stub.
-  const reg = (globalThis as Record<string, any>).browser.runtime.onMessage.addListener;
+  const reg = stubbed().runtime.onMessage.addListener;
   const handler = reg.mock.calls[0]?.[0];
   if (typeof handler !== 'function') throw new Error('no onMessage listener registered');
   void mod;
@@ -161,8 +179,13 @@ describe('registration', () => {
     const out = await syncRegistrations();
     expect(out.registered).toBe(true);
 
-    const call = (globalThis as Record<string, any>).browser.scripting.registerContentScripts.mock
-      .calls[0][0] as Array<{ id: string; matches: string[]; js: string[]; runAt: string }>;
+    const call = stubbed().scripting.registerContentScripts.mock.calls[0]?.[0] as Array<{
+      id: string;
+      matches: string[];
+      js: string[];
+      runAt: string;
+    }>;
+    expect(call, 'registerContentScripts was never called').toBeDefined();
     expect(call.map((c) => c.id).sort()).toEqual(['cn-guard', 'cn-renderer']);
     // Only the granted origin -- never a blanket match.
     for (const c of call) expect(c.matches).toEqual(['https://example.com/*']);
@@ -174,9 +197,8 @@ describe('registration', () => {
   it('does not ask to unregister ids that are not registered', async () => {
     const { syncRegistrations } = await import('~/bg/inject.ts');
     await syncRegistrations();
-    const b = (globalThis as Record<string, any>).browser;
     // Nothing was registered, per the stubbed getRegisteredContentScripts.
-    expect(b.scripting.unregisterContentScripts).not.toHaveBeenCalled();
+    expect(stubbed().scripting.unregisterContentScripts).not.toHaveBeenCalled();
   });
 });
 

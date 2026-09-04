@@ -20,6 +20,7 @@ import {
   spring,
   step,
 } from '~/cs/physics/spring.ts';
+import { caretOffset, type Edit, type History, offsetToPosition } from './history.ts';
 import { InkLayer } from './ink.ts';
 import { renderMarkdown, toggleTaskInSource } from './markdown.ts';
 import { SettingsPanel } from './SettingsPanel.ts';
@@ -134,6 +135,8 @@ export interface NoteHost {
   onChange?(note: NoteView): void;
   onInk?(note: NoteView, ink: { strokes: InkStroke[]; w: number; h: number }): void;
   onDelete?(note: NoteView): void;
+  /** The page's undo history. Notes record into it; the page applies from it. */
+  history?: History;
   /** The note's markdown source changed by something other than typing. */
   onText?(note: NoteView, text: string): void;
   onStyle?(note: NoteView, overrides: Partial<NoteStyle>): void;
@@ -326,9 +329,32 @@ export class NoteView implements Animatable {
 
     // Source while you are in it, rendered the moment you leave.
     this.bodyEl.addEventListener('focus', () => this.setEditing(true));
-    this.bodyEl.addEventListener('blur', () => this.setEditing(false));
+    this.bodyEl.addEventListener('blur', () => {
+      this.flushTextRun();
+      this.setEditing(false);
+    });
+    // beforeinput knows what the text WAS; input knows what it became. Recording needs both,
+    // and a keydown-based snapshot would miss paste, drag-drop and IME.
+    this.bodyEl.addEventListener('beforeinput', () => {
+      if (this.host.history?.isApplying) return;
+      this.pendingText = { text: this.text, caret: this.caretNow() };
+    });
     this.bodyEl.addEventListener('input', () => {
       this.el.setAttribute('aria-label', `Sticky note: ${this.text.slice(0, 40)}`);
+      const was = this.pendingText;
+      this.pendingText = null;
+      if (!was) return;
+      this.note(
+        {
+          kind: 'text',
+          before: was.text,
+          after: this.text,
+          caretBefore: was.caret,
+          caretAfter: this.caretNow(),
+        },
+        // Consecutive typing coalesces into one step; anything else breaks the run.
+        `text:${this.id}`,
+      );
     });
     this.bodyEl.addEventListener('paste', this.onPaste);
     this.previewEl.addEventListener('pointerdown', this.onPreviewPointerDown);
@@ -409,23 +435,27 @@ export class NoteView implements Animatable {
   /** Apply an override. The note keeps only what it actually changed, so a later change to
    *  the user's defaults still moves every field this note never touched. */
   setStyle(patch: Partial<NoteStyle>): void {
+    const was = { ...this.overrides };
     this.overrides = { ...this.overrides, ...patch };
     this.style = resolveStyle(this.overrides, this.host.defaults);
     this.applyStyle();
     this.resizeArt();
     this.settings?.refresh();
+    this.note({ kind: 'style', before: was, after: { ...this.overrides } }, `style:${this.id}`);
     this.host.onStyle?.(this, this.overrides);
   }
 
   /** Drop one override so the field follows the user's default again. */
   resetStyle(key: keyof NoteStyle): void {
     if (this.overrides[key] === undefined) return;
+    const was = { ...this.overrides };
     const { [key]: _dropped, ...rest } = this.overrides;
     this.overrides = rest;
     this.style = resolveStyle(this.overrides, this.host.defaults);
     this.applyStyle();
     this.resizeArt();
     this.settings?.refresh();
+    this.note({ kind: 'style', before: was, after: { ...this.overrides } });
     this.host.onStyle?.(this, this.overrides);
   }
 
@@ -538,8 +568,12 @@ export class NoteView implements Animatable {
   private readonly onPreviewPointerDown = (e: PointerEvent): void => {
     const target = e.target as HTMLElement;
     if (target.closest('input, a, canvas, img')) return;
+    // preventDefault stops the browser placing its own caret, so the click point is passed on
+    // and honoured instead -- clicking into the middle of a sentence should not jump to the
+    // end. If the platform cannot resolve the point, focusBody falls back to the browser's
+    // caret rather than to none at all.
     e.preventDefault();
-    this.focusBody();
+    this.focusBody({ clientX: e.clientX, clientY: e.clientY });
   };
 
   /**
@@ -611,11 +645,188 @@ export class NoteView implements Animatable {
    * so this only fires for a note the user deliberately focused -- it can never shadow a
    * shortcut belonging to the host page.
    */
+  /** The ui as it was when the current gesture started. */
+  private uiFrom: Record<string, unknown> | null = null;
+  /** Snapshot taken on beforeinput, so the recorder knows what the text WAS. */
+  private pendingText: { text: string; caret: number } | null = null;
+  /** The strokes as of the last commit, for diffing an ink change into a delta. */
+  private lastStrokes: InkStroke[] = [];
+
+  // ------------------------------------------------------------------- history
+
+  /** Record an edit, unless we are inside an undo already. */
+  private note(edit: Edit, mergeKey: string | null = null): void {
+    const history = this.host.history;
+    if (!history || history.isApplying) return;
+    history.record({ noteId: this.id, edit, mergeKey, at: Date.now() });
+  }
+
+  /**
+   * End the current run of typing, so the next edit is its own undo step.
+   *
+   * Called on blur and before an undo. Without it, typing, undoing, and typing again would
+   * merge across the undo and produce a step that never existed.
+   */
+  private flushTextRun(): void {
+    this.pendingText = null;
+    this.host.history?.breakRun();
+  }
+
+  /**
+   * Where the caret is, as a character offset.
+   *
+   * Falls back to the end of the text when the platform gives no shadow-aware selection --
+   * Firefox has no `ShadowRoot.getSelection()`, so an undo there restores the text exactly and
+   * the caret approximately. Better than refusing to record the edit.
+   */
+  private caretNow(): number {
+    const root = this.bodyEl.getRootNode() as ShadowRoot & {
+      getSelection?: () => Selection | null;
+    };
+    const sel = root.getSelection?.();
+    const anchor = sel?.anchorNode;
+    if (!sel || !anchor || !this.bodyEl.contains(anchor)) return this.text.length;
+    try {
+      return caretOffset(this.bodyEl, anchor, sel.anchorOffset);
+    } catch {
+      return this.text.length;
+    }
+  }
+
+  /** Undo/redo of a text edit. Replaces the text and puts the caret back. */
+  applyText(text: string, caret: number): void {
+    this.bodyEl.textContent = text;
+    if (!this.editing) this.renderPreview();
+    else this.restoreCaret(caret);
+    this.el.setAttribute('aria-label', `Sticky note: ${text.slice(0, 40)}`);
+    this.host.onText?.(this, text);
+    this.host.onChange?.(this);
+  }
+
+  private restoreCaret(caret: number): void {
+    const root = this.bodyEl.getRootNode() as ShadowRoot & {
+      getSelection?: () => Selection | null;
+    };
+    const sel = root.getSelection?.();
+    if (!sel) return;
+    try {
+      const pos = offsetToPosition(this.bodyEl, caret);
+      const range = document.createRange();
+      range.setStart(pos.node, Math.min(pos.offset, (pos.node.nodeValue ?? '').length));
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch {
+      /* the text is restored, which is the part that matters */
+    }
+  }
+
+  /** Undo/redo of a style change. Replaces the whole override set. */
+  applyStyleSet(overrides: Record<string, unknown>): void {
+    this.overrides = { ...overrides } as Partial<NoteStyle>;
+    this.style = resolveStyle(this.overrides, this.host.defaults);
+    this.applyStyle();
+    this.resizeArt();
+    this.settings?.refresh();
+    this.host.onStyle?.(this, this.overrides);
+    this.host.onChange?.(this);
+  }
+
+  /** Undo/redo of a move, resize, collapse or lock. Sparse: only what is named. */
+  applyUi(ui: Record<string, unknown>): void {
+    if (typeof ui.x === 'number' && typeof ui.y === 'number') this.moveTo(ui.x, ui.y);
+    if (typeof ui.w === 'number' && typeof ui.h === 'number') this.resize(ui.w, ui.h);
+    if (typeof ui.collapsed === 'boolean' && ui.collapsed !== this.collapsed) {
+      this.setCollapsed(ui.collapsed);
+    }
+    if (typeof ui.locked === 'boolean' && ui.locked !== this.locked) this.setLocked(ui.locked);
+    this.host.onChange?.(this);
+  }
+
+  /**
+   * Undo/redo of an ink change.
+   *
+   * Creates the ink layer if the note does not have one yet -- undoing an erase on a note
+   * whose drawing has not been opened this session still has to put the strokes back -- but
+   * deliberately does NOT turn drawing mode on. An undo must not change which tool you are
+   * holding.
+   */
+  applyInk(add: InkStroke[], remove: InkStroke[]): void {
+    const ink = this.ensureInk();
+    if (!ink) return;
+    ink.patch(add, remove);
+    this.lastStrokes = [...ink.toJSON().strokes];
+    this.host.onInk?.(this, ink.toJSON());
+    this.host.onChange?.(this);
+  }
+
+  /**
+   * One undo step per gesture.
+   *
+   * Recorded on release rather than on move: a drag fires pointermove sixty times a second and
+   * an undo stack with sixty entries for one drag is not an undo stack. `mergeKey` is null for
+   * the same reason -- the gesture is already the unit.
+   */
+  private commitUi(): void {
+    const from = this.uiFrom;
+    this.uiFrom = null;
+    if (!from) return;
+    const to = this.uiNow();
+    const before: Record<string, unknown> = {};
+    const after: Record<string, unknown> = {};
+    for (const k of Object.keys(to)) {
+      if (from[k] !== to[k]) {
+        before[k] = from[k];
+        after[k] = to[k];
+      }
+    }
+    // Position and size travel as pairs, so an undo cannot restore half of a move.
+    if ('x' in after || 'y' in after) {
+      before.x = from.x;
+      before.y = from.y;
+      after.x = to.x;
+      after.y = to.y;
+    }
+    if ('w' in after || 'h' in after) {
+      before.w = from.w;
+      before.h = from.h;
+      after.w = to.w;
+      after.h = to.h;
+    }
+    this.note({ kind: 'ui', before, after });
+  }
+
+  /** The current ui, for recording the "before" side of a change. */
+  private uiNow(): Record<string, unknown> {
+    return {
+      x: this.px.t,
+      y: this.py.t,
+      w: this.w,
+      h: this.h,
+      collapsed: this.collapsed,
+      locked: this.locked,
+    };
+  }
+
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     // Never interfere with typing, and never with an IME composition.
     if (e.isComposing || e.keyCode === 229) return;
     const root = this.el.getRootNode();
     const active = root instanceof ShadowRoot ? root.activeElement : document.activeElement;
+
+    // Undo and redo come first, and work wherever focus is inside the note -- in the text as
+    // much as on the note. preventDefault is essential in the text: without it the native
+    // editor undoes as well and the two histories fight.
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && !e.altKey && /^[zyZY]$/.test(e.key)) {
+      const redo = e.key.toLowerCase() === 'y' || e.shiftKey;
+      e.preventDefault();
+      e.stopPropagation();
+      this.flushTextRun();
+      if (redo) this.host.history?.redo();
+      else this.host.history?.undo();
+      return;
+    }
 
     // Escape always means "get me out of whatever mode I am in", wherever focus happens to be.
     if (e.key === 'Escape') {
@@ -705,6 +916,12 @@ export class NoteView implements Animatable {
   // --------------------------------------------------------------------- ink
 
   /** Turn the drawing layer on or off, creating it lazily the first time it is needed. */
+  /** Make sure the ink layer exists, without changing whether drawing is active. */
+  private ensureInk(): InkLayer | null {
+    this.enableInk(this.ink?.isEnabled ?? false);
+    return this.ink;
+  }
+
   enableInk(on: boolean): void {
     if (!this.ink) {
       this.ink = new InkLayer(
@@ -712,10 +929,20 @@ export class NoteView implements Animatable {
         this.h,
         this.inkInit?.strokes ?? [],
         { color: 'var(--cn-ink)', size: 7, tool: 'pen' },
-        (strokes) => this.host.onInk?.(this, { strokes, w: this.w, h: this.h }),
+        (strokes) => {
+          // A delta, not a snapshot: erasing one stroke out of a busy drawing must not copy
+          // the drawing into the undo stack.
+          const prev = this.lastStrokes;
+          const added = strokes.filter((k) => !prev.includes(k));
+          const removed = prev.filter((k) => !strokes.includes(k));
+          this.lastStrokes = [...strokes];
+          this.note({ kind: 'ink', added, removed });
+          this.host.onInk?.(this, { strokes, w: this.w, h: this.h });
+        },
       );
       // Above the text so a drawing can annotate what is written, below the corner curl.
       this.faceEl.insertBefore(this.ink.el, this.curlEl);
+      this.lastStrokes = [...this.ink.toJSON().strokes];
     }
     this.ink.setEnabled(on);
     this.el.classList.toggle('is-inking', on);
@@ -837,6 +1064,9 @@ export class NoteView implements Animatable {
   private timeScale = 1;
 
   setCollapsed(next: boolean): void {
+    if (next !== this.collapsed) {
+      this.note({ kind: 'ui', before: { collapsed: this.collapsed }, after: { collapsed: next } });
+    }
     this.collapsed = next;
     this.el.classList.toggle('is-collapsed', next);
     if (next) this.setEditing(false);
@@ -853,6 +1083,9 @@ export class NoteView implements Animatable {
   }
 
   setLocked(next: boolean): void {
+    if (next !== this.locked) {
+      this.note({ kind: 'ui', before: { locked: this.locked }, after: { locked: next } });
+    }
     this.locked = next;
     this.applyEditable();
     if (next) this.setEditing(false);
@@ -862,8 +1095,28 @@ export class NoteView implements Animatable {
     this.host.onChange?.(this);
   }
 
-  /** Put the caret in the body. Used right after creating a note, so typing just works. */
-  focusBody(): void {
+  /**
+   * Put the caret in the body. Used after creating a note and after clicking the rendering.
+   *
+   * THE BUG THIS SHAPE EXISTS TO PREVENT RETURNING: this used to call
+   * `selection.removeAllRanges()` and then `addRange()` with a range inside the note's shadow
+   * root, without checking that the second call took effect.
+   *
+   * `ShadowRoot.getSelection()` is a Chromium extension to the spec. Firefox does not have it,
+   * so the code fell through to `document.getSelection()`, whose `addRange()` cannot reliably
+   * address a node inside a shadow tree. The `removeAllRanges()` destroyed the caret the
+   * browser had just placed on focus, and nothing put one back. The result was a note you
+   * could TYPE into -- the editor infers a position when text is inserted -- but could not
+   * BACKSPACE in, because a delete needs a selection to delete backwards from and there was
+   * none. Reported twice as "backspace doesn't work at all", and my first attempt to
+   * reproduce it was invalid: injected key events carry no physical `code`, so the browser
+   * delivers them as events and performs no editing, which makes every contenteditable look
+   * broken under a synthetic test.
+   *
+   * So: focus first, and only ever move the caret when the move can be verified. When it
+   * cannot, the caret the browser placed on focus is the correct one -- leave it alone.
+   */
+  focusBody(at?: { clientX: number; clientY: number }): void {
     if (this.locked) return;
     this.bringToFront();
     // Edit mode FIRST. The source element is display:none while the rendering is showing, and
@@ -871,14 +1124,87 @@ export class NoteView implements Animatable {
     // nothing, which meant a note could not be typed into at all.
     this.setEditing(true);
     this.bodyEl.focus({ preventScroll: true });
-    const sel = this.bodyEl.getRootNode() as Document | ShadowRoot;
-    const selection = (sel as Document).getSelection?.() ?? document.getSelection();
+    this.placeCaret(at);
+  }
+
+  /**
+   * Move the caret, if and only if we can confirm the move worked.
+   *
+   * Returns without touching anything when the platform gives us no shadow-aware selection,
+   * which is the safe answer: the browser's own caret is better than no caret.
+   */
+  private placeCaret(at?: { clientX: number; clientY: number }): void {
+    const root = this.bodyEl.getRootNode() as ShadowRoot & {
+      getSelection?: () => Selection | null;
+    };
+    const selection = root.getSelection?.();
     if (!selection) return;
-    const range = document.createRange();
-    range.selectNodeContents(this.bodyEl);
-    range.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(range);
+
+    const range = at ? this.rangeAtPoint(at) : null;
+    if (range) {
+      this.applyRange(selection, range);
+      return;
+    }
+    // No click to honour, or the point was not over text: end of the note, which is where
+    // someone who just made a note wants to be.
+    const end = document.createRange();
+    end.selectNodeContents(this.bodyEl);
+    end.collapse(false);
+    this.applyRange(selection, end);
+  }
+
+  /** Set a range and undo the attempt if it did not land inside the body. */
+  private applyRange(selection: Selection, range: Range): void {
+    const had = selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null;
+    try {
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } catch {
+      // Some engines throw for a cross-tree range rather than ignoring it.
+    }
+    const anchor = selection.anchorNode;
+    if (anchor && this.bodyEl.contains(anchor)) return;
+
+    // It did not take. Put back whatever was there and let the browser own the caret.
+    try {
+      selection.removeAllRanges();
+      if (had) selection.addRange(had);
+    } catch {
+      /* nothing more to try */
+    }
+    this.bodyEl.blur();
+    this.bodyEl.focus({ preventScroll: true });
+  }
+
+  /** Where the user actually clicked, when the platform can tell us. */
+  private rangeAtPoint(at: { clientX: number; clientY: number }): Range | null {
+    const d = document as Document & {
+      caretPositionFromPoint?: (
+        x: number,
+        y: number,
+        options?: { shadowRoots: ShadowRoot[] },
+      ) => { offsetNode: Node; offset: number } | null;
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    };
+    const root = this.bodyEl.getRootNode();
+    try {
+      // The `shadowRoots` option is what makes this see inside our own tree; without it the
+      // answer is the host element, which is useless here.
+      const pos = d.caretPositionFromPoint?.(at.clientX, at.clientY, {
+        shadowRoots: root instanceof ShadowRoot ? [root] : [],
+      });
+      if (pos && this.bodyEl.contains(pos.offsetNode)) {
+        const r = document.createRange();
+        r.setStart(pos.offsetNode, pos.offset);
+        r.collapse(true);
+        return r;
+      }
+      const legacy = d.caretRangeFromPoint?.(at.clientX, at.clientY);
+      if (legacy && this.bodyEl.contains(legacy.startContainer)) return legacy;
+    } catch {
+      /* fall through to the end of the note */
+    }
+    return null;
   }
 
   /** Placeholder text shown while the body is empty. */
@@ -1025,6 +1351,7 @@ export class NoteView implements Animatable {
     target.addEventListener('pointercancel', this.onRelease);
     target.addEventListener('lostpointercapture', this.onRelease);
 
+    this.uiFrom = this.uiNow();
     this.grabDx = e.clientX + window.scrollX - this.px.t;
     this.grabDy = e.clientY + window.scrollY - this.py.t;
     // Where on the note it was grabbed, -1..1 from the centre. This is what makes yanking a
@@ -1099,6 +1426,7 @@ export class NoteView implements Animatable {
     this.lz.t = 0;
     this.el.classList.remove('is-dragging');
     this.host.loop.add(this);
+    this.commitUi();
     this.host.onChange?.(this);
   };
 

@@ -26,6 +26,33 @@
   "menuOpenManager": {
     "message": "All my notes…"
   },
+  "updatesTitle": {
+    "message": "Updates"
+  },
+  "updatesCheck": {
+    "message": "Check for a new version"
+  },
+  "updatesChecking": {
+    "message": "Checking…"
+  },
+  "updatesCurrent": {
+    "message": "You have the latest version."
+  },
+  "updatesAvailable": {
+    "message": "Version $1 is available."
+  },
+  "updatesOpen": {
+    "message": "Open the release page"
+  },
+  "updatesDaily": {
+    "message": "Check once a day"
+  },
+  "updatesFailed": {
+    "message": "Could not check just now."
+  },
+  "updatesDenied": {
+    "message": "Access to the release list was not granted, so there is nothing to check against."
+  },
   "noteDraw": {
     "message": "Draw"
   },

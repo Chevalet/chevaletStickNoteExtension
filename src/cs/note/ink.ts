@@ -24,6 +24,13 @@ export interface InkOptions {
 const ERASER_SLOP = 6;
 
 /** Turn a flat [x, y, pressure, ...] list into an SVG outline path. */
+/** A stable-enough identity for a stroke that has been serialised and read back. */
+export function strokeKey(s: InkStroke): string {
+  const n = s.points.length;
+  const at = (i: number): string => (s.points[i] ?? 0).toFixed(2);
+  return [n, at(0), at(1), at(n - 3), at(n - 2), s.color, s.size].join('|');
+}
+
 export function strokeToPath(stroke: InkStroke): string {
   const pts: number[][] = [];
   for (let i = 0; i + 2 < stroke.points.length; i += 3) {
@@ -132,6 +139,29 @@ export class InkLayer {
     this.redraw();
     this.onCommit?.(this.strokes);
     return true;
+  }
+
+  /**
+   * Put strokes back, and take strokes away, in one redraw.
+   *
+   * This is what undo needs: erasing removes whole strokes and drawing appends one, so both
+   * directions of an ink edit are a short list. Restoring by replacing the whole layer would
+   * copy a busy drawing on every step.
+   *
+   * Identity is by reference where the same objects come back, and by a structural key
+   * otherwise -- an entry that has been through a save/load round trip is no longer the same
+   * object as the one that was erased.
+   */
+  patch(add: InkStroke[], remove: InkStroke[]): void {
+    if (add.length === 0 && remove.length === 0) return;
+    const gone = new Set(remove);
+    const goneKeys = new Set(remove.map(strokeKey));
+    this.strokes = this.strokes.filter((s) => !gone.has(s) && !goneKeys.has(strokeKey(s)));
+    // Re-adding appends. Stroke order is paint order, and a restored stroke belonging on top
+    // is the common case (it was the last thing drawn).
+    for (const s of add) this.strokes.push({ ...s, points: [...s.points] });
+    this.redraw();
+    this.onCommit?.(this.strokes);
   }
 
   clear(): void {

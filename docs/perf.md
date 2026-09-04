@@ -104,6 +104,27 @@ largest entries are the note itself and its stylesheet. Before raising it again,
 and ask the question the number exists to force — is the new code needed on a page that has
 no notes yet? That is the common case.
 
+### Undo/redo, measured
+
+Recording has to be free, because it happens on every keystroke of every note.
+
+| what | measured |
+|---|---|
+| one recorded edit | **1.3 µs** (2000 edits in 2.6 ms) |
+| one undo step, 200-deep stack | **2 µs** |
+| 120 drag frames | **0.9 ms**, and **0 history entries** |
+
+The last row is the design point. A drag fires `pointermove` sixty times a second; recording
+per move would put sixty entries in the stack for one gesture and make undo useless. The
+entry is written on release, so a whole drag is one step. Typing coalesces the same way: a run
+of keystrokes inside 600 ms is one entry, so "hello" is one undo, not five.
+
+At 1.3 µs, recording a keystroke costs 0.008% of a 16 ms frame. Nothing here runs per frame,
+and the shared rAF loop still stops itself when everything settles.
+
+The stack is bounded twice over -- 200 entries and 2 MB of stored text, whichever comes first
+-- because text edits store before/after strings, and a note may hold 200k characters.
+
 ## Notes from measuring in a preview pane
 
 Two environment traps cost real time here, worth remembering before trusting any in-pane
@@ -148,3 +169,20 @@ Each of these was invisible in code review and obvious the moment it rendered.
    single quote bar running down two thirds of the card. `startsBlock()` is now one shared
    definition used by both the paragraph loop and the quote loop, and the tests assert
    nesting.
+9. **Backspace did nothing, and my first attempt to reproduce it was invalid.** `focusBody()`
+   called `selection.removeAllRanges()` and then `addRange()` with a range inside the note's
+   closed shadow root, without checking the second call took. `ShadowRoot.getSelection()` is a
+   Chromium extension to the spec; Firefox does not have it, so the code fell through to
+   `document.getSelection()`, which cannot address a node inside a shadow tree. The
+   `removeAllRanges()` destroyed the caret the browser had just placed on focus and nothing put
+   one back — a note you could type into (the editor infers a position on insert) but could not
+   delete in, because a delete needs a selection to delete backwards from.
+
+   The reproduction attempt is worth recording as its own lesson. Injected key events carry no
+   physical `code`, so the browser delivers them as events and performs **no editing action**.
+   Under a synthetic Backspace *every* contenteditable looks broken, so the first "reproduction"
+   proved nothing and the second confirmed nothing. `document.execCommand('delete')` is the
+   valid proxy: it runs the same edit path a real Backspace does. With the fix, clicking five
+   characters into a note reports `caretOffset: 5` inside the body and `execCommand('delete')`
+   removes the character *at* the caret rather than at the end. Before the fix the same probe
+   reported the selection anchored on `HTML` with `rangeCount: 0`.

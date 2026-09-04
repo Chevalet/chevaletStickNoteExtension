@@ -26,6 +26,7 @@ import {
 } from './anchor/index.ts';
 import { createSharedDefs } from './art/defs.ts';
 import { createHost, type Host } from './host.ts';
+import { History } from './note/history.ts';
 import { NoteView } from './note/NoteView.ts';
 import { Loop } from './physics/spring.ts';
 import { SHEET_CSS } from './styles.ts';
@@ -46,6 +47,43 @@ let enabled = false;
  * the moment two things edit the same note and one of them loses text.
  */
 const revs = new Map<NoteId, number>();
+
+/**
+ * One undo history for the whole page.
+ *
+ * Ctrl+Z undoes the last thing you did, on whichever note you did it -- see note/history.ts
+ * for why that is one stack rather than one per note. The applier lives here because undoing a
+ * delete has to bring a note back onto the page, which only the renderer can do.
+ */
+const history = new History({
+  setText: (id, text, caret) => views.get(id as NoteId)?.applyText(text, caret),
+  setStyle: (id, style) => views.get(id as NoteId)?.applyStyleSet(style),
+  setUi: (id, ui) => views.get(id as NoteId)?.applyUi(ui),
+  patchInk: (id, add, remove) =>
+    views.get(id as NoteId)?.applyInk(add as never[], remove as never[]),
+  restoreNote: (id) => void restoreFromTrash(id as NoteId),
+  trashNote: (id) => void trashAndUnmount(id as NoteId),
+});
+
+/** Undo of a delete: the note is in the trash, so bring it back and re-mount it. */
+async function restoreFromTrash(id: NoteId): Promise<void> {
+  if (views.has(id)) return;
+  const reply = await ask<{ note: NoteWire }>({ t: 'note/restore', id });
+  if (!reply.ok) return;
+  mountNote(reply.data.note);
+  reportGuardState();
+}
+
+/** Undo of a create, and the ordinary delete path. Soft: it goes to the trash. */
+async function trashAndUnmount(id: NoteId): Promise<void> {
+  const view = views.get(id);
+  view?.destroy();
+  views.delete(id);
+  revs.delete(id);
+  pending.delete(id);
+  await ask({ t: 'note/delete', id, soft: true });
+  reportGuardState();
+}
 
 async function ask<T>(msg: CsToBg): Promise<Reply<T>> {
   try {
@@ -181,6 +219,7 @@ function mountNote(wire: NoteWire): NoteView {
     {
       loop,
       layer,
+      history,
       raise: () => ++topZ,
       onChange: (n) =>
         save(wire.id, {
@@ -191,9 +230,18 @@ function mountNote(wire: NoteWire): NoteView {
       onStyle: (_n, overrides) => save(wire.id, { style: overrides }),
       onInk: (_n, ink) => save(wire.id, { ink }),
       onDelete: (n) => {
-        void ask({ t: 'note/delete', id: wire.id, soft: true });
+        // Recorded before the note goes, so Ctrl+Z brings it back.
+        history.record({
+          noteId: wire.id,
+          edit: { kind: 'delete' },
+          mergeKey: null,
+          at: Date.now(),
+        });
         n.destroy();
         views.delete(wire.id);
+        revs.delete(wire.id);
+        pending.delete(wire.id);
+        void ask({ t: 'note/delete', id: wire.id, soft: true });
         reportGuardState();
       },
     },
@@ -269,6 +317,12 @@ async function create(opts: {
   }
 
   const view = mountNote(reply.data.note);
+  history.record({
+    noteId: reply.data.note.id,
+    edit: { kind: 'create' },
+    mergeKey: null,
+    at: Date.now(),
+  });
   reportGuardState();
   // Straight into editing: nobody makes an empty note on purpose.
   view.focusBody();

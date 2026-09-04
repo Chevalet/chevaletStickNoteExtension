@@ -56,10 +56,15 @@ export type CsToBg =
   | { t: 'note/create'; url: string; note: Omit<NoteWire, 'id' | 'rev' | 'updatedAt'> }
   | { t: 'note/patch'; id: NoteId; rev: number; patch: NotePatch; clock: Record<string, number> }
   | { t: 'note/delete'; id: NoteId; soft: boolean }
+  /** Undo of a delete. The note is in the trash, not gone, so this is a restore. */
+  | { t: 'note/restore'; id: NoteId }
   | { t: 'guard/state'; hasUnsaved: boolean; noteCount: number }
   | { t: 'tab/setEnabled'; enabled: boolean }
   | { t: 'editing/begin' }
   | { t: 'editing/end' };
+
+/** Sent by the options page, not by a content script. */
+export type UiToBg = { t: 'update/check'; fromClick: boolean };
 
 // --------------------------------------------------------------------------- bg -> cs
 

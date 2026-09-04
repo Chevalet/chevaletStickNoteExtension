@@ -23,12 +23,19 @@ import {
   notesForContext,
   patchNote,
   purgeNote,
+  restoreNote,
   trashNote,
 } from './db/notes.ts';
 import { openDb } from './db/open.ts';
 import type { NoteRecord } from './db/schema.ts';
 import { allocate, DISARM_DELAY_MS, type TabGuardState } from './guard/budget.ts';
 import { injectNow, mayAccess, syncRegistrations } from './inject.ts';
+import {
+  checkForUpdate,
+  UPDATE_ALARM,
+  UPDATE_PERIOD_MINUTES,
+  type UpdateInfo,
+} from './jobs/update.ts';
 import {
   errReply,
   type HelloReply,
@@ -60,13 +67,17 @@ browser.commands.onCommand.addListener((name) => void onCommand(name));
 browser.menus.onClicked.addListener((info, tab) => void onMenuClicked(info, tab));
 // A granted or revoked origin changes which pages we are registered on. These fire in the
 // background even when the popup is what did the granting.
+browser.alarms.onAlarm.addListener((a) => void onAlarm(a));
 browser.permissions.onAdded.addListener(() => void onPermissionsChanged(true));
 browser.permissions.onRemoved.addListener(() => void onPermissionsChanged(false));
 browser.tabs.onRemoved.addListener((tabId, info) => void onTabRemoved(tabId, info));
 browser.tabs.onUpdated.addListener((tabId, change, tab) => void onTabUpdated(tabId, change, tab));
 browser.storage.onChanged.addListener((_changes, area) => {
   // Settings changed somewhere. Drop the cache; the next read picks it up.
-  if (area === 'local') settingsCache = null;
+  if (area === 'local') {
+    settingsCache = null;
+    void syncUpdateAlarm();
+  }
 });
 // No action.onClicked listener: the manifest declares a default_popup, so it never fires.
 
@@ -105,6 +116,7 @@ async function onInstalled(details: browser.runtime._OnInstalledDetails): Promis
   await ready();
   await buildMenus();
   await syncRegistrations();
+  await syncUpdateAlarm();
   if (details.reason !== 'update') return;
   // Content scripts from the previous version are orphaned: their next message throws
   // "Extension context invalidated". Tell the ones still loaded to tear down cleanly.
@@ -119,6 +131,7 @@ async function onStartup(): Promise<void> {
   tabRuntime.clear();
   armedTabs.clear();
   await buildMenus();
+  await syncUpdateAlarm();
   // `persistAcrossSessions` should have carried these across the restart, but re-syncing is
   // cheap and a registration that silently failed to persist would mean an extension that
   // does nothing until reinstalled.
@@ -361,6 +374,20 @@ async function onMessage(
       return okReply({ rev: result.note.rev, updatedAt: result.note.updatedAt });
     }
 
+    case 'note/restore': {
+      const m = msg as { id: NoteId };
+      if (!(await restoreNote(m.id))) return errReply('NOT_FOUND');
+      const record = await getNote(m.id);
+      if (!record) return errReply('NOT_FOUND');
+      const tabId = sender.tab?.id;
+      if (tabId !== undefined) {
+        const st = tabRuntime.get(tabId);
+        if (st) st.noteCount += 1;
+        scheduleAllocation();
+      }
+      return okReply({ note: toWire(record) });
+    }
+
     case 'note/delete': {
       const m = msg as { id: NoteId; soft: boolean };
       // Soft by default, always. A note is someone's writing, and an undo that lives for a few
@@ -378,6 +405,11 @@ async function onMessage(
         scheduleAllocation();
       }
       return okReply({ trashed: m.soft });
+    }
+
+    case 'update/check': {
+      const info = await runUpdateCheck((msg as { fromClick?: boolean }).fromClick === true);
+      return okReply(info);
     }
 
     case 'command':
@@ -550,6 +582,52 @@ function toWire(r: NoteRecord): NoteWire {
     updatedAt: r.updatedAt,
     ...(r.ink ? { ink: r.ink } : {}),
   } as NoteWire;
+}
+
+// --------------------------------------------------------------------- updates
+
+/**
+ * Look for a newer release, and remember the answer.
+ *
+ * The result is cached in settings storage rather than kept in memory, because the event page
+ * is torn down between wakes and the options page needs to be able to show the last answer
+ * without triggering a fresh network call every time it opens.
+ */
+async function runUpdateCheck(fromClick: boolean): Promise<UpdateInfo> {
+  const info = await checkForUpdate({
+    current: __VERSION__,
+    mayRequestPermission: fromClick,
+  });
+  await browser.storage.local.set({ lastUpdateCheck: info }).catch(() => undefined);
+
+  // A badge, not a dialog. An extension that interrupts you to talk about itself is a bad
+  // houseguest, and this one's whole premise is staying out of the way.
+  if (info.newer) {
+    await browser.action.setBadgeText({ text: '↑' }).catch(() => undefined);
+    await browser.action.setBadgeBackgroundColor({ color: '#0d7d78' }).catch(() => undefined);
+    await browser.action
+      .setTitle({ title: `Chevalet Note ${info.latest} is available` })
+      .catch(() => undefined);
+  }
+  return info;
+}
+
+/** Arm or disarm the daily check to match the setting. */
+async function syncUpdateAlarm(): Promise<void> {
+  const s = await settings();
+  if (!s.autoCheckUpdates) {
+    await browser.alarms.clear(UPDATE_ALARM).catch(() => undefined);
+    return;
+  }
+  // create() replaces an existing alarm of the same name, so this is idempotent.
+  browser.alarms.create(UPDATE_ALARM, { periodInMinutes: UPDATE_PERIOD_MINUTES });
+}
+
+async function onAlarm(alarm: browser.alarms.Alarm): Promise<void> {
+  await ready();
+  if (alarm.name !== UPDATE_ALARM) return;
+  // No click behind this, so it can only use a permission already granted.
+  await runUpdateCheck(false);
 }
 
 // ----------------------------------------------------------------------- menu

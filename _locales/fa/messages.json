@@ -26,6 +26,33 @@
   "menuOpenManager": {
     "message": "همهٔ نوت‌های من…"
   },
+  "updatesTitle": {
+    "message": "به‌روزرسانی"
+  },
+  "updatesCheck": {
+    "message": "بررسی نسخهٔ جدید"
+  },
+  "updatesChecking": {
+    "message": "در حال بررسی…"
+  },
+  "updatesCurrent": {
+    "message": "آخرین نسخه را داری."
+  },
+  "updatesAvailable": {
+    "message": "نسخهٔ $1 موجود است."
+  },
+  "updatesOpen": {
+    "message": "باز کردن صفحهٔ انتشار"
+  },
+  "updatesDaily": {
+    "message": "روزی یک بار بررسی کن"
+  },
+  "updatesFailed": {
+    "message": "الان نشد بررسی کنم."
+  },
+  "updatesDenied": {
+    "message": "دسترسی به فهرست انتشارها داده نشد، پس چیزی برای مقایسه نیست."
+  },
   "noteDraw": {
     "message": "ترسیم"
   },

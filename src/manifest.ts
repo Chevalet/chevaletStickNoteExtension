@@ -79,19 +79,31 @@ export function manifest({ version }: ManifestInput): Record<string, unknown> {
       'sessions', // setTabValue: per-tab state that survives session restore
       'tabs', // tab urls/titles for scope matching and the manager
       'scripting', // dynamic registration + on-demand injection
-      'alarms', // GC sweep, scheduled backup
+      'alarms', // the daily update check, when it is turned on
       'menus', // "Add a note here" context menu
       'activeTab', // lets the toolbar button work before any host permission is granted
     ],
 
-    // Kept optional so the install prompt stays quiet. Requested from a click, in context.
-    optional_permissions: [
-      'downloads', // only for UNATTENDED scheduled backup; manual export needs no permission
-      'webNavigation', // nicer SPA detection; tabs.onUpdated is the baseline fallback
-    ],
+    /**
+     * Kept optional so the install prompt stays quiet, and requested from a click, in context.
+     *
+     * Empty on purpose. `downloads` and `webNavigation` were declared here for features that
+     * were designed and never built: unattended scheduled backup, and finer SPA navigation
+     * detection. An extension that asks for a permission it never uses is asking a reviewer to
+     * take its word for something untrue -- and a user to grant something for nothing. They go
+     * back on the day the code that needs them lands. Manual export needs no permission at all,
+     * and `tabs.onUpdated` already covers navigation.
+     */
+    optional_permissions: [],
 
     host_permissions: [],
-    optional_host_permissions: ['*://*/*', 'file:///*'],
+    optional_host_permissions: [
+      '*://*/*',
+      'file:///*',
+      // Only for the update check, only when the button is pressed. Nothing else in the
+      // extension makes a network request of any kind.
+      'https://api.github.com/*',
+    ],
 
     commands: {
       'new-note': {

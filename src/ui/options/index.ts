@@ -7,10 +7,12 @@
  */
 
 import type { GuardMode } from '~/bg/guard/budget.ts';
+import { RELEASES_PAGE, type UpdateInfo } from '~/bg/jobs/update.ts';
 import { DEFAULT_SETTINGS, loadSettings, type Settings, saveSettings } from '~/bg/settings.ts';
 import { isRtl, setLang, t } from '~/shared/i18n.ts';
 
 declare const __VERSION__: string;
+const VERSION = __VERSION__;
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -136,6 +138,68 @@ function numberField(
   return el('label', { class: 'field' }, el('span', {}, label), input);
 }
 
+/** Last answer from the update check, so opening the page does not trigger a request. */
+let lastUpdate: UpdateInfo | null = null;
+let checking = false;
+
+function updateRow(): HTMLElement {
+  const status = el('span', { class: 'note' });
+  const button = el('button', { type: 'button' }, t('updatesCheck')) as HTMLButtonElement;
+  const link = el('a', {
+    href: RELEASES_PAGE,
+    target: '_blank',
+    rel: 'noopener noreferrer',
+  }) as HTMLAnchorElement;
+  link.textContent = t('updatesOpen');
+  link.hidden = true;
+
+  const paint = (): void => {
+    button.disabled = checking;
+    button.textContent = checking ? t('updatesChecking') : t('updatesCheck');
+    link.hidden = !lastUpdate?.newer;
+    if (!lastUpdate) {
+      status.textContent = '';
+      return;
+    }
+    if (lastUpdate.error === 'no-permission') status.textContent = t('updatesDenied');
+    else if (lastUpdate.error) status.textContent = t('updatesFailed');
+    else if (lastUpdate.newer && lastUpdate.latest) {
+      status.textContent = t('updatesAvailable', lastUpdate.latest);
+    } else status.textContent = t('updatesCurrent');
+  };
+
+  button.addEventListener('click', () => {
+    if (checking) return;
+    checking = true;
+    paint();
+    // fromClick: true is what lets the background request the host permission -- Firefox only
+    // grants one from a user gesture, and the click is that gesture.
+    void browser.runtime
+      .sendMessage({ t: 'update/check', fromClick: true })
+      .then((reply: unknown) => {
+        const r = reply as { ok?: boolean; data?: UpdateInfo };
+        lastUpdate = r?.ok ? (r.data ?? null) : null;
+      })
+      .catch(() => {
+        lastUpdate = {
+          current: VERSION,
+          latest: null,
+          newer: false,
+          url: RELEASES_PAGE,
+          checkedAt: Date.now(),
+          error: 'failed',
+        };
+      })
+      .finally(() => {
+        checking = false;
+        paint();
+      });
+  });
+
+  paint();
+  return el('div', { class: 'row' }, button, status, link);
+}
+
 function render(): void {
   document.body.textContent = '';
   document.body.dir = isRtl() ? 'rtl' : 'ltr';
@@ -187,6 +251,17 @@ function render(): void {
           (v) => {
             void patch({ locale: v as Settings['locale'] }).then(() => {
               setLang(current.locale);
+              void browser.storage.local
+                .get('lastUpdateCheck')
+                .then((got: Record<string, unknown>) => {
+                  const cached = got.lastUpdateCheck as UpdateInfo | undefined;
+                  if (cached) {
+                    lastUpdate = cached;
+                    render();
+                  }
+                })
+                .catch(() => undefined);
+
               render();
             });
           },
@@ -297,6 +372,35 @@ function render(): void {
           current.persistPrivateNotes
             ? 'Notes made in a private window are written to the database like any other.'
             : 'Notes made in a private window live in memory only and are gone when the last private window closes.',
+        ),
+      ),
+    ),
+  );
+
+  // -------------------------------------------------------------- updates
+  main.append(
+    el(
+      'section',
+      {},
+      el('h2', {}, t('updatesTitle')),
+      el(
+        'div',
+        { class: 'inner' },
+        el('p', { class: 'note' }, `Installed: ${VERSION}`),
+        updateRow(),
+        checkField(
+          t('updatesDaily'),
+          current.autoCheckUpdates,
+          (v) => void patch({ autoCheckUpdates: v }),
+        ),
+        el(
+          'p',
+          { class: 'note' },
+          'This is the only network request the extension can make, it is off unless you turn ' +
+            'it on, and it asks for permission the first time. It sends no cookies, no ' +
+            'referrer and nothing about you — it reads the release list and compares one ' +
+            'version number. It cannot install anything: Firefox only updates an add-on that ' +
+            'has been signed, so the button hands you the download page.',
         ),
       ),
     ),

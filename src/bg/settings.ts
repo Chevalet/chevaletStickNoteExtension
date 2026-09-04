@@ -35,6 +35,8 @@ export interface Settings {
     keepDaily: number;
     keepWeekly: number;
   };
+  /** Look for a new release once a day. Off by default: it is the only network call. */
+  autoCheckUpdates: boolean;
   /** Notes in private windows are in-memory only unless this is turned on. */
   persistPrivateNotes: boolean;
   /** Hold this to make notes click-through so the page underneath can be read. */
@@ -53,6 +55,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   urlMatchDefault: { ...DEFAULT_URL_MATCH },
   retention: { trashDays: 30, detachedDays: 30, revisionsPerNote: 50, autoDelete: false },
   backup: { enabled: false, everyHours: 12, keepDaily: 7, keepWeekly: 4 },
+  autoCheckUpdates: false,
   persistPrivateNotes: false,
   ghostModifier: 'Alt',
   motion: 'auto',

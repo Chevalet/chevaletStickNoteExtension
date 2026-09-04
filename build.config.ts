@@ -147,18 +147,28 @@ export async function copyStatic(): Promise<void> {
  * page's own scripts, and exists solely to hold a `beforeunload` listener. It has to stay
  * small enough that its cost is not measurable. Currently 0.3 kB.
  *
- * `cs/renderer.js` — 28 kB. Raised from 24 kB when anchoring moved onto this path (~3 kB gz
- * for `anchor/`, plus 1.7 kB minified of `approx-string-match`). The budget predated that
- * code being here, and the measured breakdown says there is no fat to cut instead: of 78 kB
- * minified, 20 kB is NoteView, 16 kB is the stylesheet, and the remainder is spread fairly
- * evenly across the settings panel, the ink layer, `perfect-freehand`, markdown and
- * anchoring. Each of those is the feature itself.
+ * `cs/renderer.js` — 30 kB, raised twice, each time with the measurement in hand.
  *
- * Before raising it again, re-measure with an esbuild metafile, and ask the question this
- * number exists to force: is the new code needed on a page that has no notes yet? That is the
- * common case, and the only reason this is watched.
+ * 24 -> 28 kB when anchoring moved onto this path (~3 kB gz for `anchor/` plus 1.7 kB
+ * minified of `approx-string-match`). 28 -> 30 kB for undo/redo: `history.ts` is 3.1 kB
+ * minified and the recorders took NoteView from 19.9 to 24.2 kB.
+ *
+ * The measured breakdown at 86.7 kB minified says there is no fat to cut instead — 24.2 kB is
+ * NoteView, 16.2 kB is the stylesheet, and the rest is spread across the ink layer,
+ * `perfect-freehand`, the settings panel, markdown, anchoring and history. Every one of those
+ * is the feature itself.
+ *
+ * The question this number exists to force is "is the new code needed on a page that has no
+ * notes yet?", and for undo the answer is uncomfortable: it is not, but it cannot be split
+ * off either. Recording has to be live from the first keystroke, and lazy-loading it would
+ * mean a dynamic import of an extension URL, which needs `web_accessible_resources` — and
+ * that lets any page on the web detect the extension. Trading a fingerprinting surface for
+ * 3 kB is not a trade worth making, so the code stays and the budget moves.
+ *
+ * Before raising it again: re-measure with an esbuild metafile, ask the same question, and if
+ * the answer is again "cannot be split", say so here rather than moving the number quietly.
  */
 export const BUDGETS_GZ: Readonly<Record<string, number>> = {
   'cs/guard.js': 1_024,
-  'cs/renderer.js': 28 * 1024,
+  'cs/renderer.js': 30 * 1024,
 };

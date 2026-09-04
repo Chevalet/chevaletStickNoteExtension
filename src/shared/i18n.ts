@@ -48,6 +48,20 @@ export const CATALOGUE = {
   menuNoteOnSelection: { en: 'Add a note on this text', fa: 'یک نوت روی این متن' },
   menuOpenManager: { en: 'All my notes…', fa: 'همهٔ نوت‌های من…' },
 
+  // updates
+  updatesTitle: { en: 'Updates', fa: 'به‌روزرسانی' },
+  updatesCheck: { en: 'Check for a new version', fa: 'بررسی نسخهٔ جدید' },
+  updatesChecking: { en: 'Checking…', fa: 'در حال بررسی…' },
+  updatesCurrent: { en: 'You have the latest version.', fa: 'آخرین نسخه را داری.' },
+  updatesAvailable: { en: 'Version $1 is available.', fa: 'نسخهٔ $1 موجود است.' },
+  updatesOpen: { en: 'Open the release page', fa: 'باز کردن صفحهٔ انتشار' },
+  updatesDaily: { en: 'Check once a day', fa: 'روزی یک بار بررسی کن' },
+  updatesFailed: { en: 'Could not check just now.', fa: 'الان نشد بررسی کنم.' },
+  updatesDenied: {
+    en: 'Access to the release list was not granted, so there is nothing to check against.',
+    fa: 'دسترسی به فهرست انتشارها داده نشد، پس چیزی برای مقایسه نیست.',
+  },
+
   // note toolbar
   noteDraw: { en: 'Draw', fa: 'ترسیم' },
   noteSettings: { en: 'Settings', fa: 'تنظیمات' },

@@ -1,14 +1,17 @@
-# Status — v0.0.1, 4 September 2026
+# Status — v0.0.2, 4 September 2026
 
-The first build that can be installed and used. **It has never been run in a real Firefox by
-its author**, so every line below carries how it was actually verified:
+Second installable build. 0.0.1 shipped with a caret bug that made Backspace do nothing, a
+close warning that could never fire, and no undo; all three are fixed here.
+
+**It has still never been run in a real Firefox by its author**, so every line below carries
+how it was actually verified:
 
 - **Tested** — unit or integration tests cover it
 - **Seen** — watched running in the browser harness (`tools/dev.ts`, port 8731)
 - **Built** — compiles and lints; never exercised
 
-336 tests · content script 27.1 kB gz of a 28.0 budget · `web-ext lint` 0 errors / 0 warnings
-/ 0 notices · package 193 kB, 30 files.
+398 tests · content script 29.5 kB gz of a 30.0 budget · `web-ext lint` 0 errors / 0 warnings
+/ 0 notices.
 
 ## Works
 
@@ -28,6 +31,8 @@ its author**, so every line below carries how it was actually verified:
 | Full ZIP export (NDJSON + checksum + positions) | Tested |
 | Per-tab on/off and per-site rules; tab identity survives session restore | Tested |
 | Nothing injected until a site is granted — no `content_scripts` in the manifest | Tested |
+| **Undo and redo** (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z) across typing, colour, style, move, resize, collapse, lock, drawing, erasing, create and delete — one ordered history for the whole page | Tested + Seen |
+| **Update check** — a button in settings, and an opt-in daily check. Off by default; it is the only network request the extension can make | Tested |
 
 ## Half-built — the storage exists, the wire to the user does not
 
@@ -44,8 +49,8 @@ its author**, so every line below carries how it was actually verified:
 
 ## Not built
 
-- **Automatic backup to a file.** `backup.enabled`/`everyHours` in settings, `alarms` permission
-  requested, no alarm ever created.
+- **Automatic backup to a file.** `backup.enabled`/`everyHours` sit in settings and nothing
+  runs them. The `downloads` permission they would need has been removed until they exist.
 - **Version history.** `addRevision`/`shouldSnapshot` written, never called.
 - **Bundled fonts.** System stacks only. Vazirmatn and Estedad are declared for Persian; the files
   are not in the repo.
@@ -54,10 +59,11 @@ its author**, so every line below carries how it was actually verified:
 - **Duplicate Tab handling.** `resolveDuplicate` written, never called.
 - **AMO signing and submission.** The build installs temporarily only.
 
-### Fix before AMO
+### Permissions — fixed in 0.0.2
 
-`alarms`, `webNavigation` and `downloads` are requested and never used. Reviewers flag exactly
-this. Either use them or drop them.
+`webNavigation` and `downloads` were requested and never used; they are gone from the manifest
+and go back the day the code that needs them lands. `alarms` is now genuinely used, by the
+opt-in daily update check. `optional_permissions` is empty.
 
 ## The one open question — spike R1
 
@@ -71,13 +77,12 @@ no, the design changes, probably to a badge and a manager prompt. Runbook in `do
 
 | Work | Size | Why |
 |---|---|---|
-| Answer R1 — load 0.0.1, make a note, close the tab | minutes | Decides whether the guard design survives |
+| Answer R1 — load 0.0.2, make a note, close the tab | minutes | Decides whether the guard design survives |
 | Wire images and the default style | small | Two original requirements, one hook away |
-| Drop or use the three permissions | small | First thing a reviewer asks |
 | Apply an import plan | medium | Backup you cannot restore is not backup |
 | Scheduled backup on an alarm | medium | Asked for; makes the trash safe to empty |
 | Bundle the Persian faces (OFL, as bytes) | medium | Persian currently depends on the OS |
-| Version history | medium | The only real undo for overwritten text |
+| Version history | medium | Undo is session-scoped; this is the one that survives a restart |
 | Export to Markdown and HTML | medium | Makes notes readable outside the extension |
 | AMO submission | large | The only route to a permanent install |
 | Sync across machines | large | Parked at your request; needs a server, changes the privacy story |

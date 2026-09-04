@@ -32,6 +32,7 @@ import type { NoteRecord } from '~/bg/db/schema.ts';
 import { defaultScopeFor, matchContext } from '~/bg/scope/match.ts';
 import { createSharedDefs } from '~/cs/art/defs.ts';
 import { createHost } from '~/cs/host.ts';
+import { History } from '~/cs/note/history.ts';
 import { NoteView } from '~/cs/note/NoteView.ts';
 import { DEFAULT_STYLE, type NoteStyle, PALETTES } from '~/cs/note/theme.ts';
 import { Loop } from '~/cs/physics/spring.ts';
@@ -67,6 +68,31 @@ const host = createHost(sheet);
 host.root.prepend(createSharedDefs());
 
 const loop = new Loop();
+
+/** One undo history for the page, exactly as the renderer has. */
+const history = new History({
+  setText: (id, text, caret) => views.get(id as NoteId)?.applyText(text, caret),
+  setStyle: (id, style) => views.get(id as NoteId)?.applyStyleSet(style),
+  setUi: (id, ui) => views.get(id as NoteId)?.applyUi(ui),
+  patchInk: (id, add, remove) =>
+    views.get(id as NoteId)?.applyInk(add as never[], remove as never[]),
+  restoreNote: (id) => void undoDelete(id as NoteId),
+  trashNote: (id) => void redoDelete(id as NoteId),
+});
+
+async function undoDelete(id: NoteId): Promise<void> {
+  if (views.get(id)) return;
+  await restoreNote(id);
+  await load();
+}
+
+async function redoDelete(id: NoteId): Promise<void> {
+  const view = views.get(id);
+  view?.destroy();
+  views.delete(id);
+  await trashNote(id);
+  await refreshStatus();
+}
 const views = new Map<NoteId, NoteView>();
 let topZ = 10;
 
@@ -155,6 +181,7 @@ function mount(rec: NoteRecord): NoteView {
     {
       loop,
       layer: host.docLayer,
+      history,
       raise: () => ++topZ,
       onChange: (n) => {
         const { x, y } = n.position;
@@ -165,7 +192,15 @@ function mount(rec: NoteRecord): NoteView {
         });
       },
       onInk: (_n, ink) => queueSave(rec.id, { ink }),
-      onDelete: (n) => void remove(rec.id, n),
+      onDelete: (n) => {
+        history.record({
+          noteId: rec.id,
+          edit: { kind: 'delete' },
+          mergeKey: null,
+          at: Date.now(),
+        });
+        void remove(rec.id, n);
+      },
       onStyle: (_n, overrides) => queueSave(rec.id, { style: overrides }),
       onText: (_n, text) => queueSave(rec.id, { body: { text } }),
       onAsset: async (_n, file, name) => {
@@ -383,7 +418,7 @@ declare global {
     };
   }
 }
-window.cn = { addNote, load, views, loop, page, host, flushSaves };
+window.cn = { addNote, load, views, loop, page, host, flushSaves, history };
 
 // Whatever is still queued when the page goes away gets written first.
 window.addEventListener('pagehide', () => void flushSaves());
