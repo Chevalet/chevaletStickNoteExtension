@@ -10,8 +10,33 @@
 declare const __DEV__: boolean;
 declare const __HOST_TAG__: string;
 
-/** Events that must not escape our shadow root into the page's own document listeners. */
-const CONTAINED_EVENTS = [
+/**
+ * Events that must not escape our shadow root into the page's own document listeners.
+ *
+ * KEYBOARD AND INPUT EVENTS ARE DELIBERATELY ABSENT, and this is the most expensive thing
+ * learned building this extension. They used to be here, and the consequence was that
+ * **Backspace did nothing inside a note, in Firefox, while typing worked perfectly.**
+ *
+ * In Gecko the editor's handling of command keys -- Backspace, Delete, Enter, caret movement
+ * -- is driven from a listener above the editing host in the propagation path. Our host is a
+ * direct child of `<html>`, so stopping propagation there meant those events never reached
+ * the editor at all. Text *insertion* travels a different path in Gecko and still landed, which
+ * is why the symptom was so lopsided and so confusing: a note you could write in and could not
+ * erase in.
+ *
+ * In Blink the same events are handled at the editing host itself, inside the shadow tree, so
+ * the identical code is harmless there -- which is why every test run in a Chromium-based
+ * harness passed while the real thing was broken. A structural difference between engines,
+ * invisible to the tests that were available.
+ *
+ * The containment those events were providing is not lost, just moved: `NoteView.onKeyDown`
+ * stops propagation itself for the keys it handles as note-level shortcuts, which is precisely
+ * the case where the page must not also react. While someone is typing in a note, the
+ * keystrokes do reach the page's document listeners with `event.target` retargeted to our
+ * host element. That is a real if minor cost -- a page with a bare "/" shortcut could react --
+ * and it is unambiguously the better side of the trade against not being able to delete text.
+ */
+export const CONTAINED_EVENTS = [
   'pointerdown',
   'pointerup',
   'pointermove',
@@ -22,14 +47,7 @@ const CONTAINED_EVENTS = [
   'click',
   'dblclick',
   'contextmenu',
-  'keydown',
-  'keyup',
-  'keypress',
   'wheel',
-  'input',
-  'beforeinput',
-  'compositionstart',
-  'compositionend',
   'focusin',
   'focusout',
   'dragstart',

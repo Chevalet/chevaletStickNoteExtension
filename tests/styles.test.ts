@@ -33,3 +33,45 @@ describe('shadow-root stylesheet', () => {
     }
   });
 });
+
+describe('event containment', () => {
+  /**
+   * The most expensive bug in this project's history, pinned so it cannot come back.
+   *
+   * Keyboard and input events used to be stopped at the shadow host. In Gecko the editor's
+   * handling of command keys sits above the editing host in the propagation path, so that
+   * stopped Backspace and Delete from ever reaching it -- while text insertion, which travels
+   * a different path, kept working. A note you could write in and could not erase in, reported
+   * three times before the mechanism was found, and invisible to every test available because
+   * the harness is Chromium-based and Blink handles those keys at the editing host itself.
+   */
+  it('never contains keyboard, input or composition events at the host', async () => {
+    const { CONTAINED_EVENTS } = await import('~/cs/host.ts');
+    const forbidden = [
+      'keydown',
+      'keyup',
+      'keypress',
+      'input',
+      'beforeinput',
+      'compositionstart',
+      'compositionend',
+      'compositionupdate',
+      'textInput',
+    ];
+    for (const type of forbidden) {
+      expect(
+        CONTAINED_EVENTS as readonly string[],
+        `containing "${type}" at the host breaks editing in Firefox`,
+      ).not.toContain(type);
+    }
+  });
+
+  it('still contains the pointer and mouse events, which is what the page must not see', () => {
+    // Those are safe: Blink and Gecko both handle pointer interaction at the target.
+    return import('~/cs/host.ts').then(({ CONTAINED_EVENTS }) => {
+      for (const type of ['pointerdown', 'mousedown', 'click', 'dblclick', 'contextmenu']) {
+        expect(CONTAINED_EVENTS as readonly string[]).toContain(type);
+      }
+    });
+  });
+});
