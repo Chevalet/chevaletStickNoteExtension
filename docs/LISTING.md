@@ -90,16 +90,34 @@ Three are allowed; two is better than padding with a third that does not fit. Do
 "Privacy & Security": storing notes locally is not a privacy tool, and claiming that category
 invites a reviewer to hold the add-on to a standard it is not trying to meet.
 
-## Tags
+## Tags — tick `privacy`, and nothing else
 
-```
-notes
-annotation
-sticky notes
-markdown
-offline
-privacy
-```
+**Tags are a fixed checkbox list, not free text.** An earlier draft of this file listed
+`notes`, `annotation`, `sticky notes`, `markdown` and `offline`, none of which exist on the
+form. That was the second time this file assumed a field instead of checking it, after the
+Productivity category. The list AMO actually offers:
+
+> ad blocker · anti malware · anti tracker · antivirus · chat · container · content blocker ·
+> coupon · dailymotion · dark mode · dndbeyond · download · facebook · google · image search ·
+> mp3 · music · password manager · pinterest · pixiv · privacy · reddit · roblox · scholar ·
+> search · security · shopping · social media · streaming · torrent · translate · twitch ·
+> twitter · user scripts · video converter · video downloader · vpn · wayback machine ·
+> whatsapp · word counter · youtube · zoom
+
+It is built around the genres extensions usually fall into, and sticky notes is not one of
+them. Ten are allowed and **one is the honest answer**:
+
+- ☑ **privacy** — defensible, and not padding. Someone filtering by this tag because they want
+  extensions that do not phone home is genuinely well served by finding this one: no account,
+  no sync, no server, no analytics, and one optional network call that is off by default.
+
+Everything else would be worse than nothing. `dark mode` means a page-darkening extension, not
+a dark palette. `scholar` is about Google Scholar. `security`, `search` and `container` all
+describe tools this is not. A wrong tag puts the add-on in front of people looking for
+something else, who then do not install it or install it and rate it badly — and to a reviewer
+a list of loosely-related tags reads as stuffing.
+
+Leaving the other nine boxes empty is the right answer, not a gap.
 
 ## Support
 

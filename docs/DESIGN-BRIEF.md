@@ -167,7 +167,7 @@ These are not preferences. Work that violates them cannot be used.
 5. **Compositor-only animation.** `transform` and `opacity`. Nothing else per frame.
 6. **Zero cost when idle.** No animation may run when nothing is happening. No infinite
    ambient loops, no perpetual shimmer.
-7. **Bundle budgets are enforced by the build.** The content script has 28 kB gzipped for
+7. **Bundle budgets are enforced by the build.** The content script has 32 kB gzipped for
    *everything* — notes, styles, markdown, drawing, anchoring. A beautiful 40 kB SVG is not a
    candidate. The stylesheet is already 16 kB of the 78 kB minified total.
 8. **Theme-agnostic.** Eight palettes plus fully custom colours, one of them dark-on-light

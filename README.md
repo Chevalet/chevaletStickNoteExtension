@@ -16,16 +16,23 @@ Firefox extension. Offline, private, and yours to export.
 
 ## What makes it different
 
-**It never touches the page.** One element is added to `<html>`, with a closed shadow root and
+**It barely touches the page.** One element is added to `<body>`, with a closed shadow root and
 `all: initial`. Every pixel not covered by a note hit-tests straight through, so the site stays
 completely usable. There are no document-level `pointermove`/`keydown`/`click` listeners, no
 whole-document `MutationObserver`, and no timers running when nothing is animating — an idle
 tab with notes on it costs **0% CPU**.
 
+That element used to be appended to `<html>`, on the reasoning that a child of the root is the
+hardest place for a page to disturb. It cost three releases: Gecko will not run an editing
+command for an editing host outside `<body>`, so Backspace inside a note did nothing while
+typing worked perfectly. `spikes/firefox-where.mjs` proves it in a real Firefox, and
+`tests/host.test.ts` makes sure it cannot come back.
+
 **Assets are bytes, never URLs.** Fonts go in through `new FontFace(arrayBuffer)`, styles
 through `adoptedStyleSheets`, images through `createImageBitmap` into a canvas. The page's
-Content-Security-Policy has nothing to block, because no network request is ever made from the
-page's document — and it is the only technique that can render a font *you* uploaded.
+Content-Security-Policy has nothing to block, because the in-page layer makes no network
+request of any kind — and it is the only technique that can render a font *you* uploaded, or a
+picture you pasted, on a site with a strict `img-src`.
 
 **Notes are anchored, not just positioned.** Every note records three things when you drop it:
 the element under the cursor, a text quote with its surrounding context (W3C Web Annotation
@@ -64,8 +71,14 @@ Markdown mirror.
 
 ## Privacy
 
-No network requests. No telemetry. No analytics. No accounts. Nothing leaves your machine,
-which is why the manifest declares `data_collection_permissions: { required: ["none"] }`.
+No telemetry. No analytics. No accounts. No sync. Nothing about you leaves your machine, which
+is why the manifest declares `data_collection_permissions: { required: ["none"] }`.
+
+There is exactly one network call in the shipped code, and it is worth being precise about
+rather than rounding down to zero: an **optional** check for a new release, off by default,
+which asks for its own host permission the first time you press the button and then reads one
+public version number with no cookies, no referrer and no identifier. Leave it off and the
+extension makes no network request whatsoever. `PRIVACY.md` has the full account.
 
 Host permissions are **not** requested at install. You grant access per site, per domain, or
 for all sites, from a button in the popup, whenever you decide to.
@@ -104,7 +117,7 @@ Bundle budgets are enforced by the build and will fail it:
 | Bundle | Budget | Why |
 |---|---|---|
 | `cs/guard.js` | 1 kB gz | runs at `document_start` on every annotated page |
-| `cs/renderer.js` | 24 kB gz | parsed on every page load that has notes |
+| `cs/renderer.js` | 32 kB gz | parsed on every page load that has notes |
 | background | 80 kB min | an event page parses its whole bundle on **every wake** |
 
 ### Layout

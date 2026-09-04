@@ -1,4 +1,4 @@
-# Status — v0.0.6 (LTS), 4 September 2026
+# Status — v0.0.9, 4 September 2026
 
 Backspace works. It took three wrong fixes to find that the cause was one line — the shadow
 host was attached outside `<body>`, where Gecko refuses to run editing commands. See the
@@ -14,6 +14,17 @@ can mean the real browser rather than a Chromium approximation:
 
 414 tests · content script 30.1 kB gz of a 32.0 budget · `web-ext lint` 0 errors / 0 warnings
 / 0 notices.
+
+## Where it stands with the store
+
+**0.0.8 is submitted to addons.mozilla.org and awaiting review.** A source archive went with it,
+which means a human reviewer rather than the automated path, so days rather than hours. The
+listing is not public until that clears.
+
+0.0.9 exists to be signed through AMO's *unlisted* channel (`pnpm sign`), which is automatic and
+takes minutes. That produces an .xpi that installs permanently in an ordinary Firefox, so there
+is something usable to hand people while the listing waits. `xpinstall.signatures.required=false`
+is not an alternative: Release and Beta builds ignore that pref.
 
 ## Works
 
@@ -78,7 +89,7 @@ no, the design changes, probably to a badge and a manager prompt. Runbook in `do
 
 | Work | Size | Why |
 |---|---|---|
-| Answer R1 — load 0.0.6, make a note, close the tab | minutes | Decides whether the guard design survives |
+| Answer R1 — make a note, type, press Ctrl+W, then repeat with a hand-armed `beforeunload` as a control | minutes | Decides whether the guard design survives. `docs/spikes.md` has the procedure; it cannot be automated |
 | Apply an import plan | medium | Backup you cannot restore is not backup |
 | Scheduled backup on an alarm | medium | Asked for; makes the trash safe to empty |
 | Bundle the Persian faces (OFL, as bytes) | medium | Persian currently depends on the OS |

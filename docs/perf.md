@@ -64,7 +64,7 @@ Enforced by `build.ts`; exceeding a budget fails a production build.
 | Bundle | Budget (gz) | Actual (gz) | Why the budget |
 |---|---|---|---|
 | `cs/guard.js` | 1.0 kB | **0.3 kB** | runs at `document_start` on every annotated page |
-| `cs/renderer.js` | 24 kB | **see build output** | parsed on every page load that has notes |
+| `cs/renderer.js` | 32 kB | **see build output** | parsed on every page load that has notes |
 | `bg/main.js` | — | — | an event page parses its whole bundle on *every* wake; keep under 80 kB minified |
 
 ---
