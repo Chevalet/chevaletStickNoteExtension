@@ -65,7 +65,13 @@ import {
   sanitizeUi,
 } from './msg/sanitize.ts';
 import { defaultScopeFor, matchContext, scopeFor, scopeKindOf } from './scope/match.ts';
-import { isEnabledFor, loadSettings, type Settings, saveSettings } from './settings.ts';
+import {
+  isEnabledFor,
+  loadSettings,
+  SETTINGS_KEY,
+  type Settings,
+  saveSettings,
+} from './settings.ts';
 import { forgetTab, getTabFlags, resolveTabKey, setTabEnabled } from './tabs/identity.ts';
 
 /** Ten megabytes. Generous for a screenshot, far short of a video. */
@@ -90,9 +96,16 @@ browser.permissions.onAdded.addListener(() => void onPermissionsChanged(true));
 browser.permissions.onRemoved.addListener(() => void onPermissionsChanged(false));
 browser.tabs.onRemoved.addListener((tabId, info) => void onTabRemoved(tabId, info));
 browser.tabs.onUpdated.addListener((tabId, change, tab) => void onTabUpdated(tabId, change, tab));
-browser.storage.onChanged.addListener((_changes, area) => {
-  // Settings changed somewhere. Drop the cache; the next read picks it up.
-  if (area === 'local') {
+browser.storage.onChanged.addListener((changes, area) => {
+  /*
+   * ONLY when the settings changed.
+   *
+   * This used to run for any write to `storage.local` at all, which was fine while settings
+   * were the only thing in there. Now that a note write bumps a counter in the same area, an
+   * unfiltered handler would drop the settings cache and broadcast to every open tab twice a
+   * second while someone types.
+   */
+  if (area === 'local' && Object.hasOwn(changes, SETTINGS_KEY)) {
     settingsCache = null;
     void syncUpdateAlarm();
     void applyRevisionPolicy();
@@ -460,6 +473,7 @@ async function onMessage(
       if (!(await restoreNote(m.id))) return errReply('NOT_FOUND');
       const record = await getNote(m.id);
       if (!record) return errReply('NOT_FOUND');
+      noteWriteHappened();
       const tabId = sender.tab?.id;
       if (tabId !== undefined) {
         const st = tabRuntime.get(tabId);
@@ -479,6 +493,7 @@ async function onMessage(
         if (!(await getNote(m.id))) return errReply('NOT_FOUND');
         await purgeNote(m.id);
       }
+      noteWriteHappened();
       const tabId = sender.tab?.id;
       if (tabId !== undefined) {
         const st = tabRuntime.get(tabId);
@@ -574,6 +589,7 @@ async function onMessage(
           name: result.note.name ?? '',
         } as never);
       }
+      noteWriteHappened();
       return okReply({ name: result.note.name ?? '' });
     }
 
@@ -609,6 +625,7 @@ async function onMessage(
           .catch(() => '');
         if (runtime) void tell(tabId, { t: 'scope/recheck', url: runtime });
       }
+      noteWriteHappened();
       return okReply({ kind: scopeKindOf(result.note.scope) });
     }
 
@@ -751,6 +768,7 @@ async function createFor(
   });
   scheduleAllocation();
 
+  noteWriteHappened();
   return okReply({ note: toWire(record) });
 }
 
@@ -802,9 +820,34 @@ function urlFromKey(key: string): string {
 
 /** Note the moment of a write, so the guard's "most recently edited" ordering is real. */
 function touch(tabId: number | undefined): void {
+  noteWriteHappened();
   if (tabId === undefined) return;
   const st = tabRuntime.get(tabId);
   if (st) st.lastEdit = Date.now();
+}
+
+/** Bumped on every note write, so an open cabinet knows to re-read. */
+export const NOTES_REV_KEY = 'notes.rev';
+let revTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Tell the cabinet that the notes have changed, without inventing a channel for it.
+ *
+ * A counter in `storage.local`, because `storage.onChanged` already fires in every extension
+ * context and the cabinet already listens to it. The alternative -- a `runtime.sendMessage`
+ * broadcast -- needs a new message type, a new listener, and a rule about who answers it, to
+ * carry one bit of information.
+ *
+ * Debounced by half a second. A content script writes at most every 250 ms while someone
+ * types, and a cabinet that re-read the whole store four times a second would be a worse
+ * problem than a cabinet half a second out of date.
+ */
+function noteWriteHappened(): void {
+  if (revTimer) return;
+  revTimer = setTimeout(() => {
+    revTimer = null;
+    void browser.storage.local.set({ [NOTES_REV_KEY]: Date.now() }).catch(() => undefined);
+  }, 500);
 }
 
 /**

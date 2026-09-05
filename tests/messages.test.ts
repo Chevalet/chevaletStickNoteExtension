@@ -286,6 +286,60 @@ describe('a single-page app changing its route', () => {
   });
 });
 
+describe('telling an open cabinet that the notes changed', () => {
+  /**
+   * The cabinet reaches an open tab -- renaming, restoring a version, editing the text. The
+   * other direction was missing: a note edited in a tab left an open cabinet showing the old
+   * text until it was touched.
+   *
+   * A counter in `storage.local`, because `storage.onChanged` already fires in every extension
+   * context and the cabinet already listens to it for the theme. Debounced by half a second in
+   * the background: a content script writes every 250 ms while someone types, and a cabinet
+   * re-reading the whole store four times a second is a worse problem than one half a second
+   * out of date.
+   */
+  const rev = () => stub.local['notes.rev'];
+
+  it('bumps a counter when a note is written', async () => {
+    const note = await createOne();
+    // The debounce, plus a little.
+    await new Promise((r) => setTimeout(r, 700));
+    const first = rev();
+    expect(typeof first).toBe('number');
+
+    await send(
+      { t: 'note/patch', id: note.id, rev: 0, patch: { body: { text: 'changed' } }, clock: {} },
+      from7,
+    );
+    await new Promise((r) => setTimeout(r, 700));
+    expect(rev()).toBeGreaterThan(first as number);
+  });
+
+  it('coalesces a burst of writes into one bump', async () => {
+    const note = await createOne();
+    await new Promise((r) => setTimeout(r, 700));
+    const before = rev() as number;
+    for (let i = 0; i < 8; i++) {
+      await send(
+        { t: 'note/patch', id: note.id, rev: 0, patch: { body: { text: `x${i}` } }, clock: {} },
+        from7,
+      );
+    }
+    await new Promise((r) => setTimeout(r, 700));
+    // One write, not eight: the value moved once.
+    expect(rev()).toBeGreaterThan(before);
+  });
+
+  it('bumps for a delete as well as an edit', async () => {
+    const note = await createOne();
+    await new Promise((r) => setTimeout(r, 700));
+    const before = rev() as number;
+    await send({ t: 'note/delete', id: note.id, soft: true }, from7);
+    await new Promise((r) => setTimeout(r, 700));
+    expect(rev()).toBeGreaterThan(before);
+  });
+});
+
 describe('note/scope', () => {
   /**
    * `Scope` has five kinds and only `url` was ever reachable: `createFor` derives the scope
