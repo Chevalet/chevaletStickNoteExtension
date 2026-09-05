@@ -468,6 +468,18 @@
   "cabRename": {
     "message": "Rename…"
   },
+  "cabEdit": {
+    "message": "Edit…"
+  },
+  "cabEditTitle": {
+    "message": "Edit this note"
+  },
+  "cabEditNote": {
+    "message": "Markdown, the same as in the note itself. Saving keeps the previous text as a version, so History can put it back."
+  },
+  "cabCouldNotSave": {
+    "message": "Could not save"
+  },
   "cabHistory": {
     "message": "History…"
   },

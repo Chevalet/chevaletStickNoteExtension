@@ -57,7 +57,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Builder, By } from 'selenium-webdriver';
+import { Builder, By, Key } from 'selenium-webdriver';
 import { Context, Options } from 'selenium-webdriver/firefox.js';
 
 const DIST = 'dist-test';
@@ -223,6 +223,70 @@ try {
     }
   }
   writeFileSync('spikes/shots/real-cabinet.png', Buffer.from(await d.takeScreenshot(), 'base64'));
+
+  // -------------------------------------------------- editing a note from here
+
+  /*
+   * The last thing the cabinet could not do. Fixing a typo meant finding the tab the note is
+   * on, or opening its URL again -- a lot of ceremony for one character.
+   *
+   * A note has to exist first, so this makes one the way a person does, on an ordinary page,
+   * and then goes looking for it in the cabinet. That also means this check exercises the
+   * whole chain: content script -> background -> store -> cabinet.
+   */
+  await d.get(process.env.CN_URL ?? 'http://127.0.0.1:8731/spikes/spa/');
+  await d.sleep(1600);
+  await d
+    .actions()
+    .keyDown(Key.ALT)
+    .move({ x: 640, y: 430 })
+    .doubleClick()
+    .keyUp(Key.ALT)
+    .perform();
+  await d.sleep(900);
+  await d.actions().sendKeys('before editing').perform();
+  await d.sleep(800);
+
+  await openPage(`${base}/ui/manager.html`);
+  await d.sleep(900);
+  const cards = await d.findElements(By.css('.card'));
+  check('the note the page made is in the cabinet', cards.length > 0, `${cards.length} cards`);
+  if (cards[0]) {
+    await cards[0].click();
+    await d.sleep(600);
+    const buttons = await d.findElements(By.css('.btn'));
+    const labels = await Promise.all(buttons.map((b) => b.getText()));
+    const editBtn = buttons[labels.findIndex((l) => /Edit/i.test(l))];
+    if (!editBtn) {
+      check('selecting one note offers Edit', false, labels.filter(Boolean).join(' | '));
+    } else {
+      await editBtn.click();
+      await d.sleep(800);
+      const box = await d.findElements(By.css('.edit-body')).then((e) => e[0] ?? null);
+      check('the editor opens with the note text in it', Boolean(box));
+      if (box) {
+        check(
+          'and it is the text the page typed',
+          (await box.getAttribute('value')).includes('before editing'),
+        );
+        await box.clear();
+        await box.sendKeys('after editing');
+        const dialogBtns = await d.findElements(By.css('dialog .btn'));
+        const dialogLabels = await Promise.all(dialogBtns.map((b) => b.getText()));
+        const save = dialogBtns[dialogLabels.findIndex((l) => /Save/i.test(l))];
+        if (save) {
+          await save.click();
+          await d.sleep(1300);
+          const body = await d.findElement(By.css('body')).getText();
+          check('saving changes the note', /after editing/.test(body));
+        }
+      }
+      writeFileSync(
+        'spikes/shots/real-cabinet-edit.png',
+        Buffer.from(await d.takeScreenshot(), 'base64'),
+      );
+    }
+  }
 
   // ------------------------------------------------------------------ the popup
 

@@ -1,6 +1,39 @@
-# Status — v0.0.11, 5 September 2026
+# Status — v0.0.12, 5 September 2026
 
-**Notes were not being saved as you typed them.** That is the release. `NoteView` told its host
+**0.0.12 is the one to install.** Two reported bugs, a language, and the four dead scope kinds
+turned into a feature. 0.0.11 is what fixed the note-losing bug below; this adds what was still
+missing around it.
+
+## What 0.0.12 changed
+
+- **Check for update stuck on "Checking…" forever.** The options page asked the BACKGROUND to
+  request the host permission, passing a `fromClick: true` flag in the belief that it carried
+  the user gesture across the message. It does not, so that request could never be granted. The
+  page asks in its own click handler now, and the button has a fifteen-second deadline, so the
+  reported symptom is impossible whatever the cause. What made it hang forever is *not*
+  established: the control did not reproduce it under geckodriver, and `spikes/firefox-pages.mjs`
+  says so rather than claiming a mechanism.
+- **Two settings screens for one set of switches.** The options page carried its own copies of
+  Where notes appear, Closing a tab, Keeping and deleting, Backup and Language — all also in
+  the cabinet, laid out differently. One home per setting now, and it is the cabinet; the
+  options page is a way in, a version number, an update check and two pieces of prose.
+- **The Language setting did nothing at all.** `t()` asked `browser.i18n.getMessage` first,
+  which answers in *Firefox's* locale — so on an English Firefox everything was English however
+  Persian the setting said to be. It appeared to work only in the dev harnesses, where
+  `browser` does not exist and the fallback ran.
+- **Persian, properly.** About 230 strings, the whole interface: cabinet, settings, keyboard
+  reference, popup, options page, and a note's own toolbar and panel. `dir` on the root, so the
+  page mirrors rather than just changing words. English is the default and following the browser
+  is an explicit choice.
+- **Where a note shows.** `Scope` had five kinds and four were unreachable. Three are a feature
+  now — this page, this whole site, every page — in the note's own settings.
+- **Hold Alt to read the page under a note**, and to click it. The stylesheet had the selector
+  for this already, from a half-built setting removed earlier in the release.
+- **Edit a note's text from the cabinet**, which was the last thing it could not do.
+
+## What 0.0.11 was
+
+**Notes were not being saved as you typed them.** That is that release. `NoteView` told its host
 about a text change when a task box was ticked, when an image was attached, on undo, and from
 every formatting shortcut — and never from typing. So a note you wrote and reloaded came back
 empty, and the only way to save your words was to press Ctrl+B while writing them.
@@ -18,9 +51,11 @@ work, the product needs it more.
 
 | | What it answers |
 |---|---|
-| `tests/` — 679 checks | Everything that reduces to a number |
+| `tests/` — 697 checks | Everything that reduces to a number |
 | `spikes/firefox-extension.mjs` | **The real extension, over a real page.** Nine checks. `pnpm build:test` writes `dist-test/` — the shipped build plus one manifest line, so a driver has host access without a click in browser chrome |
 | `spikes/firefox-persist.mjs` | Type, reload, is it there? Restore the bug and it prints NO |
+| `spikes/firefox-pages.mjs` | **The extension's own pages**, driven: the options page, the cabinet, the popup. Thirteen checks, including editing a note the page made. Getting to a `moz-extension://` URL took three refusals from Marionette and its own `geckodriver --allow-system-access`; the UUID comes out of the profile |
+| `spikes/firefox-ghost.mjs` | Hold Alt: is the page under a note reachable? Two ways to get it wrong, both invisible in the source |
 | `spikes/firefox-fonts.mjs` | Can a note get a bundled face on a page whose CSP forbids fonts |
 | `spikes/firefox-keys.mjs` | 45 checks across four keyboard layouts |
 | `spikes/shots.mjs` | 40 photographs of every pane in both themes, in one command |
@@ -34,7 +69,7 @@ The labels below mean what they say:
 - **Built** — compiles and lints; never exercised
 - **Firefox** — driven in a real Firefox through geckodriver, with real events
 
-679 tests · content script 33.7 kB gz of a 36.0 budget · fonts 263 kB · `web-ext lint` 0 errors
+697 tests · content script 36.2 kB gz of a 38.0 budget · fonts 263 kB · `web-ext lint` 0 errors
 / 0 warnings / 0 notices.
 
 ## Where it stands with the store
@@ -83,6 +118,10 @@ on one serving `font-src 'none'`. So it protected nothing and exposed something.
 | Pasted and dropped images, stored per note and painted to a canvas so no page CSP can block them | Tested |
 | Your own default note style, applied live to every note in the fields it never set itself | Tested |
 | All settings inside the cabinet, in the cabinet's own idiom | Seen |
+| **The whole interface in Persian**, as a choice, with English the default — cabinet, settings, keyboard reference, popup, options page and a note's own panel, mirrored right-to-left | Tested + Seen |
+| **Where a note shows** — this page, this whole site, every page. The kind travels over the wire and the background derives the scope, so a page cannot file a note under another page's | Tested |
+| **Hold Alt** to read, and click, the page under a note | **Firefox** |
+| **Editing a note's text from the cabinet**, and renaming it, both reaching an open tab without a reload | **Firefox** |
 | **A dark theme** across the cabinet, the popup and the options page — three states from one shared palette, with contrast asserted by test | Tested + Seen |
 | A keyboard reference that reads the browser's own bindings through `commands.getAll()` | Seen |
 | The retention sweep — enforced by an alarm four times a day, and it refuses to destroy a note it cannot date | Tested |
@@ -118,15 +157,15 @@ on one serving `font-src 'none'`. So it protected nothing and exposed something.
 
 ## Not built
 
-- **Persian in the cabinet and inside a note.** The Language setting covers the popup and the
-  options page; the cabinet's own strings and a note's placeholders are English. The setting
-  says so rather than implying otherwise.
-- **Tab-scoped notes are unreachable.** `Scope` has a `tab` kind and `notesForContext` looks it
-  up on every page load, but `createFor` takes the scope from the sender's URL and
-  `defaultScopeFor` never returns a tab scope. `resolveDuplicate` guards a collision that
-  therefore cannot happen, and says so above itself.
-- **Live edits between the cabinet and a page.** Renaming and restoring a version reach an open
-  tab; editing a note's text in the cabinet is not possible at all yet.
+- **A second language beyond Persian and English.** The catalogue has two columns; adding a
+  third is mechanical, and nobody has asked.
+- **Two of the five scope kinds stay unreachable.** `prefix` needs a path to cut at and `tab`
+  needs a concept most people do not have, so the picker offers the other three.
+  `resolveDuplicate` guards a tab-key collision that therefore still cannot happen, and says so
+  above itself.
+- **Live edits the other way.** The cabinet reaches an open tab -- renaming, restoring a
+  version, editing the text. A note edited in a tab does not push into an open cabinet; the
+  cabinet re-reads when you touch it.
 - **Firefox for Android.** Declared in the manifest (`strict_min_version_android`) and never
   tested. The interface is pointer-and-keyboard shaped, so it is a release of its own.
 - **Sync across machines.** Parked deliberately: no server, no account, nothing leaves the

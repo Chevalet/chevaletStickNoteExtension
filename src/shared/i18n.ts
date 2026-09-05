@@ -217,6 +217,13 @@ export const CATALOGUE = {
   cabExport: { en: 'Export…', fa: 'خروجی…' },
   cabImport: { en: 'Import…', fa: 'ورودی…' },
   cabRename: { en: 'Rename…', fa: 'تغییر نام…' },
+  cabEdit: { en: 'Edit…', fa: 'ویرایش…' },
+  cabEditTitle: { en: 'Edit this note', fa: 'ویرایش این نوت' },
+  cabEditNote: {
+    en: 'Markdown, the same as in the note itself. Saving keeps the previous text as a version, so History can put it back.',
+    fa: 'Markdown، همان‌طور که در خود نوت. با ذخیره‌کردن، متن قبلی به‌عنوان یک نسخه نگه داشته می‌شود تا از تاریخچه برگردانی‌اش.',
+  },
+  cabCouldNotSave: { en: 'Could not save', fa: 'ذخیره نشد' },
   cabHistory: { en: 'History…', fa: 'تاریخچه…' },
   cabRestore: { en: 'Restore', fa: 'بازگرداندن' },
   cabMoveToTrash: { en: 'Move to trash', fa: 'انداختن در سطل' },

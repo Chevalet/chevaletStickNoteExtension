@@ -8,7 +8,7 @@ next week and open the same URL: the note is still there, in the same place.
 
 Firefox extension. Offline, private, and yours to export.
 
-> **Status: 0.0.11, awaiting review on addons.mozilla.org.** A signed build is installable
+> **Status: 0.0.12, awaiting review on addons.mozilla.org.** A signed build is installable
 > now from the [releases page](https://github.com/Chevalet/chevaletStickNoteExtension/releases);
 > once the listing clears review, Firefox will update it for you on its own. The de-risking
 > spikes are still runnable — see [`docs/spikes.md`](docs/spikes.md).

@@ -468,6 +468,18 @@
   "cabRename": {
     "message": "تغییر نام…"
   },
+  "cabEdit": {
+    "message": "ویرایش…"
+  },
+  "cabEditTitle": {
+    "message": "ویرایش این نوت"
+  },
+  "cabEditNote": {
+    "message": "Markdown، همان‌طور که در خود نوت. با ذخیره‌کردن، متن قبلی به‌عنوان یک نسخه نگه داشته می‌شود تا از تاریخچه برگردانی‌اش."
+  },
+  "cabCouldNotSave": {
+    "message": "ذخیره نشد"
+  },
   "cabHistory": {
     "message": "تاریخچه…"
   },
