@@ -38,7 +38,7 @@ const idToKey = new Map<number, TabKey>();
 
 const SESSION_MAP = 'map.tabIdToKey';
 
-export function newTabKey(): TabKey {
+function newTabKey(): TabKey {
   return `tk_${crypto.randomUUID()}`;
 }
 
