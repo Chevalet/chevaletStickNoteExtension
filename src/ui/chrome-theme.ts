@@ -9,27 +9,89 @@
  * and this page", and a dark cabinet next to a blinding cream popup is a broken promise rather
  * than a partial feature. Three copies of a palette is three chances for them to drift.
  *
- * ## The two roles `--ink` used to play
+ * ## What 0.0.11 changed, and why the first dark theme was wrong
  *
- * `--ink` was both the foreground on light paper AND the near-black surface of the chrome --
- * the header bars, the section headings, the status strip. That works for exactly one theme.
- * Flip `--ink` to a light colour for a dark theme and every one of those bars turns pale.
+ * The first attempt made the dark theme by flipping `--ink` and `--paper` and leaving the
+ * chrome alone, on the reasoning that "chrome which is already dark is right in a dark theme
+ * too". Reported, correctly, as: the theme changed and the menu was still black.
  *
- * So they are separate, and only the first of them flips:
+ * It was worse than not changing it. `--drawer` was #0d0b09 and `--bar` #0b0a08 -- both DARKER
+ * than the dark page itself, so the two biggest surfaces on the screen read as holes punched
+ * in it, and switching the theme visibly did nothing to them. Two rules now, and they are the
+ * whole design:
  *
- *   --ink        foreground and keylines. FLIPS with the theme.
- *   --bar        the dark chrome surface. Dark in BOTH themes -- chrome that is already dark
- *                is right in a dark theme too.
- *   --bar-fg     text on the chrome.
- *   --on-hi      text on the acid yellow. NEVER flips: the yellow does not change, so what is
- *                written on it must not either.
- *   --on-manila  text on a folder tab: tan in light, deep ochre in dark.
+ *   1. NOTHING is black. Every dark surface is warm graphite -- a neutral grey with R > G > B
+ *      by a few points, so it belongs to the same family as the manila and the cream. #1c1a17
+ *      is the floor, and it is a colour rather than an absence.
+ *
+ *   2. Surfaces RISE by getting lighter, in both themes. The page is the floor; a card sits on
+ *      it; the chrome bar above that; the cabinet carcass, which floats with a shadow, is the
+ *      top. In the light theme that ramp runs cream -> white for the paper surfaces and
+ *      graphite -> lighter graphite for the chrome. In the dark theme it is one continuous
+ *      graphite ramp, so the carcass is LIGHTER than the page and reads as an object on it.
+ *
+ * That is why the chrome tokens differ between the themes even though both are dark: what has
+ * to hold is the relationship, not the hex.
+ *
+ * ## The cabinet carcass, which is the other half of the same report
+ *
+ * "The theme changed and the menu was still black" was true in the light theme too, and worse
+ * there: the carcass was #2c2720, DARKER than the #322e28 it became in the dark theme. Put
+ * that in words and it is plainly absurd -- the light theme's menu was darker than the dark
+ * theme's menu -- and the two screenshots side by side were indistinguishable.
+ *
+ * So in the light theme the carcass is now kraft card (#d3b483) with ink on it. That is not a
+ * retreat from the look; it is the look, arrived at properly. The thing being drawn is a card
+ * index -- manila folders, ruled cards, a torn edge -- and a card-index box is made of board,
+ * not of a black slab. The masthead is the one surface that stays dark in both themes, because
+ * a masthead is a nameplate: it carries the wordmark, and a newspaper does not reprint its
+ * nameplate in a different colour for the evening edition.
+ *
+ * `--sel` / `--on-sel` exist for the same reason. The selected drawer used to be the acid
+ * yellow, which is right on graphite and nearly invisible on kraft -- 1.35:1. So selection is
+ * "the ink-and-yellow pair, whichever of the two the ground is not": ink plate with yellow
+ * lettering on kraft, yellow plate with ink lettering on graphite. Same two colours, same
+ * gesture, legible on both.
+ *
+ * ## The roles a token can have, and which of them flip
+ *
+ *   --ink        foreground and text. FLIPS.
+ *   --paper      the floor.                                    the surface ramp, lightest
+ *   --card       a sheet on the floor.                         last, in both themes
+ *   --bar        the chrome bar.
+ *   --drawer     the cabinet carcass, which floats.
+ *   --drawer-sunk  the recessed panel at the foot of the carcass.
+ *   --edge       heavy keylines -- the 2px and 3px borders that draw this interface. In the
+ *                light theme it is the ink itself; in the dark theme a graphite one step above
+ *                the surfaces, because a 3px cream outline around every panel is a cage.
+ *                THIS is the token to reach for a border, never `--ink`.
+ *   --line       hairlines and rules. Derived from `--ink`.
+ *   --rule-card  the ruling printed on an index card -- blue on white paper, and a warm grey on
+ *                graphite, because a pale blue at any alpha over graphite is a steel wash.
+ *   --rule-paper the fainter feint on the big settings sheet.
+ *   --bar-fg     text on the chrome bar.
+ *   --on-drawer  text on the carcass.
+ *   --sel        the selected drawer's plate.
+ *   --on-sel     its lettering.
+ *   --on-hi      text on the yellow. Does not flip: dark text on a yellow, in both themes.
+ *   --on-manila  text on a folder tab.
  *   --shadow-c   the hard offset shadow. Dark in both -- a light shadow reads as a glow, which
  *                is the opposite of the printed look this is after.
  *   --scrim      the modal backdrop.
  *
  * Anything derived with `color-mix(... var(--ink) ...)` needs no dark counterpart: custom
  * properties resolve lazily where they are used, so redefining `--ink` moves them all.
+ *
+ * ## The accents are toned for the dark theme, and that is not a compromise
+ *
+ * #ffe94a and #ff2e63 are chosen to sing off cream paper. At full chroma on graphite they
+ * glare and bloom, which is what makes a dark interface tiring to sit in front of. The dark
+ * theme drops both a step in lightness and chroma -- #edd45a and #f4718c -- which is still
+ * unmistakably the same yellow and the same pink, and stops the page vibrating.
+ *
+ * `tests/theme.test.ts` asserts the contrast of every text-on-surface pair in BOTH themes, and
+ * that each surface ramp is monotonic. It exists because the one bug in this area that got all
+ * the way to a person was acid yellow on cream at about 1.3:1, and no test said a word.
  *
  * ## The three states
  *
@@ -40,49 +102,78 @@
  */
 
 const DARK = `
-  --ink: #ece4d3;
-  --paper: #17150f;
-  --card: #211e17;
-  --dim: #9c9284;
-  --accent: #ff4d78;
-  --manila: #6b5426;
-  --on-manila: #f7efdb;
-  --drawer: #0d0b09;
-  --bar: #0b0a08;
-  --shadow-c: #000;
-  --scrim: color-mix(in oklab, #000 74%, transparent);
+  --ink: #ebe4d7;
+  --dim: #a49b8d;
+  --paper: #1c1a17;
+  --card: #24211d;
+  --bar: #302b25;
+  --drawer: #3a342d;
+  --drawer-sunk: #2a2620;
+  --edge: #423c34;
+  --line: color-mix(in oklab, var(--ink) 20%, transparent);
+  /* Faint and warm rather than faint and cyan: a pale-blue ruling reads as blue biro on white
+     paper, and as a steel-blue wash on graphite. */
+  --rule-card: color-mix(in oklab, var(--ink) 13%, transparent);
+  /* 5%, not the light theme's 8%: adding cream to graphite is a far bigger relative step than
+     adding ink to white, so the same number is a faint guide on paper and a visible stripe in
+     the dark. Measured by looking at the settings sheet, where 8% cut across the text. */
+  --rule-paper: color-mix(in oklab, var(--ink) 5%, transparent);
+  --hi: #edd45a;
+  --accent: #f4718c;
+  --cyan: #8ad7e8;
+  --ok: #5fc98d;
+  --manila: #766036;
+  --on-manila: #f5eddb;
+  --on-drawer: #e9e2d5;
+  --sel: #edd45a;
+  --on-sel: #1c1a17;
+  --shadow-c: #0f0e0c;
+  --scrim: color-mix(in oklab, #0b0a09 70%, transparent);
   /* Light dots at low alpha straight over dark paper. No blend trickery: multiply would make
      them invisible against a dark ground. */
-  --halftone: radial-gradient(color-mix(in oklab, var(--ink) 26%, transparent) .8px, transparent .9px);
+  --halftone: radial-gradient(color-mix(in oklab, var(--ink) 20%, transparent) .8px, transparent .9px);
   --halftone-blend: normal;
-  --ok: #46d98a;
 `;
 
 export const THEME_CSS = /* css */ `
 :root {
   --ink: #14110e;
+  --dim: #6f665a;
+
+  /* The surface ramp: cream floor, white sheets, graphite chrome, lighter carcass. */
   --paper: #f2ece0;
   --card: #fffdf6;
+  --bar: #211d17;
+  --drawer: #d3b483;
+  --drawer-sunk: #c9a86f;
+
+  --edge: var(--ink);
+  --line: color-mix(in oklab, var(--ink) 18%, transparent);
+  /* The ruling on an index card. Blue biro on white paper. */
+  --rule-card: color-mix(in oklab, var(--cyan) 42%, transparent);
+  /* The feint on the big settings sheet: pencil, not biro. */
+  --rule-paper: color-mix(in oklab, var(--ink) 8%, transparent);
+
   --hi: #ffe94a;
   --accent: #ff2e63;
   --cyan: #7ef0ff;
-  --dim: #6f665a;
-  --line: color-mix(in oklab, var(--ink) 18%, transparent);
+  /* The one green in the palette, for a "yes" in the durability table. It has to change with
+     the theme: #0d7a3d on a dark card is unreadable. */
+  --ok: #0d7a3d;
   --manila: #e8c98a;
-  --drawer: #23201b;
 
-  --bar: #14110e;
   --bar-fg: var(--hi);
   --on-hi: #14110e;
   --on-manila: #14110e;
+  --on-drawer: #14110e;
+  --sel: #14110e;
+  --on-sel: #ffe94a;
+
   --shadow-c: #14110e;
   --shadow: 5px 5px 0 var(--shadow-c);
   --scrim: color-mix(in oklab, #14110e 55%, transparent);
   --halftone: radial-gradient(var(--ink) .8px, transparent .9px);
   --halftone-blend: multiply;
-  /* The one green in the palette, for a "yes" in the durability table. It has to change with
-     the theme: #0d7a3d on a dark card is unreadable. */
-  --ok: #0d7a3d;
 
   /* The pages are set in mono throughout, which is the dev-hub/zine register. The display face
      is the same stack at a heavier weight: no web font, so nothing is fetched and nothing can
@@ -104,6 +195,34 @@ export const THEME_CSS = /* css */ `
 :root[data-theme="dark"] {${DARK}  color-scheme: dark;
 }
 `;
+
+// ------------------------------------------------------------ reading it back
+
+/**
+ * The literal tokens of one theme, as written above.
+ *
+ * Parsing our own CSS rather than keeping a second copy in TypeScript, because two copies of a
+ * palette is exactly the drift this file exists to stop. Only plain values come back usefully
+ * -- a `color-mix(...)` is returned verbatim, and the caller is expected to skip anything that
+ * is not a hex.
+ */
+export function tokensOf(theme: 'light' | 'dark'): Record<string, string> {
+  const out: Record<string, string> = {};
+  const source = theme === 'dark' ? lightBlock() + DARK : lightBlock();
+  for (const match of source.matchAll(/--([a-z-]+):\s*([^;]+);/g)) {
+    const name = match[1];
+    const value = match[2];
+    if (name && value) out[name] = value.trim();
+  }
+  return out;
+}
+
+/** Just the declarations of the bare `:root` block, which is the whole light theme. */
+function lightBlock(): string {
+  const at = THEME_CSS.indexOf(':root {');
+  const end = THEME_CSS.indexOf('\n}', at);
+  return THEME_CSS.slice(at, end);
+}
 
 // ------------------------------------------------------- choosing between them
 

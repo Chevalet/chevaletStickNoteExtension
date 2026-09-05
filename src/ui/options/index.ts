@@ -44,7 +44,13 @@ header {
 header img { width: 26px; height: 26px; }
 header .v { margin-inline-start: auto; color: var(--cyan); font-size: 12px; }
 main { max-width: 720px; margin: 0 auto; padding: 22px; display: grid; gap: 18px; }
-section { background: var(--card); border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--shadow-c); }
+section { background: var(--card); border: 3px solid var(--edge); box-shadow: 5px 5px 0 var(--shadow-c); }
+.selwrap { position: relative; display: block; }
+.selwrap::after {
+  content: ''; position: absolute; inset-inline-end: 11px; top: 50%;
+  width: 0; height: 0; transform: translateY(-30%); pointer-events: none;
+  border-inline: 5px solid transparent; border-top: 6px solid currentColor;
+}
 section > h2 {
   margin: 0; padding: 8px 14px; background: var(--bar); color: var(--bar-fg);
   font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
@@ -55,11 +61,15 @@ label.field > span { font-size: 12.5px; }
 label.inline { display: flex; align-items: center; gap: 8px; }
 p.note { margin: 0; font-size: 12px; color: var(--dim); line-height: 1.55; }
 p.warn { margin: 0; font-size: 12px; color: var(--accent); line-height: 1.55; }
-select, input[type="number"] {
+/* Selected on the class rather than on the type, which is what let the number field fall out
+   of the design when its type changed from number to text: it kept the browser's own white
+   box next to two styled dropdowns. A control is styled because of the job it does here. */
+select, label.field input {
   all: unset; box-sizing: border-box; padding: 5px 8px; width: 100%;
   background: color-mix(in oklab, var(--hi) 22%, var(--card));
-  border: 2px solid var(--ink); font: inherit; cursor: pointer;
+  border: 2px solid var(--edge); font: inherit; cursor: pointer;
 }
+label.field input { cursor: text; }
 input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
 select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 table.facts { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -118,7 +128,19 @@ function selectField(
     sel.append(o);
   }
   sel.addEventListener('change', () => onChange(sel.value));
-  return el('label', { class: 'field' }, el('span', {}, label), sel);
+  /*
+   * The select is wrapped so a caret can be drawn over it. `all: unset` in the stylesheet
+   * strips the native arrow along with everything else, which left a dropdown looking exactly
+   * like a text field -- no affordance at all that it could be opened. Putting `appearance`
+   * back would draw a native control in the middle of a hand-drawn interface, which is the
+   * mistake the unstyled update button already made once.
+   */
+  return el(
+    'label',
+    { class: 'field' },
+    el('span', {}, label),
+    el('span', { class: 'selwrap' }, sel),
+  );
 }
 
 function checkField(label: string, value: boolean, onChange: (v: boolean) => void): HTMLElement {
@@ -135,14 +157,25 @@ function numberField(
   max: number,
   onChange: (v: number) => void,
 ): HTMLElement {
+  /*
+   * A text input with a numeric keypad, not `type="number"`.
+   *
+   * Firefox draws `-moz-number-spin-box` even under `appearance: none`, and it draws it in the
+   * platform's own light widget colours -- so the dark options page had a small grey box
+   * floating in the corner of the field, the one native artefact on the page. The clamp below
+   * is what `min`/`max` were doing anyway, and it runs whatever the field is typed into.
+   */
   const input = el('input', {
-    type: 'number',
-    min: String(min),
-    max: String(max),
+    type: 'text',
+    inputmode: 'numeric',
+    pattern: '[0-9]*',
+    'aria-valuemin': String(min),
+    'aria-valuemax': String(max),
   }) as HTMLInputElement;
   input.value = String(value);
   input.addEventListener('change', () => {
-    const v = Math.max(min, Math.min(max, Number(input.value)));
+    const typed = Number.parseInt(input.value.replace(/[^0-9]/g, ''), 10);
+    const v = Number.isFinite(typed) ? Math.max(min, Math.min(max, typed)) : value;
     input.value = String(v);
     onChange(v);
   });

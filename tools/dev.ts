@@ -228,7 +228,16 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return;
   }
 
-  const file = safePath(url);
+  /*
+   * The cabinet harness lives at /spikes/cabinet/, but it loads the SHIPPED bundle, which asks
+   * for the logo at `../assets/logo.svg` -- correct from `dist/ui/manager.html`, and
+   * /spikes/assets/logo.svg from here. Without this the harness shows a broken-image box where
+   * the wordmark goes, in every screenshot, for ever, and you stop seeing it. Serving the real
+   * file rather than patching the bundle keeps the harness a photograph of what ships.
+   */
+  const aliased = url.startsWith('/spikes/assets/') ? url.replace('/spikes/', '/') : url;
+
+  const file = safePath(aliased);
   if (!file) {
     res.writeHead(403).end('forbidden');
     return;

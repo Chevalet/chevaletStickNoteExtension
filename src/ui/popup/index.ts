@@ -75,7 +75,7 @@ header .v { margin-inline-start: auto; color: var(--cyan); font-size: 11px; }
 .btn.ghost { background: transparent; color: var(--ink); box-shadow: none; border-color: color-mix(in oklab, var(--ink) 35%, transparent); }
 .btn.wide { width: 100%; }
 .toggle { display: flex; align-items: center; gap: 8px; }
-.toggle .lamp { width: 11px; height: 11px; border: 2px solid var(--ink); background: var(--dim); }
+.toggle .lamp { width: 11px; height: 11px; border: 2px solid var(--edge); background: var(--dim); }
 .toggle.on .lamp { background: var(--accent); }
 .guard { padding: 8px 10px; border: 2px solid color-mix(in oklab, var(--ink) 20%, transparent); }
 .guard b { display: block; font-size: 11.5px; margin-bottom: 3px; }
