@@ -182,6 +182,15 @@ function mount(rec: NoteRecord): NoteView {
       loop,
       layer: host.docLayer,
       history,
+      /*
+       * The playground has no background, so it fetches the font files straight off the dev
+       * server. The path is the same one the build writes and the same one the extension asks
+       * for -- `faceFile` names it in both cases -- so a face that works here works there.
+       */
+      fontBytes: async (file) => {
+        const res = await fetch(`/dist/assets/fonts/${file}`);
+        return res.ok ? await res.arrayBuffer() : null;
+      },
       raise: () => ++topZ,
       onChange: (n) => {
         const { x, y } = n.position;

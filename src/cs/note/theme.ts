@@ -31,57 +31,23 @@ export const PALETTES: readonly Palette[] = [
 
 export const DEFAULT_PALETTE = PALETTES[0] as Palette;
 
+/*
+ * Re-exported, so a caller that wants a note's style and its type in one import still can.
+ * The table itself lives in `shared/` because the background and the build need it too, and
+ * neither of them should be reaching into the note renderer.
+ */
+export {
+  FONTS,
+  type FontChoice,
+  type FontFile,
+  faceFamily,
+  faceFile,
+  fontById,
+  fontStack,
+} from '~/shared/fonts.ts';
+
 export function paletteById(id: string): Palette {
   return PALETTES.find((p) => p.id === id) ?? DEFAULT_PALETTE;
-}
-
-/** Bundled type. `system` costs nothing and is the default; the rest load on first use. */
-export interface FontChoice {
-  id: string;
-  label: string;
-  /** CSS stack. Bundled faces are prefixed with the build-time namespace at load. */
-  stack: string;
-  /** Asset filename under assets/fonts/, absent for system stacks. */
-  file?: string;
-  /** Scripts this face actually covers, so we can fall back sensibly for Persian. */
-  scripts: ReadonlyArray<'latin' | 'arabic'>;
-}
-
-const SYSTEM_SANS =
-  'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Vazirmatn", sans-serif';
-const SYSTEM_HAND = '"Segoe Script", "Bradley Hand", "Comic Sans MS", cursive';
-
-export const FONTS: readonly FontChoice[] = [
-  { id: 'system', label: 'System', stack: SYSTEM_SANS, scripts: ['latin', 'arabic'] },
-  { id: 'system-hand', label: 'System handwriting', stack: SYSTEM_HAND, scripts: ['latin'] },
-  {
-    id: 'marker',
-    label: 'Marker',
-    stack: 'PermanentMarker',
-    file: 'marker.woff2',
-    scripts: ['latin'],
-  },
-  { id: 'display', label: 'Display', stack: 'Bangers', file: 'display.woff2', scripts: ['latin'] },
-  { id: 'hand', label: 'Handwriting', stack: 'Caveat', file: 'hand.woff2', scripts: ['latin'] },
-  { id: 'grotesk', label: 'Grotesk', stack: 'Archivo', file: 'grotesk.woff2', scripts: ['latin'] },
-  {
-    id: 'vazir',
-    label: 'Vazirmatn',
-    stack: 'Vazirmatn',
-    file: 'vazirmatn.woff2',
-    scripts: ['arabic', 'latin'],
-  },
-  {
-    id: 'estedad',
-    label: 'Estedad',
-    stack: 'Estedad',
-    file: 'estedad.woff2',
-    scripts: ['arabic', 'latin'],
-  },
-] as const;
-
-export function fontById(id: string): FontChoice {
-  return FONTS.find((f) => f.id === id) ?? (FONTS[0] as FontChoice);
 }
 
 /** Everything a single note can override. A stored note keeps only the fields it changed. */

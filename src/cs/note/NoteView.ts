@@ -20,6 +20,7 @@ import {
   spring,
   step,
 } from '~/cs/physics/spring.ts';
+import { ensureFont } from './fontload.ts';
 import {
   clearFormatting,
   cycleHeading,
@@ -39,6 +40,7 @@ import { offsetsIn, selectOffsets } from './selection.ts';
 import {
   DEFAULT_STYLE,
   fontById,
+  fontStack,
   isDarkPaper,
   type NoteStyle,
   PALETTES,
@@ -167,6 +169,14 @@ export interface NoteHost {
    * change up. Nothing calls this per frame.
    */
   motion?(): 'full' | 'reduced' | 'off';
+  /**
+   * Fetch the bytes of one bundled font file, or null.
+   *
+   * Passed in rather than imported so the note layer never talks to the background directly --
+   * the same reason `onAsset` exists. It also means a note in a test or in the playground can
+   * be given a face from a local file with no extension at all.
+   */
+  fontBytes?(file: string): Promise<ArrayBuffer | null>;
   /** The note's markdown source changed by something other than typing. */
   onText?(note: NoteView, text: string): void;
   onStyle?(note: NoteView, overrides: Partial<NoteStyle>): void;
@@ -1416,8 +1426,17 @@ export class NoteView implements Animatable {
 
   private applyStyle(): void {
     const font = fontById(this.style.fontFamily);
-    for (const [k, v] of Object.entries(styleVars(this.style, font.stack))) {
+    for (const [k, v] of Object.entries(styleVars(this.style, fontStack(font)))) {
       this.el.style.setProperty(k, v);
+    }
+    /*
+     * Ask for the face, if it is one we ship. Not awaited: the note is already on the page in
+     * the fallback and swaps when the bytes arrive, and applyStyle is called on every restyle
+     * -- once per drag frame at worst. `ensureFont` is idempotent per page, so the twentieth
+     * call is a lookup in a Map.
+     */
+    if (font.bundle && this.host.fontBytes) {
+      void ensureFont(font, { bytes: this.host.fontBytes });
     }
     this.applyDirection();
     this.el.dataset.align = this.style.align;

@@ -216,6 +216,27 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return;
   }
 
+  /*
+   * A page that forbids fonts outright, for `spikes/firefox-fonts.mjs`.
+   *
+   * The question that spike answers is whether a note can get a bundled face on a site with a
+   * strict CSP -- the same class of problem that made pasted images paint to a canvas instead
+   * of using an `<img src>`. A header cannot be faked from inside a page, so the harness needs
+   * a real response with a real Content-Security-Policy on it.
+   */
+  if (url.startsWith('/__dev/csp-fonts')) {
+    res.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+      'content-security-policy': "default-src 'self'; font-src 'none'; style-src 'unsafe-inline'",
+    });
+    res.end(
+      '<!doctype html><meta charset=utf-8><title>font-src none</title>' +
+        '<p>This page forbids fonts. A note on it should still get its own.</p>',
+    );
+    return;
+  }
+
   if (url.startsWith('/__dev/status')) {
     noStore(res, MIME['.json'] as string);
     res.end(JSON.stringify({ ...state, version: pkg.version, hostTag: HOST_TAG }, null, 2));

@@ -24,6 +24,24 @@ importers:
       '@biomejs/biome':
         specifier: ^2.3.0
         version: 2.5.11
+      '@fontsource/archivo':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/bangers':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/caveat':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/estedad':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/permanent-marker':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/vazirmatn':
+        specifier: 5.3.0
+        version: 5.3.0
       '@types/firefox-webext-browser':
         specifier: ^120.0.4
         version: 120.0.5
@@ -478,6 +496,24 @@ packages:
   '@fluent/syntax@0.19.0':
     resolution: {integrity: sha512-5D2qVpZrgpjtqU4eNOcWGp1gnUCgjfM+vKGE2y03kKN6z5EBhtx0qdRFbg8QuNNj8wXNoX93KJoYb+NqoxswmQ==}
     engines: {node: '>=14.0.0', npm: '>=7.0.0'}
+
+  '@fontsource/archivo@5.3.0':
+    resolution: {integrity: sha512-5DIMgPVJRi62OqdOVoogCFxP73EkNM/E0YVTSDIQlDEJfDbxqZduwM/YoNZwC9Sx1CDgpKinqf8ckRY1QNIecw==}
+
+  '@fontsource/bangers@5.3.0':
+    resolution: {integrity: sha512-tSRpmWwkqrO9PCqo9wjA/99/5sLOIWm5cf51G3ooEHd8qZus8sVSSJoWp/7EvM5rIgZMjKRG6XtY9yeisKxE7g==}
+
+  '@fontsource/caveat@5.3.0':
+    resolution: {integrity: sha512-eHTfzQxFSW9ABERRLNruHoNJmKed2J7pqTUc5lp4a4POMgXGKpxmWj3d9Hz10kmAg6iuTTLe6UagbA4bnsmfQw==}
+
+  '@fontsource/estedad@5.3.0':
+    resolution: {integrity: sha512-gORXc4WfyTcOLxr+X+scZv7CrydZf6kHm+dimQCuHCzDrbfqh9HS452HbT9U/DJGvnnVk7HqnffU2zOtHKTOGg==}
+
+  '@fontsource/permanent-marker@5.3.0':
+    resolution: {integrity: sha512-ZO/NtYW4SCc/iY8N3dmjWyDITcXJ/vhWZFgnwRcvzwCKKnScMrM/a2/6VHlsjCVuIgmPzNrCFbedEYhv+/jJBg==}
+
+  '@fontsource/vazirmatn@5.3.0':
+    resolution: {integrity: sha512-XC/2yN2r5gwhFT3klSuWaqncODX2DOfRYfNmbyzgtWYxHxMC+tcoaX+tgggrm6hSkEgpR1TuSDEf1PiI91G7qg==}
 
   '@fregante/relaxed-json@2.0.0':
     resolution: {integrity: sha512-PyUXQWB42s4jBli435TDiYuVsadwRHnMc27YaLouINktvTWsL3FcKrRMGawTayFk46X+n5bE23RjUTWQwrukWw==}
@@ -2388,6 +2424,18 @@ snapshots:
   '@eslint/js@8.57.1': {}
 
   '@fluent/syntax@0.19.0': {}
+
+  '@fontsource/archivo@5.3.0': {}
+
+  '@fontsource/bangers@5.3.0': {}
+
+  '@fontsource/caveat@5.3.0': {}
+
+  '@fontsource/estedad@5.3.0': {}
+
+  '@fontsource/permanent-marker@5.3.0': {}
+
+  '@fontsource/vazirmatn@5.3.0': {}
 
   '@fregante/relaxed-json@2.0.0': {}
 

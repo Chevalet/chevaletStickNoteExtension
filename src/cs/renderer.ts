@@ -299,6 +299,22 @@ function mountNote(wire: NoteWire): NoteView {
       history,
       defaults: noteDefaults,
       motion: () => motionCap,
+      /*
+       * The background reads the packaged file; this side only asks.
+       *
+       * A content script cannot fetch a moz-extension URL unless the file is in
+       * `web_accessible_resources`, and putting the fonts there would make them readable from
+       * any page on the web. One round trip per face per page -- `ensureFont` will not ask
+       * twice -- and the reply is an ArrayBuffer, which is what `FontFace` wants anyway.
+       */
+      fontBytes: async (file) => {
+        const reply = await ask<{ bytes: ArrayBuffer }>({ t: 'font/bytes', file });
+        if (!reply.ok) {
+          if (__DEV__) console.warn('[cn] font refused:', file, reply.code);
+          return null;
+        }
+        return reply.data.bytes;
+      },
       raise: () => ++topZ,
       onChange: (n) =>
         save(wire.id, {

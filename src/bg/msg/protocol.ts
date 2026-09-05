@@ -83,7 +83,20 @@ export type CsToBg =
    */
   | { t: 'asset/put'; noteId: NoteId; name: string; type: string; bytes: ArrayBuffer }
   /** Read one back, to paint into a canvas. No network is involved at any point. */
-  | { t: 'asset/get'; id: string };
+  | { t: 'asset/get'; id: string }
+  /*
+   * The bytes of one bundled font file.
+   *
+   * A content script cannot read a packaged file itself -- `fetch` on a moz-extension URL from
+   * a content script is denied unless the file is in `web_accessible_resources`, and putting
+   * fonts there would make them reachable from any page. The background has no such
+   * restriction on its own package, so it reads and hands over the bytes.
+   *
+   * `file` is a NAME, and the background checks it against the font table before touching the
+   * filesystem. A content script runs in a compromised page's process; a path it supplies is
+   * untrusted input, and "read me ../manifest.json" is the obvious thing to try.
+   */
+  | { t: 'font/bytes'; file: string };
 
 /** Sent by the options page and the cabinet, not by a content script. */
 export type UiToBg =

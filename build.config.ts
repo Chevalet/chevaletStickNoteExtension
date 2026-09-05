@@ -10,10 +10,12 @@
  * reproduces `dist/` byte-for-byte.
  */
 import { createHash } from 'node:crypto';
-import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type * as esbuild from 'esbuild';
+// The single source of truth for which faces exist and what each file is called.
+import { faceFile, FONTS } from './src/shared/fonts.ts';
 
 export const ROOT = dirname(fileURLToPath(import.meta.url));
 export const SRC = join(ROOT, 'src');
@@ -137,6 +139,93 @@ export async function copyStatic(): Promise<void> {
     await cp(join(SRC, 'ui', name, 'index.html'), join(OUT, 'ui', `${name}.html`), {
       force: true,
     }).catch(() => {});
+  }
+  await copyFonts();
+}
+
+/**
+ * Bring the bundled typefaces out of node_modules and into `dist/assets/fonts/`.
+ *
+ * ## Why they are not committed to the repository
+ *
+ * They are `devDependencies` -- @fontsource packages, published by the Fontsource project,
+ * every one OFL-1.1 or Apache-2.0 -- so `pnpm-lock.yaml` carries an integrity hash for each,
+ * and a reviewer can verify where every byte came from with `pnpm install`. A committed binary
+ * blob can only be verified by trusting a sentence in a README. THIRD-PARTY.md names them.
+ *
+ * ## Why this throws
+ *
+ * Every other line in `copyStatic` swallows its error, and that is right for them: a missing
+ * icon is a cosmetic problem visible immediately. A missing font file is not visible at all --
+ * the note renders in the system stack, which is exactly what it did before the feature
+ * existed, so a silently broken build looks like a working one. The whole reason this feature
+ * is being built is that "Vazirmatn" in the menu did nothing and nobody could tell.
+ *
+ * The names come from `faceFile` in `src/cs/note/theme.ts`, which is also what the runtime
+ * asks for. One naming rule, called from both ends, so they cannot drift apart.
+ */
+async function copyFonts(): Promise<void> {
+  const dir = join(OUT, 'assets', 'fonts');
+  await mkdir(dir, { recursive: true });
+
+  let bytes = 0;
+  let files = 0;
+  for (const font of FONTS) {
+    if (!font.bundle) continue;
+    for (const file of font.bundle.files) {
+      const from = join(
+        ROOT,
+        'node_modules',
+        font.bundle.package,
+        'files',
+        `${font.bundle.base}-${file.subset}-${file.weight}-normal.woff2`,
+      );
+      const to = join(dir, faceFile(font, file));
+      try {
+        await cp(from, to, { force: true });
+        bytes += (await stat(to)).size;
+        files++;
+      } catch (e) {
+        throw new Error(
+          `font missing: ${from}\n` +
+            `  ${font.label} is offered in the Type menu, so it has to be in the package.\n` +
+            `  Run pnpm install, or take the face out of FONTS in src/cs/note/theme.ts.\n` +
+            `  ${String(e)}`,
+        );
+      }
+    }
+  }
+  await copyFontLicences();
+  process.stdout.write(`  fonts:    ${files} files, ${(bytes / 1024).toFixed(0)}kB\n`);
+}
+
+/**
+ * Ship the licence next to the bytes, because the licence says to.
+ *
+ * The SIL Open Font Licence requires the licence text to travel with the font -- clause 2:
+ * "Copies of the Font Software may be sold or distributed... provided that each copy contains
+ * the above copyright notice and this licence". Apache-2.0 says the same for Permanent Marker.
+ * A build that copies the woff2 and leaves the LICENSE behind is not a build with a licensing
+ * footnote to tidy up later; it is redistribution without permission.
+ *
+ * One file per face, named after the face, because six files called LICENSE cannot coexist and
+ * a reviewer should be able to tell which text covers which font without opening any of them.
+ */
+async function copyFontLicences(): Promise<void> {
+  for (const font of FONTS) {
+    if (!font.bundle) continue;
+    const from = join(ROOT, 'node_modules', font.bundle.package, 'LICENSE');
+    const to = join(OUT, 'assets', 'fonts', `${font.id}-LICENSE.txt`);
+    try {
+      await cp(from, to, { force: true });
+    } catch (e) {
+      throw new Error(
+        `licence missing for ${font.label}: ${from}\n` +
+          '  The OFL requires the licence to be distributed with the font. Shipping the ' +
+          'woff2 without it is not allowed.\n' +
+          `  ${String(e)}`,
+      );
+    }
   }
 }
 

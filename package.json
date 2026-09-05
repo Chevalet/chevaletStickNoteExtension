@@ -26,6 +26,12 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.0",
+    "@fontsource/archivo": "5.3.0",
+    "@fontsource/bangers": "5.3.0",
+    "@fontsource/caveat": "5.3.0",
+    "@fontsource/estedad": "5.3.0",
+    "@fontsource/permanent-marker": "5.3.0",
+    "@fontsource/vazirmatn": "5.3.0",
     "@types/firefox-webext-browser": "^120.0.4",
     "@types/node": "^24.10.0",
     "esbuild": "^0.25.10",

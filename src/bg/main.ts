@@ -13,6 +13,7 @@
  * someone is browsing. An IndexedDB index lookup answers the same question in about 1ms.
  */
 
+import { FONTS, faceFile } from '~/shared/fonts.ts';
 import { t } from '~/shared/i18n.ts';
 import type { NoteId } from '~/shared/types.ts';
 import {
@@ -495,6 +496,26 @@ async function onMessage(
         type: record.blob.type,
         bytes: await record.blob.arrayBuffer(),
       });
+    }
+
+    case 'font/bytes': {
+      const asked = String((msg as { file?: unknown }).file ?? '');
+      /*
+       * Matched against the table, never used as a path.
+       *
+       * The set of legal names is small, known, and derived from the same function the build
+       * uses to write the files -- so this is an equality test against a whitelist, not a
+       * sanitiser trying to think of every way a string can escape a directory.
+       */
+      const known = FONTS.some((f) => f.bundle?.files.some((x) => faceFile(f, x) === asked));
+      if (!known) return errReply('SCHEMA', 'not a bundled font file');
+      try {
+        const res = await fetch(browser.runtime.getURL(`assets/fonts/${asked}`));
+        if (!res.ok) return errReply('NOT_FOUND');
+        return okReply({ file: asked, bytes: await res.arrayBuffer() });
+      } catch {
+        return errReply('NOT_FOUND');
+      }
     }
 
     case 'settings/saveDefaults': {
