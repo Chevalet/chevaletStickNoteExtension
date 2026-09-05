@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>unload probe</title>
+<!--
+  The page under test for the two unload spikes, `firefox-r1.mjs` and `firefox-unload.mjs`.
+
+  It must be served over http. An `<all_urls>` content script does not match `data:`, and the
+  first run of the R1 spike reported "no dialog" for both trials only because the probe was
+  never running at all -- the URL was a data: URL and nothing had been injected. A real page on
+  the dev server removes that whole class of false negative, and the marker below makes it
+  provable rather than assumed.
+
+  The button exists because Firefox only honours `beforeunload` after a real interaction with
+  the page (sticky activation). Clicking it is the interaction.
+
+  Dev-only. Never shipped.
+-->
+<style>
+  body { margin: 0; padding: 40px; font: 15px/1.6 ui-monospace, Consolas, monospace; }
+  button { font: inherit; padding: 10px 18px; }
+  code { background: #eee; padding: 1px 4px; }
+</style>
+</head>
+<body>
+  <h1>unload probe</h1>
+  <p>Click the button first: Firefox will not run a <code>beforeunload</code> prompt on a page
+     nobody has interacted with.</p>
+  <p><button id="poke" type="button">poke</button> <span id="poked"></span></p>
+  <p id="marker">content script: <b>not seen</b></p>
+
+<script>
+  document.getElementById('poke').addEventListener('click', () => {
+    document.getElementById('poked').textContent = 'poked';
+  });
+
+  /**
+   * The CONTROL. Arms the page's own beforeunload, in the page's own world -- the thing every
+   * site on the web does and which certainly prompts in a real browser. If a trial with this
+   * armed reports no dialog, the instrument is broken and no other line of output means
+   * anything.
+   */
+  window.__addPageGuard = () => {
+    window.addEventListener('beforeunload', (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    });
+    return true;
+  };
+
+  // Reflect whether the content script reached this page, so a null result can be told apart
+  // from a result about nothing.
+  requestAnimationFrame(() => {
+    if (document.documentElement.dataset.cnR1 === 'loaded') {
+      document.getElementById('marker').innerHTML = 'content script: <b>loaded</b>';
+    }
+  });
+</script>
+</body>
+</html>

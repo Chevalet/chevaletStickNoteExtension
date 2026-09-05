@@ -70,6 +70,8 @@ const SHOTS = [
   { name: 'popup', page: 'popup', size: [420, 640] },
   { name: 'options', page: 'options' },
 
+  { name: 'export-dialog', page: 'manager', click: ['.top .btn'], crop: 'dialog' },
+
   // Native-resolution crops of the surfaces where a colour decision actually lives.
   { name: 'crop-top', page: 'manager', crop: '.top' },
   { name: 'crop-card', page: 'manager', crop: '.card' },

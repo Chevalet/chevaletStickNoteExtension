@@ -360,6 +360,43 @@ dialog {
   box-shadow: 7px 7px 0 var(--shadow-c);
 }
 dialog::backdrop { background: var(--scrim); }
+
+/* ------------------------------------------- choosing an export, and an import
+
+   Three formats, and the difference between them is not visible from their names: one comes
+   back and two do not. So each choice is a button with a sentence, and the sentence is the
+   part that matters. */
+
+.exp { display: grid; gap: 12px; }
+.exp > p:first-child { margin: 0; font-weight: 600; }
+.exp-scope { margin: 0; font-size: 12.5px; color: var(--dim); }
+.exp-row {
+  display: grid;
+  grid-template-columns: 148px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+.exp-row .btn { width: 100%; text-align: center; }
+.exp-row p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--dim); }
+
+.imp-opt {
+  display: flex;
+  gap: 9px;
+  align-items: start;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.imp-opt input { accent-color: var(--accent); width: 15px; height: 15px; margin-top: 2px; }
+.imp-opt input:disabled + span { color: var(--dim); }
+
+@media (max-width: 520px) {
+  .exp-row { grid-template-columns: 1fr; }
+}
 dialog h3 { margin: 0; padding: 9px 14px; background: var(--bar); color: var(--bar-fg); font-size: 13px; letter-spacing: .04em; }
 dialog .content { padding: 14px; }
 dialog .content p { margin: 0 0 10px; }

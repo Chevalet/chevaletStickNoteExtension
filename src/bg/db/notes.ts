@@ -400,6 +400,34 @@ export async function putAsset(noteId: NoteId, blob: Blob, name: string): Promis
   return id;
 }
 
+/**
+ * Store an asset under the id it ALREADY has. Import only.
+ *
+ * `putAsset` mints a fresh id, which is right when an image is pasted and wrong when one is
+ * restored from an archive: a note keeps its images as a list of ids, so a new id would leave
+ * every imported drawing and screenshot pointing at nothing. The note is not touched here --
+ * the import writes the note itself, with its own asset list already checked against what the
+ * archive actually contains.
+ */
+export async function putAssetBytes(a: {
+  id: string;
+  noteId: string;
+  mime: string;
+  bytes: Uint8Array;
+}): Promise<void> {
+  const t = await tx('assets', 'readwrite');
+  t.objectStore('assets').put({
+    id: a.id as AssetId,
+    noteId: a.noteId as NoteId,
+    name: a.id,
+    mime: a.mime,
+    size: a.bytes.byteLength,
+    blob: new Blob([a.bytes as unknown as BlobPart], { type: a.mime }),
+    createdAt: Date.now(),
+  } satisfies AssetRecord);
+  await done(t);
+}
+
 export function getAsset(id: AssetId): Promise<AssetRecord | undefined> {
   return read('assets', (s) => s.get(id) as IDBRequest<AssetRecord | undefined>);
 }
