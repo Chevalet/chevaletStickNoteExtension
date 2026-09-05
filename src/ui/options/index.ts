@@ -31,6 +31,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 const OPTIONS_CSS = /* css */ `${THEME_CSS}
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   margin: 0; padding: 0 0 60px;
   background: var(--paper); color: var(--ink);

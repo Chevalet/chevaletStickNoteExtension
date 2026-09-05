@@ -201,14 +201,23 @@ cannot redirect the download: the link shown is always the releases page, never 
 response body.
 
 Note content is rendered by a small markdown lexer (src/cs/note/md-lex.ts) and built into DOM
-with createElement and textContent. innerHTML is never assigned anywhere in the codebase, so
-there is no HTML sanitiser to audit.
+with createElement and textContent. innerHTML is assigned in exactly one place, in
+src/bg/jobs/export-text.ts, and it is a READ: the app's own renderer builds the nodes and the
+result is serialised to produce a self-contained HTML file for the user to download. Nothing is
+ever parsed from a string into DOM.
 
 Every permission declared is used: storage and unlimitedStorage for the note database, sessions
 for per-tab identity that survives session restore, tabs and scripting for the per-origin
 registration above, menus for the "Add a note here" context menu, alarms for the opt-in daily
-update check, and activeTab so the toolbar button works before any host permission is granted.
-optional_permissions is empty.
+update check and the retention and backup jobs, and activeTab so the toolbar button works
+before any host permission is granted.
+
+optional_permissions declares "downloads", and nothing but the scheduled backup uses it
+(src/bg/jobs/autobackup.ts). It is requested from the click that turns that switch on, never at
+install, and the switch does not move if the request is declined. The file written is a ZIP of
+the user's own notes into the browser's download folder, on a ring of three filenames. Manual
+export needs no permission at all -- an extension page clicking its own anchor -- and that is
+what the Export button in the cabinet does.
 ```
 
 ## Screenshots

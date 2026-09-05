@@ -189,7 +189,9 @@ export function patchNote(
   now = Date.now(),
 ): Promise<PatchResult> {
   return serialize(id, async () => {
-    const t = await tx('notes', 'readwrite');
+    // Both stores in one transaction, so a snapshot and the edit it protects cannot come
+    // apart: either the old text is safe and the new text is written, or neither happened.
+    const t = await tx(['notes', 'revisions'], 'readwrite');
     const store = t.objectStore('notes');
     const current = (await req(store.get(id) as IDBRequest<NoteRecord | undefined>)) ?? null;
     if (!current) {
@@ -206,6 +208,24 @@ export function patchNote(
     const clock = { ...current.fieldClock };
 
     if (patch.body) {
+      /*
+       * The PREVIOUS text is what gets kept, before it is replaced. A history of what a note
+       * became is no use; what you want back is what it was.
+       */
+      if (
+        patch.body.text !== current.body.text &&
+        shouldSnapshot(current.body.text, patch.body.text, lastRevAt.get(id) ?? 0, now)
+      ) {
+        await writeRevision(t.objectStore('revisions'), {
+          noteId: id,
+          rev: current.rev,
+          at: now,
+          body: current.body.text,
+          title: current.title,
+          reason: 'edit',
+        });
+        lastRevAt.set(id, now);
+      }
       next.body = { format: 'md', text: patch.body.text };
       next.title = deriveTitle(patch.body.text);
       clock.body = now;
@@ -314,15 +334,45 @@ export async function purgeNote(id: NoteId): Promise<void> {
     c.continue();
   };
   await done(t);
+  // The snapshot clock is keyed by note id and the note is gone. A leftover entry could only
+  // ever affect an id that cannot come back, but a map that is only added to is a leak.
+  lastRevAt.delete(id);
 }
 
 // -------------------------------------------------------------- revisions
 
 const REVISION_GAP_MS = 30_000;
 const REVISION_DELTA_CHARS = 200;
-const REVISION_KEEP = 50;
 
-/** Should this edit be worth remembering? */
+/**
+ * How many versions of each note to keep.
+ *
+ * A module-level policy rather than an argument, because `patchNote` is called from a dozen
+ * places and threading a setting through all of them would put the same number in a dozen
+ * call sites. The background sets this on boot and whenever the setting changes; the default
+ * matches what the constant used to be, so a context that never sets it behaves as before.
+ *
+ * `keep: 0` means keep none, and it is honoured everywhere -- the setting has to be able to
+ * turn the feature off, or it is not a setting.
+ */
+let revisionKeep = 50;
+
+export function setRevisionKeep(keep: number): void {
+  revisionKeep = Number.isFinite(keep) && keep >= 0 ? Math.floor(keep) : 50;
+}
+
+export function revisionKeepNow(): number {
+  return revisionKeep;
+}
+
+/**
+ * Should this edit be worth remembering?
+ *
+ * Two ways to earn a snapshot: time since the last one, or a big change in length. Typing a
+ * word at a time earns one every thirty seconds; pasting or deleting a paragraph earns one
+ * immediately. Every keystroke would fill the store with noise and make the history useless
+ * to read, which is the failure mode that matters -- a history nobody can scan is not one.
+ */
 export function shouldSnapshot(
   previousText: string,
   nextText: string,
@@ -333,22 +383,51 @@ export function shouldSnapshot(
   return Math.abs(nextText.length - previousText.length) >= REVISION_DELTA_CHARS;
 }
 
+/** Put a revision and prune the note's oldest, inside a transaction the caller owns. */
+async function writeRevision(store: IDBObjectStore, rev: RevisionRecord): Promise<void> {
+  if (revisionKeep <= 0) return;
+  store.put(rev);
+  const all = await req(store.index('by_note').getAllKeys(rev.noteId));
+  const excess = all.length - revisionKeep;
+  for (let i = 0; i < excess; i++) store.delete(all[i] as IDBValidKey);
+}
+
 export async function addRevision(rev: RevisionRecord): Promise<void> {
   const t = await tx('revisions', 'readwrite');
-  const store = t.objectStore('revisions');
-  store.put(rev);
-  // Prune in the same transaction: a cursor over this note's revisions, oldest first.
-  const all = await req(store.index('by_note').getAllKeys(rev.noteId));
-  const excess = all.length - REVISION_KEEP;
-  for (let i = 0; i < excess; i++) store.delete(all[i] as IDBValidKey);
+  await writeRevision(t.objectStore('revisions'), rev);
   await done(t);
 }
+
+/**
+ * When this note last earned a revision, in memory only.
+ *
+ * `shouldSnapshot` needs it on every body edit, and reading the revisions index on every
+ * keystroke to find out would be a second index lookup per character typed. The cost of
+ * losing it -- the event page being killed, which happens constantly -- is that the next edit
+ * takes a snapshot it might not have needed. That is the harmless direction to be wrong in.
+ */
+const lastRevAt = new Map<NoteId, number>();
 
 export function revisionsFor(noteId: NoteId): Promise<RevisionRecord[]> {
   return read(
     'revisions',
     (s) => s.index('by_note').getAll(noteId) as IDBRequest<RevisionRecord[]>,
   );
+}
+
+/**
+ * Put an old version back as the note's current text.
+ *
+ * Routed through `patchNote`, which means the text being replaced is itself snapshotted first
+ * -- so restoring is undoable, and picking the wrong version costs nothing. Doing this with a
+ * direct write would have been three lines shorter and a trap.
+ */
+export async function restoreRevision(noteId: NoteId, at: number): Promise<boolean> {
+  const revisions = await revisionsFor(noteId);
+  const wanted = revisions.find((r) => r.at === at);
+  if (!wanted) return false;
+  const out = await patchNote(noteId, { body: { text: wanted.body } });
+  return out.ok;
 }
 
 // ------------------------------------------------------------------ assets

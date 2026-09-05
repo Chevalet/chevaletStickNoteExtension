@@ -16,9 +16,12 @@
 import { t } from '~/shared/i18n.ts';
 import type { NoteId } from '~/shared/types.ts';
 import {
+  allAssets,
+  allNotes,
   countForContext,
   createNote,
   getAsset,
+  getMeta,
   getNote,
   listTrash,
   type NotePatch,
@@ -27,12 +30,16 @@ import {
   purgeNote,
   putAsset,
   restoreNote,
+  setMeta,
+  setRevisionKeep,
   trashNote,
 } from './db/notes.ts';
 import { openDb } from './db/open.ts';
 import type { NoteRecord } from './db/schema.ts';
 import { allocate, DISARM_DELAY_MS, type TabGuardState } from './guard/budget.ts';
 import { injectNow, mayAccess, syncRegistrations } from './inject.ts';
+import { BACKUP_ALARM, type BackupState, hoursOf, runBackup } from './jobs/autobackup.ts';
+import { buildArchive } from './jobs/backup.ts';
 import { RETENTION_ALARM, RETENTION_PERIOD_MINUTES, runRetentionSweep } from './jobs/retention.ts';
 import {
   checkForUpdate,
@@ -86,6 +93,7 @@ browser.storage.onChanged.addListener((_changes, area) => {
   if (area === 'local') {
     settingsCache = null;
     void syncUpdateAlarm();
+    void applyRevisionPolicy();
     // ...and tell every open tab, because the cabinet's settings pane writes straight to
     // storage rather than through a message. Without this the entire pane was inert in any
     // tab that was already open: a changed default, a changed direction, a changed movement
@@ -125,6 +133,18 @@ function resolveMotion(s: Settings): 'full' | 'reduced' | 'off' {
   }
 }
 
+/**
+ * Tell the store how many versions of a note to keep.
+ *
+ * The store cannot read settings itself -- it is the layer underneath them -- so the number
+ * lives in a module-level policy that this sets on boot and on every settings change. Without
+ * this call the setting would be a number in storage that nothing consults, which is the exact
+ * class of dead control 0.0.10 went through the settings to remove.
+ */
+async function applyRevisionPolicy(): Promise<void> {
+  setRevisionKeep((await settings()).retention.revisionsPerNote);
+}
+
 /** Push the current settings to every tab that has a renderer in it. */
 async function broadcastSettings(): Promise<void> {
   const s = await settings();
@@ -139,6 +159,8 @@ let allocationTimer: ReturnType<typeof setTimeout> | null = null;
 function ready(): Promise<void> {
   readyPromise ??= (async () => {
     await openDb().catch(() => undefined);
+    // Before any patch can run, so the very first edit after a wake-up honours the setting.
+    await applyRevisionPolicy().catch(() => undefined);
     if (__DEV__) console.warn(`[cn bg] ready, v${__VERSION__}`);
   })();
   return readyPromise;
@@ -495,6 +517,11 @@ async function onMessage(
       return okReply(info);
     }
 
+    case 'backup/run': {
+      const state = await runBackup(backupDeps());
+      return okReply(state);
+    }
+
     case 'command':
       await onCommand((msg as { name: string }).name);
       return okReply(null);
@@ -720,6 +747,49 @@ async function syncUpdateAlarm(): Promise<void> {
   } else {
     await browser.alarms.clear(RETENTION_ALARM).catch(() => undefined);
   }
+
+  if (s.backup.enabled) {
+    browser.alarms.create(BACKUP_ALARM, { periodInMinutes: hoursOf(s) * 60 });
+  } else {
+    await browser.alarms.clear(BACKUP_ALARM).catch(() => undefined);
+  }
+}
+
+const BACKUP_STATE = 'backup.last';
+
+/**
+ * Everything the backup job needs, wired to the real browser.
+ *
+ * The download deliberately waits for the browser to accept the file before resolving. This is
+ * an event page: it can be shut down the moment the handler returns, and a revoked blob URL
+ * mid-download would produce a truncated zip -- which is worse than no backup, because it
+ * looks like one.
+ */
+function backupDeps() {
+  return {
+    notes: allNotes,
+    assets: allAssets,
+    build: (input: Parameters<typeof buildArchive>[0]) => buildArchive(input),
+    hasPermission: () => browser.permissions.contains({ permissions: ['downloads'] }),
+    readState: () => getMeta<BackupState>(BACKUP_STATE),
+    writeState: (state: BackupState) => setMeta(BACKUP_STATE, state),
+    download: async (bytes: Uint8Array, filename: string): Promise<number> => {
+      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/zip' }));
+      try {
+        return await browser.downloads.download({
+          url,
+          filename,
+          // The ring rotates by slot, so overwriting is the point: three files, in turn.
+          conflictAction: 'overwrite',
+          saveAs: false,
+        });
+      } finally {
+        // Revoked only after the browser has taken the URL, and late enough that it has
+        // finished reading it.
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      }
+    },
+  };
 }
 
 async function onAlarm(alarm: browser.alarms.Alarm): Promise<void> {
@@ -727,6 +797,11 @@ async function onAlarm(alarm: browser.alarms.Alarm): Promise<void> {
   if (alarm.name === UPDATE_ALARM) {
     // No click behind this, so it can only use a permission already granted.
     await runUpdateCheck(false);
+    return;
+  }
+  if (alarm.name === BACKUP_ALARM) {
+    const state = await runBackup(backupDeps());
+    if (__DEV__) console.warn(`[cn] backup ${state.ok ? 'ok' : 'failed'}`, state);
     return;
   }
   if (alarm.name === RETENTION_ALARM) {

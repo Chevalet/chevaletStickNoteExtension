@@ -116,7 +116,15 @@ export function manifest({ version }: ManifestInput): Record<string, unknown> {
      * back on the day the code that needs them lands. Manual export needs no permission at all,
      * and `tabs.onUpdated` already covers navigation.
      */
-    optional_permissions: [],
+    /*
+     * Asked for at the switch that needs it, never at install.
+     *
+     * `downloads` is only used by the scheduled backup. Putting "Download files" on the
+     * install prompt of a notes extension, for a feature most people will never turn on, is
+     * how an add-on gets refused before it is tried -- so it is requested from the click in
+     * the settings pane, and the switch does not move if the request is declined.
+     */
+    optional_permissions: ['downloads'],
 
     host_permissions: [],
     optional_host_permissions: [

@@ -47,6 +47,7 @@ function btn(label: string, onClick: () => void, kind = ''): HTMLButtonElement {
 
 const POPUP_CSS = /* css */ `${THEME_CSS}
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   margin: 0; width: 320px; background: var(--paper); color: var(--ink);
   font: 13px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;

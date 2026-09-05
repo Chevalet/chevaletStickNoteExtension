@@ -164,7 +164,7 @@ window.browser = {
   runtime: {
     getURL: (p) => `/${p}`,
     id: 'chevalet-note@chevalet.dev',
-    getManifest: () => ({ version: '0.0.10' }),
+    getManifest: () => ({ version: '0.0.11' }),
     // The popup and the options page both ask the background for things it alone knows.
     async sendMessage(msg) {
       if (msg && msg.t === 'popup/status') {
@@ -172,6 +172,14 @@ window.browser = {
       }
       if (msg && msg.t === 'update/check') {
         return { ok: true, data: { checkedAt: Date.now(), latest: null, current: '0.0.10' } };
+      }
+      // Answered so the Backup section can be photographed in a succeeded state. It is a
+      // stub: no file is written, and none should be by a dev harness.
+      if (msg && msg.t === 'backup/run') {
+        return {
+          ok: true,
+          data: { at: Date.now(), ok: true, slot: 1, notes: 6, bytes: 20_480 },
+        };
       }
       return { ok: true, data: {} };
     },

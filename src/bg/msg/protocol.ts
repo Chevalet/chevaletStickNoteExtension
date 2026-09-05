@@ -85,8 +85,16 @@ export type CsToBg =
   /** Read one back, to paint into a canvas. No network is involved at any point. */
   | { t: 'asset/get'; id: string };
 
-/** Sent by the options page, not by a content script. */
-export type UiToBg = { t: 'update/check'; fromClick: boolean };
+/** Sent by the options page and the cabinet, not by a content script. */
+export type UiToBg =
+  | { t: 'update/check'; fromClick: boolean }
+  /*
+   * "Back up now" goes through the background rather than being done in the page, even though
+   * an extension page could call `browser.downloads` itself. The point is that the button and
+   * the alarm run the SAME code: a manual backup that works while the scheduled one is broken
+   * would be the most misleading possible state for this feature to be in.
+   */
+  | { t: 'backup/run' };
 
 // --------------------------------------------------------------------------- bg -> cs
 

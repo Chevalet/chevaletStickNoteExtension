@@ -13,6 +13,10 @@ import { THEME_CSS } from '../chrome-theme.ts';
 
 export const MANAGER_CSS = /* css */ `${THEME_CSS}
 * { box-sizing: border-box; }
+/* Any explicit display beats the hidden attribute, and almost every row in this file sets
+   one. Without this, hiding a .srow (display:grid) left an empty dashed rule across the
+   settings sheet -- an element that had been told twice to be invisible and was not. */
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
@@ -392,6 +396,34 @@ dialog::backdrop { background: var(--scrim); }
   line-height: 1.5;
 }
 .imp-opt input { accent-color: var(--accent); width: 15px; height: 15px; margin-top: 2px; }
+
+/* ----------------------------------------------------- one note's history */
+
+.hist { display: grid; gap: 12px; max-height: 52vh; overflow-y: auto; }
+.hist-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  align-items: start;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+.sbtn-row { display: flex; gap: 8px; justify-content: flex-end; }
+
+.hist-when { display: flex; gap: 10px; align-items: baseline; font-size: 12.5px; }
+.hist-when span { color: var(--dim); font-size: 11.5px; }
+.hist-text {
+  grid-column: 1 / -1;
+  margin: 0;
+  max-height: 8.4em;
+  overflow: hidden;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  background: var(--paper);
+  border: 2px solid var(--edge);
+}
 .imp-opt input:disabled + span { color: var(--dim); }
 
 @media (max-width: 520px) {

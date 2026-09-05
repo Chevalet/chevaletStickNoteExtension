@@ -33,8 +33,25 @@
  * The rule that comes out of it: a control in here must be traceable to code that reads it. If
  * it cannot be, it does not belong on the page -- a switch that writes to storage and changes
  * nothing is worse than no switch, because it makes a promise on the app's behalf.
+ *
+ * ## And the honest way for a control to come back
+ *
+ * **Earlier versions kept per note** was removed by that rule in 0.0.10, because `addRevision`
+ * had no callers. It is back in 0.0.11, and the order matters: the store snapshots the previous
+ * text on an edit, `setRevisionKeep` carries this number down to it from both the background
+ * and the cabinet, and the History button in the notes bar reads them. The control returned
+ * after the code that reads it, not before -- which is the only way a setting should ever
+ * reappear on a page.
  */
 
+import { getMeta } from '~/bg/db/notes.ts';
+import {
+  type BackupState,
+  backupFilename,
+  MAX_HOURS,
+  MIN_HOURS,
+  RING,
+} from '~/bg/jobs/autobackup.ts';
 import { DEFAULT_SETTINGS, loadSettings, type Settings, saveSettings } from '~/bg/settings.ts';
 import { DEFAULT_STYLE, FONTS, PALETTES } from '~/cs/note/theme.ts';
 import { applyTheme, asThemeChoice, type ThemeChoice } from '../chrome-theme.ts';
@@ -127,17 +144,31 @@ function number(
   suffix: string,
   onSet: (v: number) => void,
 ): HTMLElement {
+  /*
+   * A text input with a numeric keypad, not type="number".
+   *
+   * Firefox draws its own spin box for a number input even under appearance:none, in the
+   * platform's light widget colours -- so on the dark theme there was a small grey box
+   * floating in the corner of the field, the one native artefact left on the page. The clamp
+   * below is what min and max were doing anyway, and it runs however the field was filled in.
+   * `aria-valuemin`/`max` keep the range announced to a screen reader.
+   */
   const input = h('input', {
     class: 'num',
-    type: 'number',
-    min: String(min),
-    max: String(max),
+    type: 'text',
     inputmode: 'numeric',
+    pattern: '[0-9]*',
+    role: 'spinbutton',
+    'aria-valuemin': String(min),
+    'aria-valuemax': String(max),
   }) as HTMLInputElement;
   input.value = String(value);
+  input.setAttribute('aria-valuenow', String(value));
   input.addEventListener('change', () => {
-    const n = Math.min(max, Math.max(min, Number(input.value) || min));
+    const typed = Number.parseInt(input.value.replace(/[^0-9]/g, ''), 10);
+    const n = Number.isFinite(typed) ? Math.min(max, Math.max(min, typed)) : value;
     input.value = String(n);
+    input.setAttribute('aria-valuenow', String(n));
     onSet(n);
   });
   return h('div', { class: 'numwrap' }, input, h('span', { class: 'unit' }, suffix));
@@ -483,19 +514,170 @@ function sectionKeeping(): HTMLElement {
       'Counted from the day a note went into the trash, and it keeps the whole of its last ' +
         'day. Does nothing while the switch above is off.',
     ),
+    h('p', { class: 'ssec-sub' }, 'Version history'),
+    row(
+      'Earlier versions kept per note',
+      number(
+        current.retention.revisionsPerNote,
+        0,
+        200,
+        'versions',
+        (v) =>
+          void write({ retention: { ...current.retention, revisionsPerNote: v } }).then(repaint),
+      ),
+      current.retention.revisionsPerNote === 0
+        ? 'Zero, so nothing is kept and the History button will have nothing to show. Undo in ' +
+            'a page still works; it just does not survive closing the tab.'
+        : 'Select one note in the cabinet and press History to read them, or put one back. A ' +
+            'version is kept when an edit is more than thirty seconds after the last one, or ' +
+            'changes the length by a couple of hundred characters — not on every keystroke, or ' +
+            'the list would be unreadable. The oldest are dropped past this number.',
+    ),
   );
 }
 
+/**
+ * The scheduled-backup rows.
+ *
+ * Async because the state of this section is not in `Settings` alone: whether the browser has
+ * actually granted `downloads`, and what the last run did, both live outside it. Rendering
+ * "On, every 12 hours" while the permission has been revoked in about:addons would be a lie
+ * the settings pane tells confidently, so it asks.
+ */
+async function backupRows(): Promise<HTMLElement> {
+  const box = h('div');
+  const granted = await browser.permissions
+    .contains({ permissions: ['downloads'] })
+    .catch(() => false);
+  const last = await getMeta<BackupState>('backup.last').catch(() => undefined);
+
+  box.append(
+    row(
+      'Save a backup automatically',
+      toggle(current.backup.enabled && granted, (v) => {
+        void (async () => {
+          if (v) {
+            /*
+             * The permission is requested from THIS click, and the switch only moves if it is
+             * granted. `permissions.request` needs a user gesture, so it has to happen here
+             * rather than in the background -- and a switch left on while the browser has
+             * refused the permission would be a control that promises something it cannot do.
+             */
+            const ok = await browser.permissions
+              .request({ permissions: ['downloads'] })
+              .catch(() => false);
+            if (!ok) {
+              repaint();
+              return;
+            }
+          }
+          await write({ backup: { ...current.backup, enabled: v } });
+          repaint();
+        })();
+      }),
+      granted || !current.backup.enabled
+        ? 'A ZIP into your Downloads folder, on a timer. It asks Firefox for permission to ' +
+            'save files the first time you switch it on, and nothing else in the extension ' +
+            'uses that permission.'
+        : 'Firefox has withdrawn permission to save files, so this cannot run. Switch it off ' +
+            'and on again to ask for it back.',
+    ),
+    row(
+      'How often',
+      number(
+        current.backup.everyHours,
+        MIN_HOURS,
+        MAX_HOURS,
+        'hours',
+        (v) => void write({ backup: { ...current.backup, everyHours: v } }).then(repaint),
+      ),
+      `Three files are kept, written in turn — chevalet-note-auto-1.zip to -${RING}.zip — so ` +
+        'the newest is never the only one you have. Older runs overwrite the oldest of the ' +
+        'three; nothing else is deleted. Does nothing while the switch above is off.',
+    ),
+  );
+
+  const now = h('button', { type: 'button', class: 'btn' }, 'Back up now');
+  const said = h('span', { class: 'srow-note' });
+  // Hidden until there is something to say. An always-present empty row draws a dashed rule
+  // across the sheet for nothing, which is how a settings page starts to look unfinished.
+  const saidRow = h('div', { class: 'srow is-quiet' }, h('div', { class: 'srow-text' }, said));
+  saidRow.hidden = true;
+  const say = (text: string): void => {
+    said.textContent = text;
+    saidRow.hidden = false;
+  };
+  now.addEventListener('click', () => {
+    void (async () => {
+      now.disabled = true;
+      say('Working…');
+      const reply = (await browser.runtime.sendMessage({ t: 'backup/run' }).catch(() => null)) as {
+        ok?: boolean;
+        data?: BackupState;
+      } | null;
+      now.disabled = false;
+      const state = reply?.data;
+      if (!state) say('The background did not answer.');
+      else if (!state.ok) say(state.error ?? 'It failed.');
+      else if (state.notes === 0) say('Nothing to back up.');
+      else {
+        say(
+          `Saved ${state.notes} note${state.notes === 1 ? '' : 's'} to ${backupFilename(state.slot)}.`,
+        );
+      }
+    })();
+  });
+
+  box.append(
+    row(
+      'Run one now',
+      h('div', { class: 'sbtn-row' }, now),
+      // Deliberately the same code path as the alarm: a manual backup that works while the
+      // scheduled one is broken is the most misleading state this feature could be in.
+      last
+        ? `Last run ${new Date(last.at).toLocaleString()} — ${
+            last.ok
+              ? `${last.notes} note${last.notes === 1 ? '' : 's'}, ${Math.round(last.bytes / 1024)} kB, into ${backupFilename(last.slot)}`
+              : (last.error ?? 'failed')
+          }.`
+        : 'It has never run.',
+    ),
+  );
+  box.append(saidRow);
+
+  box.append(
+    h(
+      'p',
+      { class: 'ssec-note' },
+      'What this is not: it cannot choose the folder — the browser decides that — it cannot ' +
+        'run while Firefox is closed, and a file on the same disk is not an off-site backup. ' +
+        'It survives Refresh Firefox and uninstalling the extension. It does not survive the ' +
+        'disk failing.',
+    ),
+  );
+
+  return box;
+}
+
 function sectionBackup(): HTMLElement {
-  return h(
+  const box = h(
     'div',
     { class: 'ssec-body' },
     h(
       'p',
       { class: 'ssec-note' },
-      'Export ZIP in the bar above works now and needs no permission at all. It contains every ' +
+      'Export… in the bar above works now and needs no permission at all. It contains every ' +
         'note, its position, its style and its images, as one archive you can keep anywhere.',
     ),
+    h('p', { class: 'ssec-sub' }, 'Automatically'),
+  );
+  // The permission check and the last-run line are async; the section itself is not, so the
+  // rows are appended when they arrive rather than making every section async for one of them.
+  const slot = h('div');
+  box.append(slot);
+  void backupRows().then((rows) => slot.replaceWith(rows));
+  box.append(h('p', { class: 'ssec-sub' }, 'Other'));
+  box.append(
     row(
       'Check for a new version once a day',
       toggle(current.autoCheckUpdates, (v) => void write({ autoCheckUpdates: v })),
@@ -518,6 +700,7 @@ function sectionBackup(): HTMLElement {
         'only for now — the translation exists, the cabinet has not been wired to it yet.',
     ),
   );
+  return box;
 }
 
 // --------------------------------------------------------------------- keys
