@@ -150,6 +150,8 @@ export interface NoteInit {
   locked?: boolean;
   ink?: { strokes: InkStroke[]; w: number; h: number };
   name?: string;
+  /** Where it shows. `other` is a scope kind the picker does not offer. */
+  scope?: 'url' | 'domain' | 'global' | 'other';
 }
 
 export interface NoteHost {
@@ -183,6 +185,14 @@ export interface NoteHost {
   onText?(note: NoteView, text: string): void;
   /** The person renamed the note. An empty string means they cleared the name. */
   onName?(note: NoteView, name: string): void;
+  /**
+   * The person changed where the note shows: this page, this whole site, everywhere.
+   *
+   * A KIND, not a scope. The background computes the scope from the URL the note is already
+   * attached to -- a content script handing over a scope would be a page reaching into
+   * another page's notes.
+   */
+  onScope?(note: NoteView, kind: 'url' | 'domain' | 'global'): void;
   onStyle?(note: NoteView, overrides: Partial<NoteStyle>): void;
   onSaveDefault?(note: NoteView, style: NoteStyle): void;
   /** Store a pasted or dropped image and return the id to reference it by. */
@@ -208,6 +218,7 @@ export class NoteView implements Animatable {
   private readonly previewEl: HTMLDivElement;
   private editing = false;
   private noteName: string;
+  private noteScope: 'url' | 'domain' | 'global' | 'other';
   private readonly nameEl: HTMLDivElement;
   private readonly grainEl: HTMLCanvasElement;
   private readonly paperPath: SVGPathElement;
@@ -255,6 +266,7 @@ export class NoteView implements Animatable {
     this.host = host;
     this.overrides = { ...init.style };
     this.noteName = (init.name ?? '').trim().slice(0, 120);
+    this.noteScope = init.scope ?? 'url';
     this.hostDefaults = host.defaults;
     this.style = resolveStyle(this.overrides, this.hostDefaults);
     this.w = init.w;
@@ -569,6 +581,11 @@ export class NoteView implements Animatable {
       style: () => this.style,
       name: () => this.noteName,
       rename: (next) => this.setName(next),
+      scope: () => this.noteScope,
+      setScope: (kind) => {
+        this.noteScope = kind;
+        this.host.onScope?.(this, kind);
+      },
       overrides: () => this.overrides,
       defaults: () => this.hostDefaults ?? (DEFAULT_STYLE as NoteStyle),
       change: (patch) => this.setStyle(patch),

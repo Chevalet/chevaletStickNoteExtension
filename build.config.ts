@@ -239,7 +239,7 @@ async function copyFontLicences(): Promise<void> {
  * page's own scripts, and exists solely to hold a `beforeunload` listener. It has to stay
  * small enough that its cost is not measurable. Currently 0.3 kB.
  *
- * `cs/renderer.js` — 36 kB, raised five times, each with the measurement in hand.
+ * `cs/renderer.js` — 38 kB, raised six times, each with the measurement in hand.
  *
  * 24 -> 28 kB when anchoring moved onto this path (~3 kB gz for `anchor/` plus 1.7 kB
  * minified of `approx-string-match`). 28 -> 30 kB for undo/redo: `history.ts` is 3.1 kB
@@ -291,13 +291,36 @@ async function copyFontLicences(): Promise<void> {
  * stylesheet, and the rest is spread across the ink layer, `perfect-freehand`, the settings
  * panel, markdown, anchoring, history and formatting. Every one of those is the feature itself.
  *
+ * 36 -> 38 kB in 0.0.12, and the cut came first this time.
+ *
+ * Three things landed: the note's own strings going through `t()`, a picker for where a note
+ * shows, and hold-Alt to see through the notes. Measured at 36.3 kB against a 36 kB ceiling --
+ * over by three hundred bytes, which is exactly the situation this comment exists to make
+ * awkward.
+ *
+ * So the picker was rewritten before the number moved: three buttons and 25 lines of CSS
+ * became a `<select>`, which is what every other choice in that panel already is. That bought
+ * 0.2 kB and made the panel more consistent, and it was still 36.1 kB. The metafile says
+ * where the weight is and there is no fat left to trade:
+ *
+ *     src/cs/note/NoteView.ts     26.9 kB minified   the note itself
+ *     src/cs/styles.ts            19.6 kB            its stylesheet
+ *     src/cs/renderer.ts           7.7 kB            mounting, saving, the page listeners
+ *     src/cs/note/SettingsPanel.ts 6.2 kB            the panel
+ *     src/cs/note/ink.ts           5.2 kB            drawing
+ *     perfect-freehand             4.6 kB            the stroke geometry
+ *
+ * The i18n split already took 11 kB gz OUT of this bundle by moving the catalogue behind a
+ * table a note actually uses, so the direction of travel is right. 38 kB, and the next
+ * feature argues again.
+ *
  * Before raising it again: re-measure with an esbuild metafile (see the tail of this comment's
  * history for how), ask the same question, and if the answer is again "cannot be split", say so
  * here rather than moving the number quietly.
  */
 export const BUDGETS_GZ: Readonly<Record<string, number>> = {
   'cs/guard.js': 1_024,
-  'cs/renderer.js': 36 * 1024,
+  'cs/renderer.js': 38 * 1024,
   /*
    * The extension's own pages, which had no ceiling at all until 0.0.12.
    *

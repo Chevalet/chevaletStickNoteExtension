@@ -19,6 +19,10 @@ export interface SettingsPanelHost {
   name(): string;
   /** Rename it. '' clears the name. */
   rename(next: string): void;
+  /** Where the note shows. */
+  scope(): 'url' | 'domain' | 'global' | 'other';
+  /** Move it. The background works out the scope from the note's own page. */
+  setScope(kind: 'url' | 'domain' | 'global'): void;
   /** The note's own overrides, so the panel can show what is customised. */
   overrides(): Partial<NoteStyle>;
   /** The user's defaults, for the "follows default" markers. */
@@ -80,7 +84,7 @@ export class SettingsPanel {
        * rather than how it looks -- and because someone opening this panel to name a note
        * should not have to read past eight colour controls to find the box.
        */
-      this.section(t('noteName'), [this.nameRow()]),
+      this.section(t('noteName'), [this.nameRow(), this.scopeRow()]),
 
       this.section(t('setPaper'), [
         this.swatches(),
@@ -206,6 +210,57 @@ export class SettingsPanel {
     input.addEventListener('change', () => this.host.rename(input.value));
 
     wrap.append(label, input);
+    return wrap;
+  }
+
+  /**
+   * Where the note shows: this page, this whole site, every page.
+   *
+   * Next to the name because both answer "what is this note", rather than "what does it look
+   * like" -- which is everything else in this panel.
+   *
+   * `Scope` has five kinds and this offers three. `prefix` needs a path to cut at and `tab`
+   * needs a concept most people do not have; a note already carrying one of those shows its
+   * choice as unavailable rather than being silently rewritten by opening this panel.
+   */
+  private scopeRow(): HTMLElement {
+    const wrap = document.createElement('label');
+    wrap.className = 'set-row';
+    const label = document.createElement('span');
+    label.className = 'set-label';
+    label.textContent = t('noteWhere');
+
+    /*
+     * A select, not three buttons.
+     *
+     * The three-button version cost 0.3 kB more than the content-script budget allowed, and
+     * the budget's rule is to cut or argue with a measurement rather than nudge the number.
+     * There was something to cut: every other choice in this panel -- font, direction, align,
+     * tape, shadow -- is a select, so three buttons here was the odd one out as well as the
+     * expensive one. Consistency and 25 lines of CSS, for free.
+     */
+    const sel = document.createElement('select');
+    const current = this.host.scope();
+    for (const [kind, text] of [
+      ['url', t('noteWhereUrl')],
+      ['domain', t('noteWhereDomain')],
+      ['global', t('noteWhereGlobal')],
+    ] as const) {
+      const o = document.createElement('option');
+      o.value = kind;
+      o.textContent = text;
+      o.selected = current === kind;
+      sel.append(o);
+    }
+    // A note carrying `prefix` or `tab` -- kinds the picker does not offer -- shows nothing
+    // selected rather than being silently rewritten by the panel opening.
+    if (current === 'other') sel.selectedIndex = -1;
+    sel.addEventListener('change', () => {
+      const kind = sel.value;
+      if (kind === 'url' || kind === 'domain' || kind === 'global') this.host.setScope(kind);
+    });
+
+    wrap.append(label, sel);
     return wrap;
   }
 

@@ -826,6 +826,7 @@ async function keyRows(): Promise<HTMLElement> {
     table(t('keyOnAnyPage'), [
       [t('keyAltDoubleClick'), t('keyAltDouble')],
       [t('keyRightClickCap'), t('keyRightClick')],
+      [t('keyHoldAlt'), t('keySeeThrough')],
     ]),
 
     h('p', { class: 'ssec-note' }, t('keyNoCtrlU')),

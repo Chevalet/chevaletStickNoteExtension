@@ -193,6 +193,8 @@ function mount(): Host {
   sheet.replaceSync(SHEET_CSS);
   host = createHost(sheet);
   host.root.prepend(createSharedDefs());
+  // Armed here rather than at boot: a page with no notes gets no listeners at all.
+  armGhost();
   return host;
 }
 
@@ -304,6 +306,15 @@ function mountNote(wire: NoteWire): NoteView {
       // arrived and was dropped. See the comment on NoteWire.ink.
       ...(wire.ink ? { ink: wire.ink } : {}),
       ...(wire.name ? { name: wire.name } : {}),
+      /*
+       * The kind only. `NoteWire` has carried the whole `Scope` since the first release, so
+       * there was nothing to add to the wire -- the picker just needed to be told which of
+       * three it is looking at.
+       */
+      scope:
+        wire.scope.kind === 'url' || wire.scope.kind === 'domain' || wire.scope.kind === 'global'
+          ? wire.scope.kind
+          : 'other',
     },
     {
       loop,
@@ -335,6 +346,13 @@ function mountNote(wire: NoteWire): NoteView {
         }),
       onText: (_n, text) => save(wire.id, { body: { text } }),
       onName: (_n, name) => save(wire.id, { name }),
+      /*
+       * Not through `save`: the scope is not a patch a page is allowed to write. The
+       * background derives it from the URL the note is already on. See `note/scope`.
+       */
+      onScope: (_n, kind) => {
+        void ask({ t: 'note/scope', id: wire.id, kind });
+      },
       onStyle: (_n, overrides) => save(wire.id, { style: overrides }),
       onAsset: async (_n, file, name) => {
         const bytes = await file.arrayBuffer();
@@ -705,6 +723,46 @@ function cycleFocus(): void {
   if (all.length === 0) return;
   focusIndex = (focusIndex + 1) % all.length;
   all[focusIndex]?.el.focus({ preventScroll: false });
+}
+
+/**
+ * Hold Alt to see through the notes.
+ *
+ * Two listeners on someone else's window, which is a cost this project counts: both are
+ * passive, neither calls `preventDefault`, and they do nothing at all until a note exists --
+ * `mount()` is what arms them. The alternative was a setting nobody would find for a gesture
+ * that has to be momentary to be useful.
+ *
+ * `blur` matters as much as `keyup`: Alt+Tab away with the key down and the keyup never
+ * arrives, so the notes would stay ghosted until the next Alt press. Anyone who has held a
+ * modifier in a browser and watched an interface stick knows what that feels like.
+ */
+let ghostArmed = false;
+
+function armGhost(): void {
+  if (ghostArmed) return;
+  ghostArmed = true;
+  const set = (on: boolean): void => {
+    // One attribute on the host, which `:host([data-ghost])` in the stylesheet was written for
+    // and nothing had ever set. Covers both layers at once.
+    if (on) host?.rootEl.setAttribute('data-ghost', '');
+    else host?.rootEl.removeAttribute('data-ghost');
+  };
+  window.addEventListener('keydown', (e) => {
+    // Not while typing in a note: Alt is part of plenty of chords, and a note that faded
+    // while you reached for one would be absurd.
+    if (e.key === 'Alt' && !e.repeat && !isEditingSomewhere()) set(true);
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.key === 'Alt') set(false);
+  });
+  window.addEventListener('blur', () => set(false));
+}
+
+/** Is a note's body focused? Then the modifier belongs to whatever is being typed. */
+function isEditingSomewhere(): boolean {
+  for (const view of views.values()) if (view.isEditing) return true;
+  return false;
 }
 
 // A bfcache restore fires no navigation event the background can see, so the content script

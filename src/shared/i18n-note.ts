@@ -19,6 +19,14 @@ import { type Entry, makeT } from './i18n-core.ts';
 export { isRtl, type Lang, setLang } from './i18n-core.ts';
 
 export const NOTE_CATALOGUE = {
+  noteWhere: { en: 'Shows on', fa: 'نمایش روی' },
+  noteWhereUrl: { en: 'This page', fa: 'همین صفحه' },
+  noteWhereDomain: { en: 'This whole site', fa: 'کل این سایت' },
+  noteWhereGlobal: { en: 'Every page', fa: 'همهٔ صفحه‌ها' },
+  noteWhereNote: {
+    en: 'A note on the whole site appears on every page of it, at the same place on each.',
+    fa: 'نوتی که روی کل سایت باشد، در همهٔ صفحه‌های آن و در همان جای هر صفحه ظاهر می‌شود.',
+  },
   noteEraseAll: { en: 'Erase everything', fa: 'پاک کردن همه' },
   noteName: { en: 'Name', fa: 'نام' },
   noteNamePlaceholder: { en: 'Untitled', fa: 'بی‌نام' },

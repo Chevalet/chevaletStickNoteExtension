@@ -25,7 +25,9 @@
     "sign": "node tools/sign.mjs",
     "build:test": "pnpm build && node --experimental-strip-types tools/build-test-ext.ts",
     "spike:ext": "node spikes/firefox-extension.mjs",
-    "spike:persist": "node spikes/firefox-persist.mjs"
+    "spike:persist": "node spikes/firefox-persist.mjs",
+    "spike:pages": "node spikes/firefox-pages.mjs",
+    "spike:ghost": "node spikes/firefox-ghost.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.0",

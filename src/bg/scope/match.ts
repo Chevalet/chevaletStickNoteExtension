@@ -173,6 +173,43 @@ function ensureSlash(prefix: string): string {
 }
 
 /** Build a default `url` scope for a page, honouring the site's query preset. */
+/**
+ * The three places a note can live, as a person would put it.
+ *
+ * `Scope` has five kinds and only `url` was ever reachable: `createFor` derives the scope from
+ * the sender's URL and nothing could change it afterwards, because `sanitizePatch` refuses a
+ * scope from a content script -- correctly, since a page must not be able to move a note onto
+ * another page's notes. So four kinds sat in the type, and `notesForContext` looked all of
+ * them up on every page load, for records that could not exist.
+ *
+ * These three need no extra input beyond the URL the note is already on, which is why they are
+ * the three offered. `prefix` needs a path to cut at and `tab` needs a concept most people do
+ * not have; both stay in the type, unoffered, and `resolveDuplicate` above says what that
+ * means for it.
+ */
+export function scopeFor(kind: 'url' | 'domain' | 'global', url: string): Scope | null {
+  if (kind === 'global') return { kind: 'global' };
+  if (kind === 'url') return defaultScopeFor(url);
+  const parsed = normalizeUrlFull(url);
+  if (!parsed) return null;
+  return {
+    kind: 'domain',
+    registrable: registrableDomain(parsed.hostname),
+    // Every note on `blog.example.com` shows on `www.example.com` too. That is what "this
+    // whole site" means to a person, and the alternative -- one note per subdomain -- is the
+    // page scope they already have.
+    includeSubdomains: true,
+  };
+}
+
+/** Which of the three a stored scope is, for showing the current choice. */
+export function scopeKindOf(scope: Scope): 'url' | 'domain' | 'global' | 'other' {
+  if (scope.kind === 'url' || scope.kind === 'domain' || scope.kind === 'global') {
+    return scope.kind;
+  }
+  return 'other';
+}
+
 export function defaultScopeFor(url: string): Scope | null {
   const parsed = normalizeUrlFull(url);
   if (!parsed) return null;

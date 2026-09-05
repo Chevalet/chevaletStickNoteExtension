@@ -1,4 +1,19 @@
 {
+  "noteWhere": {
+    "message": "Shows on"
+  },
+  "noteWhereUrl": {
+    "message": "This page"
+  },
+  "noteWhereDomain": {
+    "message": "This whole site"
+  },
+  "noteWhereGlobal": {
+    "message": "Every page"
+  },
+  "noteWhereNote": {
+    "message": "A note on the whole site appears on every page of it, at the same place on each."
+  },
   "noteEraseAll": {
     "message": "Erase everything"
   },
@@ -995,6 +1010,12 @@
   },
   "setBackupNotNote": {
     "message": "What this is not: it cannot choose the folder — the browser decides that — it cannot run while Firefox is closed, and a file on the same disk is not an off-site backup. It survives Refresh Firefox and uninstalling the extension. It does not survive the disk failing."
+  },
+  "keyHoldAlt": {
+    "message": "Hold Alt"
+  },
+  "keySeeThrough": {
+    "message": "See through the notes, and click the page under them"
   },
   "keyArrows": {
     "message": "Arrows"

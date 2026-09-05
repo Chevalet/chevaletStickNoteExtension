@@ -98,7 +98,16 @@ export type CsToBg =
    * filesystem. A content script runs in a compromised page's process; a path it supplies is
    * untrusted input, and "read me ../manifest.json" is the obvious thing to try.
    */
-  | { t: 'font/bytes'; file: string };
+  | { t: 'font/bytes'; file: string }
+  /*
+   * "Show this note on this page / this whole site / every page."
+   *
+   * Sent by a note's own settings panel, and by the cabinet, which is why it appears in both
+   * unions. A KIND, never a scope: the background derives the scope from the URL the note is
+   * already attached to, because a page handing over a scope would be a page reaching into
+   * another page's notes -- the reason `sanitizePatch` has always dropped one.
+   */
+  | { t: 'note/scope'; id: NoteId; kind: 'url' | 'domain' | 'global' };
 
 /** Sent by the options page and the cabinet, not by a content script. */
 export type UiToBg =
@@ -129,7 +138,16 @@ export type UiToBg =
    * `note/touched` exists: only the background can tell the open tabs, and a note renamed in
    * the cabinet should show its new name in its own header without a reload.
    */
-  | { t: 'note/rename'; id: NoteId; name: string };
+  | { t: 'note/rename'; id: NoteId; name: string }
+  /*
+   * Move a note between "this page", "this whole site" and "everywhere".
+   *
+   * A `kind`, never a scope. The background computes the scope itself from the URL the note is
+   * already attached to, because a content script must not be able to hand over a scope: that
+   * would let a page put its notes onto another page's, which is exactly why `sanitizePatch`
+   * drops a scope and always has.
+   */
+  | { t: 'note/scope'; id: NoteId; kind: 'url' | 'domain' | 'global' };
 
 // --------------------------------------------------------------------------- bg -> cs
 

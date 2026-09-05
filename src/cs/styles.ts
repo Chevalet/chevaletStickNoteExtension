@@ -22,6 +22,8 @@ export const SHEET_CSS = /* css */ `
 }
 .lyr-pin { position: fixed; }
 
+
+
 /* ---------------------------------------------------------------- the note */
 
 .note {
@@ -618,7 +620,31 @@ export const SHEET_CSS = /* css */ `
 
 /* ------------------------------------------------------------------ global */
 
-:host([data-ghost]) .note { pointer-events: none; opacity: .35; }
+/*
+ * Hold Alt to read the page under a note.
+ *
+ * A note is opaque paper on top of someone's words, and the words underneath are the reason
+ * the note is there. While Alt is held the notes go translucent and stop taking the pointer,
+ * so a click lands on the page: a link under a note is clickable.
+ *
+ * This selector was already here, and nothing set the attribute -- the half-built
+ * ghostModifier setting and toggle-ghost command it was written for were both removed
+ * earlier in 0.0.12 for being unreachable. Building a second mechanism next to it (a class on
+ * each layer) is how you end up with two ways to do one thing, so the gesture drives THIS.
+ *
+ * pointer-events has to be on the NOTE, not on the layer: the layer is already none --
+ * that is how a click between notes reaches the page -- and .note sets auto on itself, so
+ * a rule on the parent does nothing however important it is. Measured: with the layer rule
+ * alone, spikes/firefox-ghost.mjs reports the note still owns the point.
+ */
+:host([data-ghost]) .note {
+  pointer-events: none;
+  opacity: .28;
+  transition: opacity 90ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  :host([data-ghost]) .note { transition: none; }
+}
 
 @media print { :host { display: none; } }
 

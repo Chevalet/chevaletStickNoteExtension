@@ -64,7 +64,7 @@ import {
   sanitizeText,
   sanitizeUi,
 } from './msg/sanitize.ts';
-import { defaultScopeFor, matchContext } from './scope/match.ts';
+import { defaultScopeFor, matchContext, scopeFor, scopeKindOf } from './scope/match.ts';
 import { isEnabledFor, loadSettings, type Settings, saveSettings } from './settings.ts';
 import { forgetTab, getTabFlags, resolveTabKey, setTabEnabled } from './tabs/identity.ts';
 
@@ -577,6 +577,41 @@ async function onMessage(
       return okReply({ name: result.note.name ?? '' });
     }
 
+    case 'note/scope': {
+      const m = msg as { id: NoteId; kind?: unknown };
+      const kind = m.kind === 'domain' || m.kind === 'global' ? m.kind : 'url';
+      const record = await getNote(m.id);
+      if (!record) return errReply('NOT_FOUND');
+
+      /*
+       * The URL comes from the RECORD, never from the message.
+       *
+       * `context.url` is what the page was when the note was made; the index key is the
+       * fallback for a note old enough to predate that field. Either way it is a URL this
+       * extension wrote down itself, so a page cannot use this to reach another page's notes.
+       */
+      const url = record.context?.url ?? urlFromKey(record.ix_urlKeys[0] ?? '');
+      const scope = url ? scopeFor(kind, url) : null;
+      if (!scope) return errReply('READONLY', 'this note has no page to scope it to');
+
+      const result = await patchNote(m.id, { scope });
+      if (!result.ok) return errReply('NOT_FOUND');
+      /*
+       * Every tab hears about it, because the answer to "does this note belong here" has
+       * changed for all of them at once: widening a note to the whole site should make it
+       * appear on the other tabs of that site without a reload, and narrowing it should make
+       * it vanish from them.
+       */
+      for (const tabId of tabRuntime.keys()) {
+        const runtime = await browser.tabs
+          .get(tabId)
+          .then((tab) => tab.url ?? '')
+          .catch(() => '');
+        if (runtime) void tell(tabId, { t: 'scope/recheck', url: runtime });
+      }
+      return okReply({ kind: scopeKindOf(result.note.scope) });
+    }
+
     case 'note/touched': {
       const id = (msg as { id: NoteId }).id;
       const record = await getNote(id);
@@ -750,6 +785,19 @@ function sanitizePatch(patch: NotePatch): NotePatch {
   // `scope` is deliberately NOT copied. A content script does not get to move a note to
   // another page's notes; that is the manager's job, and it runs in our own context.
   return out;
+}
+
+/**
+ * A URL out of an index key, for a note old enough to have no stored context.
+ *
+ * The key is `<state> <normalised url>`, and the normalised form drops the scheme -- so this
+ * puts https back on. Good enough for deciding a registrable domain, which is all it is for.
+ */
+function urlFromKey(key: string): string {
+  const sep = key.indexOf(' ');
+  const body = sep >= 0 ? key.slice(sep + 1) : key;
+  if (!body) return '';
+  return /^https?:\/\//.test(body) ? body : `https://${body.replace(/^\/\//, '')}`;
 }
 
 /** Note the moment of a write, so the guard's "most recently edited" ordering is real. */

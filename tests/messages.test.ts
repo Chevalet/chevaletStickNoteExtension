@@ -286,6 +286,101 @@ describe('a single-page app changing its route', () => {
   });
 });
 
+describe('note/scope', () => {
+  /**
+   * `Scope` has five kinds and only `url` was ever reachable: `createFor` derives the scope
+   * from the sender's URL and `sanitizePatch` refuses one from a content script -- correctly,
+   * because a page must not be able to move a note onto another page's notes. So four kinds
+   * sat in the type while `notesForContext` looked all of them up on every page load.
+   *
+   * Three of them are a feature now: this page, this whole site, every page. The kind comes
+   * over the wire and the background derives the scope itself, from the URL the note is
+   * already attached to.
+   */
+  const PAGE = 'https://example.com/article';
+
+  it('widens a note to the whole site, and keeps it findable there', async () => {
+    const note = await createOne();
+    const reply = (await send({ t: 'note/scope', id: note.id, kind: 'domain' }, from7)) as Reply<{
+      kind: string;
+    }>;
+    expect(reply.ok && reply.data.kind).toBe('domain');
+
+    // The point of the feature: another page on the same site now finds it.
+    const elsewhere = (await send(
+      { t: 'notes/forContext', url: 'https://example.com/somewhere/else' },
+      { tab: { id: 7, url: 'https://example.com/somewhere/else' } },
+    )) as Reply<{ notes: NoteWire[] }>;
+    expect(elsewhere.ok && elsewhere.data.notes.map((n) => n.id)).toContain(note.id);
+  });
+
+  it('narrows it back to the page it was made on', async () => {
+    const note = await createOne();
+    await send({ t: 'note/scope', id: note.id, kind: 'domain' }, from7);
+    await send({ t: 'note/scope', id: note.id, kind: 'url' }, from7);
+
+    const elsewhere = (await send(
+      { t: 'notes/forContext', url: 'https://example.com/somewhere/else' },
+      { tab: { id: 7, url: 'https://example.com/somewhere/else' } },
+    )) as Reply<{ notes: NoteWire[] }>;
+    expect(elsewhere.ok && elsewhere.data.notes).toEqual([]);
+
+    const home = (await send({ t: 'notes/forContext', url: PAGE }, from7)) as Reply<{
+      notes: NoteWire[];
+    }>;
+    expect(home.ok && home.data.notes.map((n) => n.id)).toContain(note.id);
+  });
+
+  it('puts a note on every page when asked', async () => {
+    const note = await createOne();
+    await send({ t: 'note/scope', id: note.id, kind: 'global' }, from7);
+    const other = (await send(
+      { t: 'notes/forContext', url: 'https://a-completely-different.example/page' },
+      { tab: { id: 7, url: 'https://a-completely-different.example/page' } },
+    )) as Reply<{ notes: NoteWire[] }>;
+    expect(other.ok && other.data.notes.map((n) => n.id)).toContain(note.id);
+  });
+
+  it('takes a KIND and never a scope, whatever the message contains', async () => {
+    /*
+     * The security property. A content script that sends its own scope must not be able to
+     * file a note under someone else's page -- so the handler reads only `kind`, and derives
+     * the rest from the note's stored context.
+     */
+    const note = await createOne();
+    await send(
+      {
+        t: 'note/scope',
+        id: note.id,
+        kind: 'url',
+        scope: { kind: 'url', urlKey: 'active https://victim.example/inbox' },
+      },
+      from7,
+    );
+    const victim = (await send(
+      { t: 'notes/forContext', url: 'https://victim.example/inbox' },
+      { tab: { id: 7, url: 'https://victim.example/inbox' } },
+    )) as Reply<{ notes: NoteWire[] }>;
+    expect(victim.ok && victim.data.notes).toEqual([]);
+  });
+
+  it('says so when the note is gone', async () => {
+    const reply = await send({ t: 'note/scope', id: 'n_nope', kind: 'domain' }, from7);
+    expect(reply).toMatchObject({ ok: false, code: 'NOT_FOUND' });
+  });
+
+  it('tells the open tabs, so a widened note appears without a reload', async () => {
+    const note = await createOne();
+    await send({ t: 'hello', url: PAGE, protocolV: 1 }, from7);
+    stub.sent.length = 0;
+    await send({ t: 'note/scope', id: note.id, kind: 'domain' }, from7);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(
+      stub.sent.filter((m) => (m.message as { t?: string }).t === 'scope/recheck').length,
+    ).toBeGreaterThan(0);
+  });
+});
+
 describe('registration', () => {
   it('registers content scripts rather than declaring them in the manifest', async () => {
     const { syncRegistrations } = await import('~/bg/inject.ts');

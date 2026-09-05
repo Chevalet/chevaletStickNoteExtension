@@ -570,6 +570,11 @@ export const CATALOGUE = {
     en: 'What this is not: it cannot choose the folder — the browser decides that — it cannot run while Firefox is closed, and a file on the same disk is not an off-site backup. It survives Refresh Firefox and uninstalling the extension. It does not survive the disk failing.',
     fa: 'این چه چیزی نیست: نمی‌تواند پوشه را انتخاب کند — مرورگر تصمیم می‌گیرد — وقتی فایرفاکس بسته است اجرا نمی‌شود، و فایلی روی همان دیسک بکاپ خارج از محل نیست. از Refresh Firefox و حذف افزونه جان سالم می‌برد. از خراب شدن دیسک نه.',
   },
+  keyHoldAlt: { en: 'Hold Alt', fa: 'نگه داشتن Alt' },
+  keySeeThrough: {
+    en: 'See through the notes, and click the page under them',
+    fa: 'دیدنِ صفحه از پشت نوت‌ها، و کلیک روی خودِ صفحه',
+  },
   keyArrows: { en: 'Arrows', fa: 'کلیدهای جهت' },
   keyAltArrows: { en: 'Alt + arrows', fa: 'Alt + کلیدهای جهت' },
   keyAltDoubleClick: { en: 'Alt + double-click', fa: 'Alt + دوبار کلیک' },
