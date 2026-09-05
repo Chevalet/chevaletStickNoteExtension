@@ -239,7 +239,7 @@ async function copyFontLicences(): Promise<void> {
  * page's own scripts, and exists solely to hold a `beforeunload` listener. It has to stay
  * small enough that its cost is not measurable. Currently 0.3 kB.
  *
- * `cs/renderer.js` — 34 kB, raised four times, each with the measurement in hand.
+ * `cs/renderer.js` — 36 kB, raised five times, each with the measurement in hand.
  *
  * 24 -> 28 kB when anchoring moved onto this path (~3 kB gz for `anchor/` plus 1.7 kB
  * minified of `approx-string-match`). 28 -> 30 kB for undo/redo: `history.ts` is 3.1 kB
@@ -271,10 +271,25 @@ async function copyFontLicences(): Promise<void> {
  * `selection.ts` is not purely additive, incidentally: `history.ts` re-exports its two tree
  * walks instead of carrying its own copies, so the net cost is a little under the 5.10 kB.
  *
- * The measured breakdown at 94.0 kB minified says there is no fat to cut instead — 25.5 kB is
- * NoteView, 16.3 kB is the stylesheet, and the rest is spread across the ink layer,
- * `perfect-freehand`, the settings panel, markdown, anchoring, history and formatting. Every
- * one of those is the feature itself.
+ * 34 -> 36 kB in 0.0.11, for two things a person reported and one they asked for. Measured,
+ * again with a metafile, against the same question -- is this needed on a page with no notes?
+ *
+ *     src/cs/renderer.ts        7.01 kB minified, up 0.71 kB.  `recheckScope`: when a
+ *                               single-page app changes route, work out which notes belong on
+ *                               the new URL. Needed the moment a note exists, and the note may
+ *                               be made a second after the page loads -- so no, it cannot wait.
+ *     src/cs/note/NoteView.ts   26.77 kB, up 0.62 kB.  A note's name: the field, the header
+ *                               line, the accessible label, and the two callbacks.
+ *     src/cs/styles.ts          18.73 kB, up 2.05 kB.  The name's row in the grid, the name
+ *                               box in the settings panel, and the three-row face.
+ *
+ * Total 101.5 kB minified, 33.7 kB gz. The ceiling goes to 36 rather than 34.5 for the same
+ * reason it went to 32 for images: moving this line by a few hundred bytes at a time is how a
+ * budget stops meaning anything. The next feature has headroom; the one after argues again.
+ *
+ * The breakdown says there is no fat to cut instead -- 26.8 kB is NoteView, 18.7 kB is the
+ * stylesheet, and the rest is spread across the ink layer, `perfect-freehand`, the settings
+ * panel, markdown, anchoring, history and formatting. Every one of those is the feature itself.
  *
  * Before raising it again: re-measure with an esbuild metafile (see the tail of this comment's
  * history for how), ask the same question, and if the answer is again "cannot be split", say so
@@ -282,5 +297,5 @@ async function copyFontLicences(): Promise<void> {
  */
 export const BUDGETS_GZ: Readonly<Record<string, number>> = {
   'cs/guard.js': 1_024,
-  'cs/renderer.js': 34 * 1024,
+  'cs/renderer.js': 36 * 1024,
 };

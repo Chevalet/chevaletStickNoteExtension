@@ -204,6 +204,7 @@ export const THEME_CSS = /* css */ `
 /* An explicit choice, which has to beat the media query in both directions. */
 :root[data-theme="dark"] {${DARK}  color-scheme: dark;
 }
+/* end of stylesheet */
 `;
 
 // ------------------------------------------------------------ reading it back

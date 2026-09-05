@@ -325,17 +325,6 @@ export class NoteView implements Animatable {
     header.className = 'handle';
     header.append(div('grip-dots'));
 
-    /*
-     * The note's own name, shown in the header when it has one.
-     *
-     * Display only. The header is the drag handle, and a click-to-edit field inside a drag
-     * handle is a fight between two gestures that people lose either way -- so naming happens
-     * in the note's settings panel and in the cabinet, and this is where the answer appears.
-     */
-    this.nameEl = div('note-name');
-    this.nameEl.hidden = true;
-    header.append(this.nameEl);
-
     const actions = div('actions');
     // 18px glyphs at 55% opacity were unhittable in practice -- the first person to try the
     // build could not delete a note at all. These are 26px targets with real icons.
@@ -374,7 +363,31 @@ export class NoteView implements Animatable {
     }
 
     this.inkInit = init.ink ?? null;
-    this.faceEl.append(this.grainEl, art, header, this.bodyEl, this.previewEl, curlWrap, grips);
+    /*
+     * The note's own name, on its own line under the toolbar.
+     *
+     * It started inside the header, beside the toolbar, and a real name did not fit: "Tuesday
+     * shopping" rendered as "Tuesda…" in the seven characters the toolbar left it. A name you
+     * cannot read is barely a name, so it gets the full width and the note grows by one line
+     * when -- and only when -- it has one.
+     *
+     * Display only. Naming happens in the note's settings panel and in the cabinet: a
+     * click-to-edit field inside a drag handle is a fight between two gestures that people
+     * lose either way.
+     */
+    this.nameEl = div('note-name');
+    this.nameEl.hidden = true;
+
+    this.faceEl.append(
+      this.grainEl,
+      art,
+      header,
+      this.nameEl,
+      this.bodyEl,
+      this.previewEl,
+      curlWrap,
+      grips,
+    );
     this.cardEl.append(this.faceEl);
     tilt.append(this.cardEl);
     note.append(this.shadowEl, tilt);

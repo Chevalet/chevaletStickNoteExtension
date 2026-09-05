@@ -8,7 +8,7 @@ next week and open the same URL: the note is still there, in the same place.
 
 Firefox extension. Offline, private, and yours to export.
 
-> **Status: 0.0.10, awaiting review on addons.mozilla.org.** A signed build is installable
+> **Status: 0.0.11, awaiting review on addons.mozilla.org.** A signed build is installable
 > now from the [releases page](https://github.com/Chevalet/chevaletStickNoteExtension/releases);
 > once the listing clears review, Firefox will update it for you on its own. The de-risking
 > spikes are still runnable — see [`docs/spikes.md`](docs/spikes.md).
@@ -96,7 +96,8 @@ one, or to quote the text you have selected.
 | arrows | Nudge — `Shift` ×10, `Ctrl` ×25. `Alt`+arrows resizes |
 
 **While writing** — the body of a note is markdown source, so `Ctrl+B` wraps the selection in
-`**` rather than styling it. Pressing it again unwraps.
+`**` rather than styling it. Pressing it again unwraps. Every keystroke is saved; you do not
+have to click away first.
 
 | | |
 |---|---|

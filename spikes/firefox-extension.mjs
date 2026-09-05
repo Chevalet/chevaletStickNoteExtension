@@ -82,6 +82,20 @@ const noteAt = async (x, y) =>
     return el ? el.tagName.toLowerCase().startsWith('chevalet-note-root-') : false;
   `);
 
+/**
+ * Both points at once, at every step.
+ *
+ * The first version of this file asserted one point at a time, and every line said YES while
+ * the final screenshot showed a note that should not have been there -- because by then it was
+ * somewhere the assertions were not looking. A trace of both points after every action is what
+ * found it.
+ */
+const where = async (label) => {
+  const at = await noteAt(700, 480);
+  const on = await noteAt(500, 620);
+  console.log(`       trace  ${label.padEnd(34)} at(700,480)=${at}  at(500,620)=${on}`);
+};
+
 const hostPresent = async () =>
   d.executeScript(`
     return [...document.querySelectorAll('*')].some(
@@ -122,12 +136,14 @@ try {
   await d.sleep(700);
 
   check('a note appears where it was made', await noteAt(AT.x, AT.y));
+  await where('made on the index');
 
   // ----------------------------------------------------- it survives a reload
 
   await d.navigate().refresh();
   await d.sleep(2200);
   check('and it is still there after a reload', await noteAt(AT.x, AT.y));
+  await where('after a reload');
 
   // ------------------------------------------------- the reported scope leak
 
@@ -144,6 +160,7 @@ try {
     'a note does not follow a pushState route change away from its page',
     (await noteAt(AT.x, AT.y)) === false,
   );
+  await where('routed to /blog');
 
   const ON_BLOG = { x: 500, y: 620 };
   await d
@@ -157,6 +174,7 @@ try {
   await d.actions().sendKeys('note on /blog itself').perform();
   await d.sleep(700);
   check('a note can be made on a route that was never loaded', await noteAt(ON_BLOG.x, ON_BLOG.y));
+  await where('made a note on /blog');
 
   // THE REPORT: /blog/what-is-defi must not show the note from /blog.
   await d.findElement(By.id('to-article')).click();
@@ -165,6 +183,7 @@ try {
     'and it does NOT appear on an article under it',
     (await noteAt(ON_BLOG.x, ON_BLOG.y)) === false,
   );
+  await where('routed to /blog/what-is-defi');
 
   await d.findElement(By.id('to-other')).click();
   await d.sleep(1600);
@@ -172,10 +191,12 @@ try {
     'nor on a sibling article',
     (await noteAt(ON_BLOG.x, ON_BLOG.y)) === false,
   );
+  await where('routed to a sibling');
 
   await d.findElement(By.id('to-section')).click();
   await d.sleep(1600);
   check('and it comes back on the route it belongs to', await noteAt(ON_BLOG.x, ON_BLOG.y));
+  await where('routed back to /blog');
 
   writeFileSync(
     'spikes/shots/extension.png',

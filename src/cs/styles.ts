@@ -81,7 +81,15 @@ export const SHEET_CSS = /* css */ `
   color: var(--cn-ink);
   font: var(--cn-size) / var(--cn-lh) var(--cn-font);
   display: grid;
-  grid-template-rows: 30px 1fr;
+  /*
+   * Three rows: the toolbar, the name if it has one, and the text.
+   *
+   * The middle row is auto, so it collapses to nothing when the name is hidden -- and the
+   * rows below are placed EXPLICITLY, because the name was added as a fourth child and grid
+   * auto-placement put it after the 1fr row: the name appeared along the bottom edge of the
+   * note. Seen in a screenshot, ten minutes after moving it out of the header.
+   */
+  grid-template-rows: 30px auto 1fr;
   isolation: isolate;
   /* Lets the toolbar respond to the NOTE's width rather than the viewport's -- a note is
      resized by hand, so a media query would be measuring the wrong thing entirely. */
@@ -234,6 +242,7 @@ export const SHEET_CSS = /* css */ `
 /* Above the ink layer, or turning drawing on makes the toolbar unclickable and there is no
    way to turn it off again. */
 .handle {
+  grid-row: 1;
   position: relative;
   z-index: 7;
   display: flex;
@@ -252,26 +261,25 @@ export const SHEET_CSS = /* css */ `
 /*
  * The note's own name, in the header, when it has one.
  *
- * min-width:0 and the ellipsis are not decoration: the header is a flex row that also holds
- * the toolbar, and a long name without them pushes the buttons out through the torn edge --
- * the same bug the note on .handle above describes. It shrinks to nothing before the
- * toolbar loses a single pixel, because a name you cannot fully read is a smaller problem
- * than a delete button you cannot reach.
+ * It was in the header first, next to the toolbar, and a real name did not fit: "Tuesday
+ * shopping" came out as "Tuesda..." in the seven characters that were left. Seen in a
+ * screenshot; no test would have minded.
  *
  * NO BACKTICKS IN THIS FILE. It is one CSS template literal; a backtick in a comment ends
  * the string, and the error surfaces as a nonsense type error twenty lines later. Third time.
  */
 .note-name {
-  flex: 0 1 auto;
-  min-width: 0;
+  grid-row: 2;
+  /* Its own line, under the toolbar, so a name has the whole width to be read in. */
+  padding: 4px 12px 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 700 11px/1 var(--cn-font);
+  font: 700 12px/1.3 var(--cn-font);
   letter-spacing: .01em;
-  opacity: .75;
-  padding: 0 2px;
-  /* Not selectable: a drag that starts on the name is still a drag. */
+  color: var(--cn-ink);
+  opacity: .82;
+  /* Not selectable: a note is dragged by its top, and a half-selected name is nobody's goal. */
   user-select: none;
 }
 
@@ -343,6 +351,7 @@ export const SHEET_CSS = /* css */ `
 /* -------------------------------------------------------------------- body */
 
 .body {
+  grid-row: 3;
   padding: 7px 11px 12px;
   overflow: auto;
   overscroll-behavior: contain;
@@ -487,6 +496,7 @@ export const SHEET_CSS = /* css */ `
 .note.is-editing .preview { display: none; }
 
 .preview {
+  grid-row: 3;
   padding: 7px 11px 12px;
   overflow: auto;
   overscroll-behavior: contain;
@@ -628,4 +638,5 @@ export const SHEET_CSS = /* css */ `
   }
   .paper, .grain, .ink, .curl, .shadow { display: none; }
 }
+/* end of stylesheet */
 `;

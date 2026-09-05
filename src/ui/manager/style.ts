@@ -762,4 +762,5 @@ dialog pre { max-height: 180px; overflow: auto; background: color-mix(in oklab, 
   .srow-ctl { justify-content: flex-start; }
   .swatches { justify-content: flex-start; }
 }
+/* end of stylesheet */
 `;
