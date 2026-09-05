@@ -15,9 +15,21 @@
 
 export interface ManifestInput {
   version: string;
+  /**
+   * A build for `spikes/firefox-extension.mjs` only, never for release.
+   *
+   * It declares `<all_urls>` in `permissions` so that a WebDriver-driven Firefox has host
+   * access without a click in browser chrome, which is where WebDriver cannot go. NOTHING
+   * else differs -- in particular there are still no static `content_scripts`, so the
+   * extension's own `syncRegistrations` does the registering and the harness exercises the
+   * real path rather than a shortcut around it.
+   *
+   * `pnpm build:test` writes this into `dist-test/`, which is gitignored and never packaged.
+   */
+  testHostAccess?: boolean;
 }
 
-export function manifest({ version }: ManifestInput): Record<string, unknown> {
+export function manifest({ version, testHostAccess }: ManifestInput): Record<string, unknown> {
   return {
     manifest_version: 3,
     name: '__MSG_extName__',
@@ -126,7 +138,7 @@ export function manifest({ version }: ManifestInput): Record<string, unknown> {
      */
     optional_permissions: ['downloads'],
 
-    host_permissions: [],
+    host_permissions: testHostAccess ? ['<all_urls>'] : [],
     optional_host_permissions: [
       '*://*/*',
       'file:///*',
@@ -153,15 +165,21 @@ export function manifest({ version }: ManifestInput): Record<string, unknown> {
       },
     },
 
-    web_accessible_resources: [
-      {
-        // Fonts are fetched by the content script and installed via `new FontFace(buffer)`,
-        // so they are never referenced by URL from the page -- but the fetch still needs the
-        // resource to be web-accessible.
-        resources: ['assets/fonts/*'],
-        matches: ['*://*/*'],
-      },
-    ],
+    /*
+     * NO web_accessible_resources, and that is a deliberate deletion.
+     *
+     * An `assets/fonts` entry open to every URL sat here from the original plan, with a
+     * comment saying the fetch needed it. It did not. The BACKGROUND reads the packaged file
+     * -- a background script may always read its own package, web-accessible or not -- and
+     * passes the bytes to the content script, which builds a FontFace from them and never
+     * touches a URL. Measured in spikes/firefox-fonts.mjs with the entry absent: the face
+     * loads and is in use, on an ordinary page and on one serving font-src 'none'.
+     *
+     * So the entry protected nothing and exposed something. Anything listed here is reachable
+     * from any page that learns the extension's UUID, and an extension with none of them
+     * cannot leak a file at all. This is the answer to give a reviewer who asks why a notes
+     * extension ships fonts.
+     */
 
     incognito: 'spanning',
   };

@@ -20,9 +20,17 @@
  * in it, and switching the theme visibly did nothing to them. Two rules now, and they are the
  * whole design:
  *
- *   1. NOTHING is black. Every dark surface is warm graphite -- a neutral grey with R > G > B
- *      by a few points, so it belongs to the same family as the manila and the cream. #1c1a17
- *      is the floor, and it is a colour rather than an absence.
+ *   1. NOTHING is black, and the second attempt means it. The first graphite ramp started at #1c1a17,
+ *      which is a colour by the numbers and still reads as black on a screen in a lit room --
+ *      reported, twice, as "much too dark". The floor is now #2e2b28, about two and a half
+ *      times as much light, which is the difference between a dark grey object and a hole.
+ *      Every dark surface is warm graphite: a neutral grey with R > G > B by a few points, so
+ *      it belongs to the same family as the manila and the cream.
+ *
+ *      Lifting the floor is not free, and the test enforces the part that pays for it: the
+ *      keylines and the raised surfaces had to come up with it, or a lighter page just makes
+ *      the panels on it disappear. `--edge` went #423c34 -> #55e4e44 for exactly
+ *      that reason -- at the old value it fell below the 1.4:1 floor against the new page.
  *
  *   2. Surfaces RISE by getting lighter, in both themes. The page is the floor; a card sits on
  *      it; the chrome bar above that; the cabinet carcass, which floats with a shadow, is the
@@ -103,26 +111,28 @@
 
 const DARK = `
   --ink: #ebe4d7;
-  --dim: #a49b8d;
-  --paper: #1c1a17;
-  --card: #24211d;
-  --bar: #302b25;
-  --drawer: #3a342d;
-  --drawer-sunk: #2a2620;
-  --edge: #423c34;
-  --line: color-mix(in oklab, var(--ink) 20%, transparent);
+  /* Lifted with the page. At #a49b8d this was 4.4956:1 on the new card colour -- four
+     thousandths under AA, caught by the test, and the sort of thing an eye never finds. */
+  --dim: #aaa193;
+  --paper: #2e2b28;
+  --card: #383430;
+  --bar: #423d38;
+  --drawer: #4b463f;
+  --drawer-sunk: #3c3833;
+  --edge: #554e44;
+  --line: color-mix(in oklab, var(--ink) 22%, transparent);
   /* Faint and warm rather than faint and cyan: a pale-blue ruling reads as blue biro on white
      paper, and as a steel-blue wash on graphite. */
   --rule-card: color-mix(in oklab, var(--ink) 13%, transparent);
   /* 5%, not the light theme's 8%: adding cream to graphite is a far bigger relative step than
      adding ink to white, so the same number is a faint guide on paper and a visible stripe in
      the dark. Measured by looking at the settings sheet, where 8% cut across the text. */
-  --rule-paper: color-mix(in oklab, var(--ink) 5%, transparent);
+  --rule-paper: color-mix(in oklab, var(--ink) 7%, transparent);
   --hi: #edd45a;
   --accent: #f4718c;
   --cyan: #8ad7e8;
   --ok: #5fc98d;
-  --manila: #766036;
+  --manila: #7d663a;
   --on-manila: #f5eddb;
   --on-drawer: #e9e2d5;
   --sel: #edd45a;

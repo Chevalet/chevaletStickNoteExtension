@@ -212,6 +212,14 @@ registration above, menus for the "Add a note here" context menu, alarms for the
 update check and the retention and backup jobs, and activeTab so the toolbar button works
 before any host permission is granted.
 
+web_accessible_resources is EMPTY -- the key is absent. Six typefaces ship in
+assets/fonts/, and the content script never sees their URLs: the background reads its own
+packaged file and passes the bytes, and the note builds a FontFace from the ArrayBuffer. That
+is not obfuscation, it is the only way that works -- a font face declared inside a shadow root
+is ignored, and a moz-extension URL in a stylesheet is fetched with the page's principal, so a
+site sending font-src 'self' blocks it. spikes/firefox-fonts.mjs measures all of it. Nothing
+in the package is reachable from a web page.
+
 optional_permissions declares "downloads", and nothing but the scheduled backup uses it
 (src/bg/jobs/autobackup.ts). It is requested from the click that turns that switch on, never at
 install, and the switch does not move if the request is declined. The file written is a ZIP of

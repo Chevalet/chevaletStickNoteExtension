@@ -18,6 +18,17 @@
  *      `arabic` and `latin` files with no `unicode-range` in its CSS, so whether the arabic
  *      file alone can render "1. اول" -- Latin digits, Arabic letters -- is a question about
  *      the font's cmap, and the honest way to answer it is to render both and measure.
+ *   4. Whether the bytes can get to the content script WITHOUT
+ *      `web_accessible_resources`. The manifest carried an `assets/fonts` entry open to every
+ *      URL, from the original plan, with a comment claiming the fetch needed it. If the
+ *      background can read its own packaged file and pass the bytes over a message, that entry
+ *      is an exposure surface protecting nothing, and it should go. The second probe below is
+ *      that exact shape: a background that fetches, a content script that only asks, and no
+ *      web-accessible resources at all.
+ *
+ *      (The first draft of this paragraph wrote that match pattern out in full, inside a block
+ *      comment. The slash-star in it closed the comment and the file would not parse. Same
+ *      family as a backtick in a CSS template literal, two files over.)
  *
  * The measurement is text width. A font that is not being used leaves the width at whatever
  * the fallback gives, and the fallback here is `monospace` -- deliberately, because a
@@ -32,7 +43,7 @@
  *   node spikes/firefox-fonts.mjs
  */
 
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Builder } from 'selenium-webdriver';
@@ -75,11 +86,36 @@ writeFileSync(
       version: '1.0',
       browser_specific_settings: { gecko: { id: 'font-probe@chevalet.test' } },
       permissions: ['<all_urls>'],
+      background: { scripts: ['bg.js'], persistent: false },
       content_scripts: [{ matches: ['<all_urls>'], js: ['cs.js'], run_at: 'document_idle' }],
+      // Deliberately absent: no web_accessible_resources. See point 4 in the header.
     },
     null,
     2,
   ),
+);
+
+// A real packaged font file, so the background has something to read.
+mkdirSync(join(dir, 'assets', 'fonts'), { recursive: true });
+copyFileSync(SUBSETS.arabic, join(dir, 'assets', 'fonts', 'packaged.woff2'));
+
+writeFileSync(
+  join(dir, 'bg.js'),
+  `
+// Exactly what src/bg/main.ts does for 'font/bytes': read our own packaged file and hand the
+// bytes over. A background script may fetch its own resources whether or not they are
+// web-accessible; the point of this probe is to prove that rather than assume it.
+browser.runtime.onMessage.addListener(async (msg) => {
+  if (!msg || msg.t !== 'font/bytes') return;
+  try {
+    const res = await fetch(browser.runtime.getURL('assets/fonts/' + msg.file));
+    if (!res.ok) return { ok: false, code: res.status };
+    return { ok: true, bytes: await res.arrayBuffer() };
+  } catch (e) {
+    return { ok: false, code: String(e) };
+  }
+});
+`,
 );
 
 /*
@@ -152,6 +188,27 @@ window.__fontProbe = async () => {
     for (const [name, text] of Object.entries(SAMPLES)) {
       out.widths['both-' + name] = measure(root, 'cnProbe-arabic, cnProbe-latin', text);
     }
+  }
+
+  /*
+   * THE SHIPPED PATH: bytes over a message from the background, no web_accessible_resources.
+   * If this works, the manifest's assets/fonts entry can go.
+   */
+  try {
+    const reply = await browser.runtime.sendMessage({ t: 'font/bytes', file: 'packaged.woff2' });
+    if (!reply || !reply.ok) {
+      out.wired = 'background refused: ' + JSON.stringify(reply);
+    } else {
+      const face = new FontFace('cnProbe-wired', reply.bytes);
+      await face.load();
+      document.fonts.add(face);
+      out.wired = 'ok';
+      for (const [name, text] of Object.entries(SAMPLES)) {
+        out.widths['wired-' + name] = measure(root, 'cnProbe-wired', text);
+      }
+    }
+  } catch (e) {
+    out.wired = 'threw: ' + String(e);
   }
 
   host.remove();
@@ -229,6 +286,14 @@ try {
     console.log(
       `    document.fonts.add: arabic=${r.added.arabic} latin=${r.added.latin}` +
         (r.errors.length ? `  errors: ${r.errors.join(' | ')}` : ''),
+    );
+    console.log(
+      `    bytes over a message, no web_accessible_resources: ${r.wired}` +
+        (r.wired === 'ok' && Math.abs(r.widths['wired-arabicOnly'] - r.widths['base-arabicOnly']) > 0.5
+          ? '  (and the face is in use)'
+          : r.wired === 'ok'
+            ? '  BUT THE FACE IS NOT IN USE'
+            : ''),
     );
 
     const w = r.widths;

@@ -229,10 +229,6 @@ export function setLang(explicit: Lang | ''): void {
   lang = ui.startsWith('fa') ? 'fa' : 'en';
 }
 
-export function currentLang(): Lang {
-  return lang;
-}
-
 export function isRtl(): boolean {
   return lang === 'fa';
 }

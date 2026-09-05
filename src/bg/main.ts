@@ -58,6 +58,7 @@ import {
 } from './msg/protocol.ts';
 import {
   DEFAULT_UI,
+  sanitizeName,
   sanitizeStyle,
   sanitizeTags,
   sanitizeText,
@@ -259,9 +260,22 @@ async function onTabUpdated(
     scheduleAllocation();
     return;
   }
-  if (change.status !== 'complete' || !tab.url) return;
+  /*
+   * A URL change with no page load: a single-page app calling pushState.
+   *
+   * This used to be dropped on the floor, because the handler returned unless
+   * `status === 'complete'` -- and an in-page route change usually reports no status at
+   * all. So the tab's note count went stale AND, far worse, the content script was never
+   * told, and went on showing the previous page's notes. That is the reported bug: a note
+   * made on /blog appearing on /blog/what-is-defi.
+   */
+  const routed = typeof change.url === 'string' && change.url.length > 0;
+  if (!routed && (change.status !== 'complete' || !tab.url)) return;
   await ready();
-  await refreshTab(tabId, tab.url, Boolean(tab.incognito));
+  const url = change.url ?? tab.url;
+  if (!url) return;
+  await refreshTab(tabId, url, Boolean(tab.incognito));
+  if (routed) void tell(tabId, { t: 'scope/recheck', url });
 }
 
 /** Recount a tab's notes and re-run the guard allocation. */
@@ -543,6 +557,41 @@ async function onMessage(
       return okReply(state);
     }
 
+    case 'note/rename': {
+      const m = msg as { id: NoteId; name?: unknown };
+      const result = await patchNote(m.id, { name: sanitizeName(m.name) ?? '' });
+      if (!result.ok) return errReply('NOT_FOUND');
+      for (const tabId of tabRuntime.keys()) {
+        void tell(tabId, {
+          t: 'note/renamed',
+          id: m.id,
+          name: result.note.name ?? '',
+        } as never);
+      }
+      return okReply({ name: result.note.name ?? '' });
+    }
+
+    case 'note/touched': {
+      const id = (msg as { id: NoteId }).id;
+      const record = await getNote(id);
+      if (!record) return errReply('NOT_FOUND');
+      /*
+       * To every tab with a renderer in it. Most of them will not have this note mounted and
+       * will ignore it; the one that does replaces its text, unless someone is typing in it,
+       * in which case their own words win.
+       */
+      for (const tabId of tabRuntime.keys()) {
+        void tell(tabId, {
+          t: 'note/changed',
+          id,
+          rev: record.rev,
+          patch: { body: { text: record.body.text } },
+          origin: 'other',
+        });
+      }
+      return okReply({ rev: record.rev });
+    }
+
     case 'command':
       await onCommand((msg as { name: string }).name);
       return okReply(null);
@@ -672,6 +721,11 @@ async function createFor(
 function sanitizePatch(patch: NotePatch): NotePatch {
   const out: NotePatch = {};
   if (patch.body !== undefined) out.body = { text: sanitizeText(patch.body.text) };
+  if (patch.name !== undefined) {
+    // `?? ''` on purpose: an empty name is how the box is cleared, and `sanitizeName` returns
+    // undefined for one. Dropping it here instead would make the name unclearable.
+    out.name = sanitizeName(patch.name) ?? '';
+  }
   if (patch.ui !== undefined) {
     // Sparse: only the keys actually sent are clamped and written.
     const full = sanitizeUi({ ...DEFAULT_UI, ...patch.ui });
@@ -716,6 +770,7 @@ function toWire(r: NoteRecord): NoteWire {
     tags: r.tags,
     updatedAt: r.updatedAt,
     ...(r.ink ? { ink: r.ink } : {}),
+    ...(r.name ? { name: r.name } : {}),
   };
 }
 

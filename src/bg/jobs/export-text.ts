@@ -110,6 +110,9 @@ export function toMarkdown(input: TextExportInput): string {
     out.push(`## ${group.title || group.page || 'Unfiled'}`, '');
     if (group.page) out.push(`<${group.page}>`, '');
     for (const note of group.notes) {
+      // A name the person gave it goes above the text as a heading. Without one there is
+      // nothing to invent: the first line of the note is already the first line of the note.
+      if (note.name) out.push(`### ${note.name}`, '');
       out.push(`*${stamp(note.updatedAt)}*`, '');
       out.push(note.body.text.trim(), '');
       if (note.ink?.strokes.length) {
@@ -194,6 +197,7 @@ section > .page { border:2px solid var(--edge); padding:14px; display:grid; gap:
 section > .page > .src { font-size:12px; color:var(--dim); word-break:break-all; margin:0; }
 article { background:var(--card); border:2px solid var(--edge); padding:12px 14px;
           box-shadow:3px 3px 0 color-mix(in oklab, var(--edge) 55%, transparent); }
+article > .named { margin:0 0 2px; font-size:1.15em; }
 article > .when { font-size:11.5px; color:var(--dim); margin:0 0 8px; }
 article :is(h1,h2,h3,h4) { font-size:1.05em; margin:.6em 0 .3em; }
 article > :first-child { margin-top:0; }
@@ -255,6 +259,7 @@ export function toHtml(input: TextExportInput): HtmlExport {
       }
       const dir = /[֐-ࣿ]/.test(note.body.text) ? ' dir="auto"' : '';
       parts.push(`<article${dir}>`);
+      if (note.name) parts.push(`<h3 class="named">${esc(note.name)}</h3>`);
       parts.push(`<p class="when">${esc(stamp(note.updatedAt))}</p>`);
       parts.push(bodyHtml(note, assets));
       if (note.ink?.strokes.length) {

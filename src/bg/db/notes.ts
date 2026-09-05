@@ -135,6 +135,8 @@ export async function countForContext(ctx: MatchContext): Promise<number> {
 
 export interface NotePatch {
   body?: { text: string };
+  /** A name the person gave the note. An empty string clears it. */
+  name?: string;
   ink?: NoteRecord['ink'];
   ui?: Partial<NoteUi>;
   anchor?: unknown;
@@ -229,6 +231,14 @@ export function patchNote(
       next.body = { format: 'md', text: patch.body.text };
       next.title = deriveTitle(patch.body.text);
       clock.body = now;
+    }
+    if (patch.name !== undefined) {
+      // Empty clears it. `name` is absent rather than blank when unnamed, so that "named?" is
+      // one question everywhere it is asked.
+      const trimmed = patch.name.trim().slice(0, 120);
+      if (trimmed) next.name = trimmed;
+      else delete next.name;
+      clock.name = now;
     }
     if (patch.ui) {
       next.ui = { ...current.ui, ...patch.ui };

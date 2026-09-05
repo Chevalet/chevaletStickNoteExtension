@@ -374,6 +374,19 @@ dialog::backdrop { background: var(--scrim); }
 .exp { display: grid; gap: 12px; }
 .exp > p:first-child { margin: 0; font-weight: 600; }
 .exp-scope { margin: 0; font-size: 12.5px; color: var(--dim); }
+/* The rename box. Same idiom as the search field, on paper rather than on the chrome. */
+.ren {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 7px 10px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--edge);
+  font: inherit;
+}
+.ren::placeholder { color: var(--dim); }
+.ren:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 .exp-row {
   display: grid;
   grid-template-columns: 148px 1fr;

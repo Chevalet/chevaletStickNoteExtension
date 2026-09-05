@@ -148,6 +148,7 @@ export interface NoteInit {
   collapsed?: boolean;
   locked?: boolean;
   ink?: { strokes: InkStroke[]; w: number; h: number };
+  name?: string;
 }
 
 export interface NoteHost {
@@ -179,6 +180,8 @@ export interface NoteHost {
   fontBytes?(file: string): Promise<ArrayBuffer | null>;
   /** The note's markdown source changed by something other than typing. */
   onText?(note: NoteView, text: string): void;
+  /** The person renamed the note. An empty string means they cleared the name. */
+  onName?(note: NoteView, name: string): void;
   onStyle?(note: NoteView, overrides: Partial<NoteStyle>): void;
   onSaveDefault?(note: NoteView, style: NoteStyle): void;
   /** Store a pasted or dropped image and return the id to reference it by. */
@@ -203,6 +206,8 @@ export class NoteView implements Animatable {
   private readonly bodyEl: HTMLDivElement;
   private readonly previewEl: HTMLDivElement;
   private editing = false;
+  private noteName: string;
+  private readonly nameEl: HTMLDivElement;
   private readonly grainEl: HTMLCanvasElement;
   private readonly paperPath: SVGPathElement;
   private readonly tapeG: SVGGElement;
@@ -248,6 +253,7 @@ export class NoteView implements Animatable {
     this.id = init.id;
     this.host = host;
     this.overrides = { ...init.style };
+    this.noteName = (init.name ?? '').trim().slice(0, 120);
     this.hostDefaults = host.defaults;
     this.style = resolveStyle(this.overrides, this.hostDefaults);
     this.w = init.w;
@@ -318,6 +324,18 @@ export class NoteView implements Animatable {
     const header = document.createElement('header');
     header.className = 'handle';
     header.append(div('grip-dots'));
+
+    /*
+     * The note's own name, shown in the header when it has one.
+     *
+     * Display only. The header is the drag handle, and a click-to-edit field inside a drag
+     * handle is a fight between two gestures that people lose either way -- so naming happens
+     * in the note's settings panel and in the cabinet, and this is where the answer appears.
+     */
+    this.nameEl = div('note-name');
+    this.nameEl.hidden = true;
+    header.append(this.nameEl);
+
     const actions = div('actions');
     // 18px glyphs at 55% opacity were unhittable in practice -- the first person to try the
     // build could not delete a note at all. These are 26px targets with real icons.
@@ -381,7 +399,25 @@ export class NoteView implements Animatable {
       this.pendingText = { text: this.text, caret: this.caretNow() };
     });
     this.bodyEl.addEventListener('input', () => {
-      this.el.setAttribute('aria-label', `Sticky note: ${this.text.slice(0, 40)}`);
+      this.paintName();
+
+      /*
+       * SAVE. This line was missing, and its absence lost people's notes.
+       *
+       * `onText` was called when a task box was ticked, when an image was attached, on undo,
+       * and by every formatting shortcut -- and NOT by typing. So a note you typed and then
+       * reloaded came back empty: the create call had stored an empty body and nothing ever
+       * told the store otherwise. Only pressing Ctrl+B, or ticking a checkbox, saved your
+       * words, as a side effect of doing something else.
+       *
+       * It survived four releases because of how it was being checked. `spikes/playground`
+       * reached into the note and added its own `input` listener that saved on every
+       * keystroke, so the one tool used to verify "does a note come back after a reload?"
+       * answered yes about behaviour the extension did not have. That listener is gone now: a
+       * harness that adds behaviour is a harness that lies.
+       */
+      this.host.onText?.(this, this.text);
+
       const was = this.pendingText;
       this.pendingText = null;
       if (!was) return;
@@ -417,6 +453,8 @@ export class NoteView implements Animatable {
     host.layer.append(note);
     this.setEditing(false);
     if (this.inkInit && this.inkInit.strokes.length > 0) this.enableInk(false);
+    // After the header exists, and it also sets the accessible label.
+    this.paintName();
   }
 
   private readonly halftonePath: SVGPathElement;
@@ -515,6 +553,8 @@ export class NoteView implements Animatable {
     if (this.settings) return;
     this.settings = new SettingsPanel({
       style: () => this.style,
+      name: () => this.noteName,
+      rename: (next) => this.setName(next),
       overrides: () => this.overrides,
       defaults: () => this.hostDefaults ?? (DEFAULT_STYLE as NoteStyle),
       change: (patch) => this.setStyle(patch),
@@ -710,9 +750,18 @@ export class NoteView implements Animatable {
    * Called on blur and before an undo. Without it, typing, undoing, and typing again would
    * merge across the undo and produce a step that never existed.
    */
+  /**
+   * Called when the note loses focus.
+   *
+   * Saves as well as breaking the undo run, and the save is the important half: the host
+   * debounces, so clicking away is the moment a person expects their words to be safe rather
+   * than a quarter of a second later. `pagehide` is a backstop, and a best-effort one -- a
+   * message sent from a page that is being torn down may never arrive.
+   */
   private flushTextRun(): void {
     this.pendingText = null;
     this.host.history?.breakRun();
+    this.host.onText?.(this, this.text);
   }
 
   /**
@@ -728,12 +777,71 @@ export class NoteView implements Animatable {
     return offsetsIn(this.bodyEl)?.end ?? this.text.length;
   }
 
+  /**
+   * The name, if it has one.
+   *
+   * Deliberately not folded into `text`: the cabinet lists a note by its name when it has one
+   * and by the first line of its body when it does not, and a note whose name IS its first
+   * line would lose the distinction the moment the body was edited.
+   */
+  get name(): string {
+    return this.noteName;
+  }
+
+  /** Rename, from the settings panel or from a message. Empty clears it. */
+  setName(next: string, tell = true): void {
+    const clean = next
+      .replace(/[\r\n\t]+/g, ' ')
+      .trim()
+      .slice(0, 120);
+    if (clean === this.noteName) return;
+    this.noteName = clean;
+    this.paintName();
+    if (tell) this.host.onName?.(this, clean);
+  }
+
+  private paintName(): void {
+    this.nameEl.textContent = this.noteName;
+    this.nameEl.hidden = this.noteName.length === 0;
+    this.nameEl.title = this.noteName;
+    // The name is the better label when there is one: a screen reader should say what the
+    // note is called before it starts reading the note out.
+    this.el.setAttribute(
+      'aria-label',
+      this.noteName ? `Sticky note: ${this.noteName}` : `Sticky note: ${this.text.slice(0, 40)}`,
+    );
+  }
+
+  /** Is someone typing in this note right now? */
+  get isEditing(): boolean {
+    return this.editing;
+  }
+
+  /**
+   * Text changed somewhere else -- the cabinet restoring an earlier version.
+   *
+   * Deliberately NOT `applyText`, which calls `onText` and would save the text straight back,
+   * bouncing a write to the store for a change that came from the store. This only updates
+   * what is on the screen.
+   *
+   * Refuses while the note is being edited. Replacing the words under someone's cursor
+   * because another window restored a version is worse than being briefly out of date, and
+   * their own next keystroke saves what they have anyway.
+   */
+  applyExternalText(text: string): boolean {
+    if (this.editing) return false;
+    this.bodyEl.textContent = text;
+    this.renderPreview();
+    this.paintName();
+    return true;
+  }
+
   /** Undo/redo of a text edit. Replaces the text and puts the caret back. */
   applyText(text: string, caret: number): void {
     this.bodyEl.textContent = text;
     if (!this.editing) this.renderPreview();
     else this.restoreCaret(caret);
-    this.el.setAttribute('aria-label', `Sticky note: ${text.slice(0, 40)}`);
+    this.paintName();
     this.host.onText?.(this, text);
     this.host.onChange?.(this);
   }
@@ -1085,7 +1193,7 @@ export class NoteView implements Animatable {
     this.flushTextRun();
     this.bodyEl.textContent = next.text;
     selectOffsets(this.bodyEl, next.start, next.end);
-    this.el.setAttribute('aria-label', `Sticky note: ${next.text.slice(0, 40)}`);
+    this.paintName();
 
     this.note({
       kind: 'text',
@@ -1445,7 +1553,7 @@ export class NoteView implements Animatable {
       ? '1'
       : '0';
     this.el.dataset.tape = this.style.tape;
-    this.el.setAttribute('aria-label', `Sticky note: ${this.text.slice(0, 40)}`);
+    this.paintName();
     if (this.physicsNow() !== 'full') {
       const inert = { w: 1e6, z: 1 };
       for (const s of [this.rz, this.rx, this.ry, this.sk, this.curl]) retune(s, inert.w, inert.z);

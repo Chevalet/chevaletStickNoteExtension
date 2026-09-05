@@ -7,9 +7,34 @@
  *
  * Like extension IndexedDB, `storage.local` survives "clear cookies and site data" -- the
  * sanitizer excludes `moz-extension://` principals.
+ *
+ * ## Every field here is read by something
+ *
+ * 0.0.10 went through the settings PANE and removed the controls that nothing read. 0.0.11
+ * went through this TYPE and removed four fields that no control offered and no code consumed:
+ *
+ *   urlMatchDefault        A per-user default for URL normalisation. `scope/match.ts` derives
+ *                          its variants from `DEFAULT_URL_MATCH` directly and never consulted
+ *                          this, so it was a knob wired to nothing. Per-site matching rules
+ *                          are a real idea; they will need a different shape than one global
+ *                          default, and inventing that shape in advance is how you get a field
+ *                          that is wrong when the feature finally arrives.
+ *   retention.detachedDays "Keep notes whose page vanished for N days". Nothing marks a note
+ *                          detached -- there is no such state on a note record -- so the sweep
+ *                          could never have used it.
+ *   backup.keepDaily       Grandfather-father-son rotation for the scheduled backup, which
+ *   backup.keepWeekly      turned out to be a ring of three fixed filenames. Two numbers
+ *                          describing a policy that does not exist.
+ *   ghostModifier          "Hold this key to make notes click-through." No key handler ever
+ *                          looked at it, no page offered it, and the `toggle-ghost` command it
+ *                          pairs with was declared in the protocol and never sent. Reading a
+ *                          page under a note is a real want; it needs a design, not a
+ *                          leftover field.
+ *
+ * Removing a field is safe: `mergeSettings` reads what it knows and ignores the rest, so a
+ * profile that still has these keys in storage is unaffected.
  */
 
-import { DEFAULT_URL_MATCH, type UrlMatch } from '~/shared/types.ts';
 import { DEFAULT_GUARD, type GuardSettings } from './guard/budget.ts';
 
 export const SETTINGS_KEY = 'settings.v1';
@@ -21,10 +46,8 @@ export interface Settings {
   /** Per-origin overrides, keyed by origin. */
   siteRules: Record<string, 'on' | 'off'>;
   guard: GuardSettings;
-  urlMatchDefault: UrlMatch;
   retention: {
     trashDays: number;
-    detachedDays: number;
     revisionsPerNote: number;
     /** Off by default: nothing is ever destroyed unless the user asks for it. */
     autoDelete: boolean;
@@ -32,8 +55,6 @@ export interface Settings {
   backup: {
     enabled: boolean;
     everyHours: number;
-    keepDaily: number;
-    keepWeekly: number;
   };
   /**
    * How a new note looks, as a SPARSE diff against the built-in style.
@@ -51,8 +72,6 @@ export interface Settings {
   autoCheckUpdates: boolean;
   /** Notes in private windows are in-memory only unless this is turned on. */
   persistPrivateNotes: boolean;
-  /** Hold this to make notes click-through so the page underneath can be read. */
-  ghostModifier: 'Alt' | 'Control' | 'Shift' | 'none';
   /** `auto` follows prefers-reduced-motion. */
   motion: 'auto' | 'full' | 'reduced' | 'off';
   /**
@@ -72,13 +91,11 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   defaultEnabled: true,
   siteRules: {},
   guard: { ...DEFAULT_GUARD },
-  urlMatchDefault: { ...DEFAULT_URL_MATCH },
-  retention: { trashDays: 30, detachedDays: 30, revisionsPerNote: 50, autoDelete: false },
-  backup: { enabled: false, everyHours: 12, keepDaily: 7, keepWeekly: 4 },
+  retention: { trashDays: 30, revisionsPerNote: 50, autoDelete: false },
+  backup: { enabled: false, everyHours: 12 },
   noteDefaults: {},
   autoCheckUpdates: false,
   persistPrivateNotes: false,
-  ghostModifier: 'Alt',
   motion: 'auto',
   theme: 'auto',
   locale: '',
@@ -100,7 +117,6 @@ export function mergeSettings(stored: unknown): Settings {
     ...base,
     ...s,
     guard: { ...base.guard, ...(s.guard ?? {}) },
-    urlMatchDefault: { ...base.urlMatchDefault, ...(s.urlMatchDefault ?? {}) },
     retention: { ...base.retention, ...(s.retention ?? {}) },
     backup: { ...base.backup, ...(s.backup ?? {}) },
     siteRules: { ...(s.siteRules ?? {}) },
@@ -113,7 +129,6 @@ function structuredCloneish(s: Readonly<Settings>): Settings {
   return {
     ...s,
     guard: { ...s.guard },
-    urlMatchDefault: { ...s.urlMatchDefault },
     retention: { ...s.retention },
     backup: { ...s.backup },
     siteRules: { ...s.siteRules },

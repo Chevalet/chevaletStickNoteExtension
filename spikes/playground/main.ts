@@ -226,7 +226,20 @@ function mount(rec: NoteRecord): NoteView {
 
   // Text edits: the note body is a contenteditable in the shadow root.
   const body = view.el.querySelector('.body');
-  body?.addEventListener('input', () => queueSave(rec.id, { body: { text: view.text } }));
+  /*
+   * There was an `input` listener here that saved on every keystroke, reaching into the note's
+   * own shadow root to do it. It is gone, and this comment is its gravestone.
+   *
+   * The extension had no such listener. `NoteView` called `onText` when a task box was ticked,
+   * when an image was attached, on undo and from the formatting shortcuts -- never from typing
+   * -- so in the real product a note you typed and reloaded came back EMPTY. This line made
+   * the playground save anyway, which meant the one tool used to check "do notes survive a
+   * reload?" said yes about behaviour that only existed here. Four releases.
+   *
+   * The rule that follows: a harness may STUB what it cannot have (a background, a browser
+   * API) and must never ADD behaviour the product lacks. If the playground needs a line to
+   * work, the product needs it more.
+   */
 
   views.set(rec.id, view);
   return view;

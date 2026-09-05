@@ -256,7 +256,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
    * the wordmark goes, in every screenshot, for ever, and you stop seeing it. Serving the real
    * file rather than patching the bundle keeps the harness a photograph of what ships.
    */
-  const aliased = url.startsWith('/spikes/assets/') ? url.replace('/spikes/', '/') : url;
+  const aliased = url.startsWith('/spikes/assets/fonts/')
+    ? // The fonts are not in the repository -- they are copied out of node_modules into dist
+      // by the build -- so this one goes to dist, not to the source tree. Without it every
+      // bundled face 404s in the harness and every screenshot of the Type picker shows eight
+      // labels in the same mono font, which is a false alarm you would learn to ignore.
+      url.replace('/spikes/assets/', '/dist/assets/')
+    : url.startsWith('/spikes/assets/')
+      ? url.replace('/spikes/', '/')
+      : url;
 
   const file = safePath(aliased);
   if (!file) {

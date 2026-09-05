@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPA routes — chevaletNote</title>
+<!--
+  A page that changes its URL without loading a document, which is what a blog built on
+  Next.js, Astro or anything else with a client router does all day.
+
+  It exists for `spikes/firefox-extension.mjs`, to reproduce the reported bug: a note made on
+  /blog appeared on /blog/what-is-defi as well, because a `pushState` unloads nothing and the
+  content script had no idea the page it was on had changed.
+
+  The paths are the ones from the report, so the reproduction is the report.
+
+  Dev-only. Never shipped.
+-->
+<style>
+  body { margin: 0; padding: 40px; background: #fbf7ee; color: #14110e;
+         font: 16px/1.65 ui-monospace, Consolas, monospace; }
+  main { max-width: 720px; }
+  h1 { font-size: 22px; }
+  nav { display: flex; gap: 10px; margin: 18px 0 28px; }
+  button { font: inherit; padding: 8px 14px; cursor: pointer; background: #ffe94a;
+           border: 2px solid #14110e; }
+  code { background: #eee6d2; padding: 1px 5px; }
+  .where { font-weight: 700; }
+  .filler { height: 900px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>A client-side router</h1>
+  <nav>
+    <button id="to-section" type="button">/blog</button>
+    <button id="to-article" type="button">/blog/what-is-defi</button>
+    <button id="to-other" type="button">/blog/something-else</button>
+  </nav>
+  <p>Path now: <span class="where" id="where"></span></p>
+  <p>These buttons call <code>history.pushState</code>. No document is unloaded, nothing is
+     fetched, and this paragraph is never re-rendered — exactly like the blog where the bug was
+     found. A note made on one path must not appear on another.</p>
+  <p>Alt + double-click anywhere below to stick a note.</p>
+  <div class="filler"></div>
+</main>
+
+<script>
+  /*
+   * Real PATHS, not hash routes.
+   *
+   * The reported bug was /blog versus /blog/what-is-defi -- a path change -- and hash routing
+   * goes down different normalisation rules, so testing hashes would be testing something
+   * else. pushState never fetches, so it does not matter that the dev server would 404 on
+   * these paths; what does matter is that the FIRST load happens on a path it serves, which
+   * is why the spike does its reload check before touching any of these buttons.
+   */
+  const paths = {
+    'to-section': '/spikes/spa/blog',
+    'to-article': '/spikes/spa/blog/what-is-defi',
+    'to-other': '/spikes/spa/blog/something-else',
+  };
+  const show = () => {
+    document.getElementById('where').textContent = location.pathname;
+  };
+  for (const [id, path] of Object.entries(paths)) {
+    document.getElementById(id).addEventListener('click', () => {
+      history.pushState({}, '', path);
+      show();
+    });
+  }
+  window.addEventListener('popstate', show);
+  show();
+</script>
+</body>
+</html>

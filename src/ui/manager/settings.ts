@@ -52,8 +52,10 @@ import {
   MIN_HOURS,
   RING,
 } from '~/bg/jobs/autobackup.ts';
+import { lastImport } from '~/bg/jobs/import.ts';
 import { DEFAULT_SETTINGS, loadSettings, type Settings, saveSettings } from '~/bg/settings.ts';
-import { DEFAULT_STYLE, FONTS, PALETTES } from '~/cs/note/theme.ts';
+import { DEFAULT_STYLE, PALETTES } from '~/cs/note/theme.ts';
+import { FONTS, fontById, fontStack } from '~/shared/fonts.ts';
 import { applyTheme, asThemeChoice, type ThemeChoice } from '../chrome-theme.ts';
 
 type Patch = Partial<Settings>;
@@ -114,11 +116,19 @@ function toggle(on: boolean, onSet: (v: boolean) => void): HTMLElement {
   return b;
 }
 
-/** Segmented choice, drawn as a strip of index-card tabs. */
+/**
+ * Segmented choice, drawn as a strip of index-card tabs.
+ *
+ * `styleFor` lets one option carry its own type -- used by the Type picker so each face is
+ * shown in itself. Nothing else uses it, and nothing else should: a segmented control whose
+ * options look different from each other for any reason other than being samples of what they
+ * select is just a jumbled row of buttons.
+ */
 function choice<T extends string>(
   value: T,
   options: ReadonlyArray<readonly [T, string]>,
   onSet: (v: T) => void,
+  styleFor?: (v: T) => string,
 ): HTMLElement {
   const wrap = h('div', { class: 'seg', role: 'radiogroup' });
   for (const [v, label] of options) {
@@ -127,6 +137,7 @@ function choice<T extends string>(
       { type: 'button', role: 'radio', 'aria-checked': String(v === value) },
       label,
     );
+    if (styleFor) b.style.fontFamily = styleFor(v);
     b.addEventListener('click', () => {
       for (const other of wrap.children) other.setAttribute('aria-checked', 'false');
       b.setAttribute('aria-checked', 'true');
@@ -398,7 +409,13 @@ function sectionLook(): HTMLElement {
         def('fontFamily'),
         FONTS.map((f) => [f.id, f.label] as const),
         (v) => void write(defaultsPatch('fontFamily', v)),
+        // Each name written in its own face. The faces are bundled, and this is an extension
+        // page, so a plain url() in `fontFaceCss` is all it takes.
+        (v) => fontStack(fontById(v)),
       ),
+      'Six of these are bundled with the extension and load only when a note uses one, so ' +
+        'they look the same on every machine. The two System entries use whatever your ' +
+        'computer has.',
     ),
     row(
       'Text size',
@@ -669,8 +686,39 @@ function sectionBackup(): HTMLElement {
       'Export… in the bar above works now and needs no permission at all. It contains every ' +
         'note, its position, its style and its images, as one archive you can keep anywhere.',
     ),
-    h('p', { class: 'ssec-sub' }, 'Automatically'),
   );
+  /*
+   * What the last import did, if there has been one.
+   *
+   * An import is the most consequential thing this extension can be asked to do, and the only
+   * record of it was a dialog that closed. `rememberImport` has been writing this down since
+   * the import path landed and nothing read it back -- which is the same fault as a setting
+   * nothing consults, one layer along.
+   */
+  const importedRow = h('div');
+  box.append(importedRow);
+  void lastImport()
+    .then((last) => {
+      if (!last) return;
+      const when = new Date(last.at).toLocaleString();
+      const bits = [
+        `${last.created} created`,
+        `${last.updated} overwritten`,
+        `${last.skipped} left alone`,
+      ];
+      if (last.assets) bits.push(`${last.assets} image${last.assets === 1 ? '' : 's'}`);
+      if (last.failed.length) bits.push(`${last.failed.length} failed`);
+      importedRow.append(
+        h(
+          'p',
+          { class: 'ssec-note' },
+          `Last import: ${when} — ${bits.join(', ')}.` +
+            (last.exportedAt ? ` The archive was made on ${last.exportedAt.slice(0, 10)}.` : ''),
+        ),
+      );
+    })
+    .catch(() => undefined);
+  box.append(h('p', { class: 'ssec-sub' }, 'Automatically'));
   // The permission check and the last-run line are async; the section itself is not, so the
   // rows are appended when they arrive rather than making every section async for one of them.
   const slot = h('div');

@@ -22,6 +22,8 @@ export interface NoteWire {
   rev: number;
   scope: Scope;
   body: { format: 'md'; text: string };
+  /** The name the person gave it, if any. Absent, never empty. */
+  name?: string;
   ui: {
     x: number;
     y: number;
@@ -107,21 +109,71 @@ export type UiToBg =
    * the alarm run the SAME code: a manual backup that works while the scheduled one is broken
    * would be the most misleading possible state for this feature to be in.
    */
-  | { t: 'backup/run' };
+  | { t: 'backup/run' }
+  /*
+   * "I changed this note behind your back."
+   *
+   * Sent by the cabinet after it restores an earlier version, because it writes to IndexedDB
+   * directly and IndexedDB has no change events -- so a tab showing that note would go on
+   * showing the old text until it was reloaded. The background reads the note and broadcasts
+   * `note/changed`.
+   *
+   * The cabinet could not send that broadcast itself: only the background knows which tabs
+   * have a renderer in them.
+   */
+  | { t: 'note/touched'; id: NoteId }
+  /*
+   * Rename, from the cabinet.
+   *
+   * Through the background rather than written straight to IndexedDB, for the same reason
+   * `note/touched` exists: only the background can tell the open tabs, and a note renamed in
+   * the cabinet should show its new name in its own header without a reload.
+   */
+  | { t: 'note/rename'; id: NoteId; name: string };
 
 // --------------------------------------------------------------------------- bg -> cs
 
+/*
+ * Two members were removed in 0.0.11 for being declared and never sent.
+ *
+ *   scope/apply    A batch of adds, removes and patches for when a tab's URL changes under a
+ *                  single-page app. Nothing sent it and nothing handled it: a renderer
+ *                  currently re-resolves by asking `notes/forContext` again. That is the right
+ *                  shape to bring back if the SPA path ever needs to be incremental, and a
+ *                  four-field message type sitting in the protocol claiming it already is was
+ *                  the sort of thing that gets believed.
+ *   toggle-ghost   A command to hold a key and make notes click-through. The manifest declares
+ *                  no such command, no code sends it, and the `ghostModifier` setting it would
+ *                  have read went the same way.
+ *
+ * `note/changed` was in the same state and is now genuinely used -- by the cabinet restoring
+ * an earlier version. That is the difference: it earned its place by having a sender.
+ */
 export type BgToCs =
-  | {
-      t: 'scope/apply';
-      add: NoteWire[];
-      remove: NoteId[];
-      patch: Array<{ id: NoteId; rev: number; patch: NotePatch }>;
-    }
+  /*
+   * The tab's URL changed WITHOUT a page load.
+   *
+   * A single-page app routes from /blog to /blog/what-is-defi by calling `pushState`. No
+   * document is unloaded, so the content script keeps running -- and kept showing the notes
+   * it had mounted for the old URL. Reported exactly that way: a note made on the section
+   * page appeared on every article under it.
+   *
+   * A content script cannot see `pushState` without patching the page's own History object,
+   * which is not a thing to do to someone else's page. The background can: `tabs.onUpdated`
+   * fires with a new `url` for exactly this. So it nudges, and the renderer re-resolves by
+   * asking `notes/forContext` again -- the same path it uses at boot, rather than a second
+   * one that could disagree with it.
+   *
+   * (This replaces a `scope/apply` member that was declared here from the first week, never
+   * sent, and deleted earlier in 0.0.11 for being dead. It was dead, and the feature it stood
+   * for was missing -- which is the more interesting half, and took a bug report to find.)
+   */
+  | { t: 'scope/recheck'; url: string }
   | { t: 'note/changed'; id: NoteId; rev: number; patch: NotePatch; origin: 'self' | 'other' }
+  | { t: 'note/renamed'; id: NoteId; name: string }
   | { t: 'guard/set'; armed: boolean; reason: 'budget' | 'policy' | 'clean' }
   | { t: 'tab/enabled'; enabled: boolean }
-  | { t: 'command'; name: 'new-note' | 'cycle-notes' | 'toggle-ghost' }
+  | { t: 'command'; name: 'new-note' | 'cycle-notes' }
   | { t: 'teardown'; reason: 'disabled' | 'update' | 'revoked' }
   /**
    * Settings changed -- in the cabinet, in the options page, or in another tab. Notes

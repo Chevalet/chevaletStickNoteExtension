@@ -21,6 +21,8 @@ interface Stub {
   tabs: Map<number, { id: number; url: string; title?: string; incognito?: boolean }>;
   sent: Array<{ tabId: number; message: unknown }>;
   session: Map<string, unknown>;
+  /** `storage.session`, which is a different store from the per-tab session VALUES above. */
+  sessionStore: Map<string, unknown>;
   local: Record<string, unknown>;
 }
 
@@ -48,6 +50,7 @@ function installBrowserStub(): void {
     tabs: new Map([[7, { id: 7, url: 'https://example.com/article', title: 'An article' }]]),
     sent: [],
     session: new Map(),
+    sessionStore: new Map(),
     local: {},
   };
 
@@ -112,9 +115,24 @@ function installBrowserStub(): void {
           delete stub.local[k];
         },
       },
+      /*
+       * A real map, not `() => ({})`.
+       *
+       * The empty stub made every read of the tab-id-to-key map come back blank, so the
+       * duplicate-tab path could never fire in a test -- a stub that always answers "nothing
+       * here" cannot fail, and neither can anything that depends on it.
+       */
       session: {
-        get: async () => ({}),
-        set: async () => undefined,
+        get: async (k?: string | string[] | null) => {
+          if (k == null) return Object.fromEntries(stub.sessionStore);
+          const keys = Array.isArray(k) ? k : [k];
+          return Object.fromEntries(
+            keys.filter((n) => stub.sessionStore.has(n)).map((n) => [n, stub.sessionStore.get(n)]),
+          );
+        },
+        set: async (o: Record<string, unknown>) => {
+          for (const [k, v] of Object.entries(o)) stub.sessionStore.set(k, v);
+        },
       },
       onChanged: { addListener: vi.fn() },
     },
@@ -171,6 +189,101 @@ async function createOne(over: Record<string, unknown> = {}): Promise<NoteWire> 
 
 beforeEach(async () => {
   send = await loadBackground();
+});
+
+describe('note/touched', () => {
+  /**
+   * The cabinet restores an earlier version by writing to IndexedDB directly, and IndexedDB
+   * has no change events -- so a tab showing that note would go on showing the old text until
+   * it was reloaded. The cabinet cannot broadcast to tabs itself; only the background knows
+   * which of them have a renderer in them.
+   */
+  it('tells every tab with a renderer, so an open note stops being stale', async () => {
+    const note = await createOne();
+    // `hello` is what puts a tab in the runtime map, which is the list this broadcasts to.
+    await send({ t: 'hello', url: 'https://example.com/article', protocolV: 1 }, from7);
+    stub.sent.length = 0;
+
+    const reply = await send({ t: 'note/touched', id: note.id }, {});
+    expect(reply).toMatchObject({ ok: true });
+
+    const sent = stub.sent.filter(
+      (m) => (m.message as { t?: string }).t === 'note/changed',
+    ) as Array<{ tabId: number; message: { id: string; patch: { body: { text: string } } } }>;
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.tabId).toBe(7);
+    expect(sent[0]?.message.id).toBe(note.id);
+    // The text as STORED, read back after the write, rather than anything the sender said --
+    // the cabinet sends only an id, so there is nothing to disagree about.
+    expect(sent[0]?.message.patch.body.text).toBe('hello');
+  });
+
+  it('says so plainly when the note is gone', async () => {
+    const reply = await send({ t: 'note/touched', id: 'n_missing' }, {});
+    expect(reply).toMatchObject({ ok: false, code: 'NOT_FOUND' });
+    expect(stub.sent.filter((m) => (m.message as { t?: string }).t === 'note/changed')).toEqual([]);
+  });
+
+  it('needs no sender tab, because the cabinet is not a tab', async () => {
+    // Every other handler that writes insists on `sender.tab.id`. This one is called from an
+    // extension page, so insisting would make it uncallable.
+    const note = await createOne();
+    expect(await send({ t: 'note/touched', id: note.id }, {})).toMatchObject({ ok: true });
+  });
+});
+
+describe('a single-page app changing its route', () => {
+  /**
+   * Reported: a note made on `https://blog.prepzone.dev/blog` also appeared on
+   * `https://blog.prepzone.dev/blog/what-is-defi`.
+   *
+   * The matcher was never wrong -- `tests/scope-leak.test.ts` proves it for those two exact
+   * URLs. What was missing is this: a `pushState` route change unloads no document, so the
+   * content script kept showing the notes it had mounted, and nothing told it the page had
+   * changed. `onTabUpdated` even dropped the event, because it returned early unless
+   * `status === 'complete'` and an in-page route change reports no status at all.
+   */
+  const updated = async (change: Record<string, unknown>) => {
+    const reg = (
+      globalThis as unknown as {
+        browser: { tabs: { onUpdated: { addListener: { mock: { calls: unknown[][] } } } } };
+      }
+    ).browser.tabs.onUpdated.addListener;
+    const handler = reg.mock.calls[0]?.[0] as (
+      id: number,
+      c: Record<string, unknown>,
+      t: Record<string, unknown>,
+    ) => Promise<void>;
+    await handler(7, change, { id: 7, url: 'https://example.com/article' });
+    // The handler is async and fires the message without awaiting it.
+    await new Promise((r) => setTimeout(r, 20));
+  };
+
+  const nudges = () => stub.sent.filter((m) => (m.message as { t?: string }).t === 'scope/recheck');
+
+  it('tells the page, so it can work out which notes belong there now', async () => {
+    stub.sent.length = 0;
+    await updated({ url: 'https://example.com/article/deeper' });
+    const sent = nudges();
+    expect(sent).toHaveLength(1);
+    const first = sent[0];
+    if (!first) throw new Error('no nudge was sent');
+    expect((first.message as { url: string }).url).toBe('https://example.com/article/deeper');
+  });
+
+  it('does not nudge for a plain page load, which re-resolves anyway', async () => {
+    // `hello` already does the work on a real navigation. A second nudge would be a second
+    // round trip for nothing on every page load in every tab.
+    stub.sent.length = 0;
+    await updated({ status: 'complete' });
+    expect(nudges()).toEqual([]);
+  });
+
+  it('ignores an update that is neither a route change nor a completed load', async () => {
+    stub.sent.length = 0;
+    await updated({ favIconUrl: 'https://example.com/icon.png' });
+    expect(nudges()).toEqual([]);
+  });
 });
 
 describe('registration', () => {

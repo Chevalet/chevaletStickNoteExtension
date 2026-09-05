@@ -73,7 +73,7 @@ export function versionFromRelease(payload: unknown): string | null {
 }
 
 /** True when we already hold the permission the check needs. */
-export function hasApiPermission(): Promise<boolean> {
+function hasApiPermission(): Promise<boolean> {
   return browser.permissions.contains({ origins: [API_ORIGIN] }).catch(() => false);
 }
 

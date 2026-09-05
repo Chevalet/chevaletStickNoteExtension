@@ -66,6 +66,25 @@ export function sanitizeUi(ui: unknown, base: NoteWire['ui'] = DEFAULT_UI): Note
 }
 
 /** Note text: a string, capped, with no lone surrogates left at the cut. */
+/**
+ * A note's name, as typed by a person, on its way in from a content script.
+ *
+ * One line: newlines are stripped rather than rejected, because the obvious way to get one in
+ * is to paste a line of text that happens to end with a return, and refusing the paste is a
+ * worse answer than trimming it. Capped at 120 characters, which is the same cap `deriveTitle`
+ * uses -- the cabinet lays the two out in the same column.
+ *
+ * Returns undefined for an empty name, so clearing the box removes the field.
+ */
+export function sanitizeName(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const one = value
+    .replace(/[\r\n\t]+/g, ' ')
+    .trim()
+    .slice(0, 120);
+  return one.length > 0 ? one : undefined;
+}
+
 export function sanitizeText(v: unknown): string {
   if (typeof v !== 'string') return '';
   if (v.length <= LIMITS.textChars) return v;

@@ -169,6 +169,34 @@ export function fontStack(font: FontChoice): string {
   return [...subsets.map((sub) => `"${faceFamily(font, sub)}"`), font.stack].join(', ');
 }
 
+/**
+ * `@font-face` rules for one of the extension's OWN pages.
+ *
+ * A plain URL, which a note cannot use and this can: the cabinet, the popup and the options
+ * page are `moz-extension://` documents, so a relative `url()` is same-origin and the page's
+ * own CSP allows it. None of the shadow-root or page-CSP trouble applies.
+ *
+ * It exists so the Type picker can show each face IN that face. A font menu written in one
+ * font is a list of words, and the point of choosing type is to see it.
+ *
+ * `font-display: block` here, not `swap` as in a note: these are eight small labels on a
+ * settings sheet, and text that reflows a moment after the sheet appears is more distracting
+ * than eight labels arriving together a frame later.
+ */
+export function fontFaceCss(base = '../assets/fonts/'): string {
+  const out: string[] = [];
+  for (const font of FONTS) {
+    for (const file of font.bundle?.files ?? []) {
+      out.push(
+        `@font-face{font-family:"${faceFamily(font, file.subset)}";` +
+          `font-weight:${file.weight};font-style:normal;font-display:block;` +
+          `src:url("${base}${faceFile(font, file)}") format("woff2")}`,
+      );
+    }
+  }
+  return out.join('\n');
+}
+
 export function fontById(id: string): FontChoice {
   return FONTS.find((f) => f.id === id) ?? (FONTS[0] as FontChoice);
 }

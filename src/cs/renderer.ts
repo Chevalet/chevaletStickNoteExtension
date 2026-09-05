@@ -292,6 +292,7 @@ function mountNote(wire: NoteWire): NoteView {
       // `ink` on the wire; the field was simply missing from `NoteWire` and from here, so it
       // arrived and was dropped. See the comment on NoteWire.ink.
       ...(wire.ink ? { ink: wire.ink } : {}),
+      ...(wire.name ? { name: wire.name } : {}),
     },
     {
       loop,
@@ -322,6 +323,7 @@ function mountNote(wire: NoteWire): NoteView {
           style: n.styleOverrides,
         }),
       onText: (_n, text) => save(wire.id, { body: { text } }),
+      onName: (_n, name) => save(wire.id, { name }),
       onStyle: (_n, overrides) => save(wire.id, { style: overrides }),
       onAsset: async (_n, file, name) => {
         const bytes = await file.arrayBuffer();
@@ -527,6 +529,43 @@ async function boot(): Promise<void> {
 }
 
 /**
+ * The URL changed under us, with no page load. Work out which notes belong here now.
+ *
+ * Asks the background the same question `boot` asks, rather than diffing anything locally:
+ * one code path decides which notes belong on a URL, and it is the one that has tests.
+ *
+ * Order matters. Pending edits are flushed FIRST, because notes that no longer belong here
+ * are about to be destroyed and a queued patch on one of them would go with it. That is the
+ * whole reason this is not three lines.
+ */
+let currentUrl = location.href;
+
+async function recheckScope(url: string): Promise<void> {
+  if (!enabled) return;
+  if (url === currentUrl) return;
+  currentUrl = url;
+
+  await flushAll();
+
+  const reply = await ask<{ notes: NoteWire[] }>({ t: 'notes/forContext', url });
+  if (!reply.ok) return;
+
+  const belongs = new Map(reply.data.notes.map((w) => [w.id, w]));
+  for (const [id, view] of [...views]) {
+    if (belongs.has(id)) continue;
+    // Not ours any more. `destroy` only takes it off the page; the note itself is untouched
+    // in the database and comes back when its own page does.
+    view.destroy();
+    views.delete(id);
+  }
+  for (const wire of reply.data.notes) {
+    if (!views.has(wire.id)) mountNote(wire);
+  }
+  void Promise.all(reply.data.notes.map((w) => ensureAssets(w.body.text)));
+  reportGuardState();
+}
+
+/**
  * Double-click on empty page space makes a note there.
  *
  * Guarded hard, because this listener lives on someone else's page: it never fires for a
@@ -582,6 +621,28 @@ browser.runtime.onMessage.addListener((msg: unknown) => {
     noteDefaults = resolveStyle(m.style);
     motionCap = m.motion ?? motionCap;
     for (const view of views.values()) view.setDefaults(noteDefaults);
+    return Promise.resolve({ ok: true });
+  }
+
+  if (type === 'scope/recheck') {
+    void recheckScope((msg as { url: string }).url);
+    return Promise.resolve({ ok: true });
+  }
+
+  if (type === 'note/renamed') {
+    const m = msg as { id: string; name: string };
+    // `false`: do not tell the host. The rename came FROM the store.
+    views.get(m.id as NoteId)?.setName(m.name, false);
+    return Promise.resolve({ ok: true });
+  }
+
+  if (type === 'note/changed') {
+    // Only the cabinet sends this, and only after restoring an earlier version. A note this
+    // page does not have is simply not here -- another tab is showing a different page.
+    const m = msg as { id: string; patch?: { body?: { text?: string } } };
+    const text = m.patch?.body?.text;
+    const view = views.get(m.id as NoteId);
+    if (view && typeof text === 'string') view.applyExternalText(text);
     return Promise.resolve({ ok: true });
   }
 

@@ -249,6 +249,32 @@ export const SHEET_CSS = /* css */ `
   min-width: 0;
   overflow: hidden;
 }
+/*
+ * The note's own name, in the header, when it has one.
+ *
+ * min-width:0 and the ellipsis are not decoration: the header is a flex row that also holds
+ * the toolbar, and a long name without them pushes the buttons out through the torn edge --
+ * the same bug the note on .handle above describes. It shrinks to nothing before the
+ * toolbar loses a single pixel, because a name you cannot fully read is a smaller problem
+ * than a delete button you cannot reach.
+ *
+ * NO BACKTICKS IN THIS FILE. It is one CSS template literal; a backtick in a comment ends
+ * the string, and the error surfaces as a nonsense type error twenty lines later. Third time.
+ */
+.note-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 700 11px/1 var(--cn-font);
+  letter-spacing: .01em;
+  opacity: .75;
+  padding: 0 2px;
+  /* Not selectable: a drag that starts on the name is still a drag. */
+  user-select: none;
+}
+
 /* The divider is inset rather than a full-width border, because the torn edge wanders
    inward and a full-width line pokes out through the tear. */
 .handle::before {
@@ -374,6 +400,21 @@ export const SHEET_CSS = /* css */ `
   margin: 0 0 4px;
 }
 .set-label { opacity: .8; }
+/* The name box. Spans the control and marker columns, because a name has no default to
+   override and so no marker to leave room for. */
+.set-name {
+  all: unset;
+  box-sizing: border-box;
+  grid-column: 2 / -1;
+  width: 100%;
+  padding: 3px 6px;
+  font: 500 11.5px/1.4 var(--cn-font);
+  color: var(--cn-ink);
+  background: color-mix(in oklab, var(--cn-ink) 7%, transparent);
+  border: 1px solid color-mix(in oklab, var(--cn-ink) 28%, transparent);
+}
+.set-name::placeholder { color: color-mix(in oklab, var(--cn-ink) 45%, transparent); }
+.set-name:focus-visible { outline: 2px solid var(--cn-accent); outline-offset: 1px; }
 /* A dot next to a field the note has customised. Clicking it goes back to the default. */
 .set-mark {
   all: unset;

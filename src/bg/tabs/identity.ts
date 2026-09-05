@@ -27,20 +27,19 @@ export interface TabFlags {
   enabled?: boolean;
 }
 
-/** In-memory, hot. Rebuilt from `storage.session` on the first wake after a restart. */
+/**
+ * In-memory, hot. Rebuilt from `storage.session` on the first wake after a restart.
+ *
+ * One direction only. There was a `keyToId` beside this and a `liveTabFor()` reading it, for
+ * `resolveDuplicate` -- which nothing calls, for the reason written above it. A reverse index
+ * kept in step with nothing looking at it is a second place for the two to disagree.
+ */
 const idToKey = new Map<number, TabKey>();
-const keyToId = new Map<TabKey, number>();
 
 const SESSION_MAP = 'map.tabIdToKey';
 
 export function newTabKey(): TabKey {
   return `tk_${crypto.randomUUID()}`;
-}
-
-/** Drop the in-memory maps. Tests and `runtime.onStartup` use this. */
-export function resetIdentity(): void {
-  idToKey.clear();
-  keyToId.clear();
 }
 
 async function readValue(tabId: number): Promise<TabValue | null> {
@@ -96,17 +95,10 @@ export async function resolveTabKey(
 
 function remember(tabId: number, key: TabKey): void {
   idToKey.set(tabId, key);
-  keyToId.set(key, tabId);
 }
 
 export function forgetTab(tabId: number): void {
-  const key = idToKey.get(tabId);
   idToKey.delete(tabId);
-  if (key && keyToId.get(key) === tabId) keyToId.delete(key);
-}
-
-export function liveTabFor(key: TabKey): number | undefined {
-  return keyToId.get(key);
 }
 
 // --------------------------------------------------------------- session map
@@ -167,6 +159,26 @@ export async function setTabEnabled(tabId: number, enabled: boolean | undefined)
  *
  * Returns the key the new tab should end up with, and whether its tab-scoped notes should be
  * cloned along with it.
+ *
+ * ## NOT CALLED, and deliberately still not called
+ *
+ * This was wired up in 0.0.11 -- detection in `resolveTabKey`, cloning in the `hello` handler,
+ * three tests -- and then taken back out, because the state it guards cannot happen:
+ *
+ *   NOTHING IN THE SHIPPING CODE CAN CREATE A TAB-SCOPED NOTE.
+ *
+ * `Scope` has a `tab` kind and `notesForContext` looks it up on every page load, but
+ * `createFor` derives the scope from the sender's URL and never from the message, and
+ * `defaultScopeFor` never returns a tab scope. A note cannot be moved to one afterwards
+ * either: `sanitizePatch` carries no scope.
+ *
+ * So two tabs sharing a key is harmless today, and the guard would have added a
+ * `storage.session` read plus a `tabs.get` to the coldest part of the hottest path -- the
+ * first `hello` of every page load -- to protect against nothing.
+ *
+ * Keep this function. When a tab-scoped note becomes reachable the collision becomes real on
+ * the same day, and this is the decision already written down and tested. The order is: make
+ * the scope reachable first, call this second.
  */
 export function resolveDuplicate(
   incoming: TabKey | null,

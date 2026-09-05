@@ -22,7 +22,7 @@ const RENDERER_ID = 'cn-renderer';
 const GUARD_ID = 'cn-guard';
 
 /** Every origin pattern the user has granted us. */
-export async function grantedOrigins(): Promise<string[]> {
+async function grantedOrigins(): Promise<string[]> {
   const all = await browser.permissions.getAll().catch(() => null);
   return (all?.origins ?? []).filter((o) => typeof o === 'string' && o.length > 0);
 }

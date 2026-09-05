@@ -9,3 +9,4 @@ Thumbs.db
 # never commit secrets or AMO credentials
 .env
 *.env
+dist-test/

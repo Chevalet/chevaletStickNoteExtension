@@ -14,6 +14,10 @@ import { DEFAULT_STYLE, FONTS, type NoteStyle, PALETTES } from './theme.ts';
 export interface SettingsPanelHost {
   /** Current resolved style (defaults + this note's overrides). */
   style(): NoteStyle;
+  /** The note's name, or '' if it has none. */
+  name(): string;
+  /** Rename it. '' clears the name. */
+  rename(next: string): void;
   /** The note's own overrides, so the panel can show what is customised. */
   overrides(): Partial<NoteStyle>;
   /** The user's defaults, for the "follows default" markers. */
@@ -62,6 +66,13 @@ export class SettingsPanel {
     const s = this.host.style();
 
     this.el.append(
+      /*
+       * The name comes first, because it is the one field here that is about WHAT the note is
+       * rather than how it looks -- and because someone opening this panel to name a note
+       * should not have to read past eight colour controls to find the box.
+       */
+      this.section('Name', [this.nameRow()]),
+
       this.section('Paper', [
         this.swatches(),
         this.color('paper', 'Paper', s.paper ?? '#ffe94a'),
@@ -147,6 +158,44 @@ export class SettingsPanel {
       this.footer(),
     );
     this.refresh();
+  }
+
+  /**
+   * The name box.
+   *
+   * Not a `row()`: that helper is built around "is this field overriding a default", and a
+   * name has no default to override. It writes on `change` rather than on every keystroke,
+   * so a name is saved when it is finished rather than eleven times while it is typed.
+   */
+  private nameRow(): HTMLElement {
+    const wrap = document.createElement('label');
+    wrap.className = 'set-row';
+    const label = document.createElement('span');
+    label.className = 'set-label';
+    label.textContent = 'Name';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'set-name';
+    input.maxLength = 120;
+    input.value = this.host.name();
+    input.placeholder = 'Untitled';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    // The panel lives inside the note, whose keydown handler treats single letters as
+    // shortcuts. Without this, typing a name would toggle the pen and cycle the palette.
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.host.rename(input.value);
+        input.blur();
+      }
+    });
+    input.addEventListener('change', () => this.host.rename(input.value));
+
+    wrap.append(label, input);
+    return wrap;
   }
 
   private section(title: string, rows: HTMLElement[]): HTMLElement {

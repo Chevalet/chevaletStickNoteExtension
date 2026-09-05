@@ -70,12 +70,10 @@ export function ensureFont(font: FontChoice, source: FontSource): Promise<void> 
   return work;
 }
 
-/** Test seam. Also used when a page is torn down and re-injected after an update. */
-export function forgetFonts(): void {
-  inflight.clear();
-}
-
-/** Which faces this page has asked for, for the dev overlay. */
-export function loadedFonts(): string[] {
-  return [...inflight.keys()];
-}
+/*
+ * There was a `forgetFonts()` and a `loadedFonts()` here, for "a test seam" and "the dev
+ * overlay". Neither existed. Two exports written for imaginary callers, in the same release
+ * that went through the settings removing controls nothing reads -- so they are gone. A
+ * teardown does not need one: the register is module state in a content script, which dies
+ * with the page.
+ */
