@@ -110,6 +110,23 @@ export const CATALOGUE = {
 
   // options
   optTitle: { en: 'Settings', fa: 'تنظیمات' },
+  optSettingsLive: { en: 'Settings live in the cabinet', fa: 'تنظیمات در کابینت است' },
+  optSettingsLiveNote: {
+    en:
+      'Every setting is in one place, and this is not it. The cabinet holds where notes ' +
+      'appear, how they look, what happens when a tab closes, how long the trash is kept, ' +
+      'backup, the language, and the whole keyboard reference. This page is what Firefox ' +
+      'opens from its add-ons list, so it keeps the way in, the version, and the two notes ' +
+      'below about what your notes survive and what leaves your machine — which is nothing.',
+    fa:
+      'همهٔ تنظیمات در یک جا هستند و آن جا این صفحه نیست. کابینت این‌ها را دارد: نوت‌ها کجا ' +
+      'ظاهر شوند، چه شکلی باشند، وقتی تبی بسته می‌شود چه اتفاقی بیفتد، سطل زباله چند روز ' +
+      'نگه داشته شود، بکاپ، زبان، و راهنمای کامل کلیدها. این صفحه همان چیزی است که فایرفاکس ' +
+      'از فهرست افزونه‌هایش باز می‌کند، پس فقط راه ورود، شمارهٔ نسخه، و دو یادداشت پایین را ' +
+      'دارد: نوت‌هایت از چه چیزهایی جان سالم می‌برند، و چه چیزی از دستگاهت بیرون می‌رود — که ' +
+      'هیچ چیز.',
+  },
+  optOpenCabinet: { en: 'Open the cabinet', fa: 'کابینت را باز کن' },
   optWhereNotes: { en: 'Where notes appear', fa: 'نوت‌ها کجا ظاهر شوند' },
   optCloseWarning: { en: 'Warning before a tab closes', fa: 'هشدار قبل از بسته شدن تب' },
   optKeeping: { en: 'Keeping and deleting', fa: 'نگه‌داری و حذف' },

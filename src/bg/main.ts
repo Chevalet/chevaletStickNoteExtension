@@ -548,7 +548,8 @@ async function onMessage(
     }
 
     case 'update/check': {
-      const info = await runUpdateCheck((msg as { fromClick?: boolean }).fromClick === true);
+      // No flag any more: the page asks for the permission itself, before sending this.
+      const info = await runUpdateCheck();
       return okReply(info);
     }
 
@@ -783,10 +784,9 @@ function toWire(r: NoteRecord): NoteWire {
  * is torn down between wakes and the options page needs to be able to show the last answer
  * without triggering a fresh network call every time it opens.
  */
-async function runUpdateCheck(fromClick: boolean): Promise<UpdateInfo> {
+async function runUpdateCheck(): Promise<UpdateInfo> {
   const info = await checkForUpdate({
     current: __VERSION__,
-    mayRequestPermission: fromClick,
   });
   await browser.storage.local.set({ lastUpdateCheck: info }).catch(() => undefined);
 
@@ -872,7 +872,7 @@ async function onAlarm(alarm: browser.alarms.Alarm): Promise<void> {
   await ready();
   if (alarm.name === UPDATE_ALARM) {
     // No click behind this, so it can only use a permission already granted.
-    await runUpdateCheck(false);
+    await runUpdateCheck();
     return;
   }
   if (alarm.name === BACKUP_ALARM) {

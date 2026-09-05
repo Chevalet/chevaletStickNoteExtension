@@ -6,9 +6,8 @@
  * missing: someone would rely on a warning that a browser will not always show.
  */
 
-import type { GuardMode } from '~/bg/guard/budget.ts';
-import { RELEASES_PAGE, type UpdateInfo } from '~/bg/jobs/update.ts';
-import { DEFAULT_SETTINGS, loadSettings, type Settings, saveSettings } from '~/bg/settings.ts';
+import { API_ORIGIN, RELEASES_PAGE, type UpdateInfo } from '~/bg/jobs/update.ts';
+import { DEFAULT_SETTINGS, loadSettings, type Settings } from '~/bg/settings.ts';
 import { isRtl, setLang, t } from '~/shared/i18n.ts';
 import { applyTheme, asThemeChoice, THEME_CSS } from '../chrome-theme.ts';
 
@@ -89,7 +88,6 @@ table.facts td:last-child { text-align: end; white-space: nowrap; }
 .yes { color: var(--ok); font-weight: 700; }
 .no { color: var(--accent); font-weight: 700; }
 a { color: inherit; text-decoration-color: var(--accent); }
-.saved { position: fixed; inset: auto 0 0 0; padding: 6px 22px; background: var(--bar); color: var(--cyan); font-size: 12px; }
 @media (forced-colors: active) {
   section { border: 1px solid CanvasText; box-shadow: none; }
   select, input { border: 1px solid ButtonBorder; background: Field; color: FieldText; }
@@ -99,96 +97,24 @@ a { color: inherit; text-decoration-color: var(--accent); }
 
 let current: Settings = { ...DEFAULT_SETTINGS };
 
-async function patch(next: Partial<Settings>): Promise<void> {
-  current = await saveSettings(next);
-  flash();
-}
-
-let flashTimer = 0;
-function flash(): void {
-  let bar = document.querySelector('.saved');
-  if (!bar) {
-    bar = el('div', { class: 'saved', role: 'status', 'aria-live': 'polite' });
-    document.body.append(bar);
-  }
-  bar.textContent = t('optSaved');
-  clearTimeout(flashTimer);
-  flashTimer = self.setTimeout(() => bar?.remove(), 1600);
-}
-
-function selectField(
-  label: string,
-  value: string,
-  options: ReadonlyArray<readonly [string, string]>,
-  onChange: (v: string) => void,
-): HTMLElement {
-  const sel = el('select');
-  for (const [v, text] of options) {
-    const o = el('option', { value: v }, text);
-    if (v === value) o.selected = true;
-    sel.append(o);
-  }
-  sel.addEventListener('change', () => onChange(sel.value));
-  /*
-   * The select is wrapped so a caret can be drawn over it. `all: unset` in the stylesheet
-   * strips the native arrow along with everything else, which left a dropdown looking exactly
-   * like a text field -- no affordance at all that it could be opened. Putting `appearance`
-   * back would draw a native control in the middle of a hand-drawn interface, which is the
-   * mistake the unstyled update button already made once.
-   */
-  return el(
-    'label',
-    { class: 'field' },
-    el('span', {}, label),
-    el('span', { class: 'selwrap' }, sel),
-  );
-}
-
-function checkField(label: string, value: boolean, onChange: (v: boolean) => void): HTMLElement {
-  const box = el('input', { type: 'checkbox' }) as HTMLInputElement;
-  box.checked = value;
-  box.addEventListener('change', () => onChange(box.checked));
-  return el('label', { class: 'inline' }, box, el('span', {}, label));
-}
-
-function numberField(
-  label: string,
-  value: number,
-  min: number,
-  max: number,
-  onChange: (v: number) => void,
-): HTMLElement {
-  /*
-   * A text input with a numeric keypad, not `type="number"`.
-   *
-   * Firefox draws `-moz-number-spin-box` even under `appearance: none`, and it draws it in the
-   * platform's own light widget colours -- so the dark options page had a small grey box
-   * floating in the corner of the field, the one native artefact on the page. The clamp below
-   * is what `min`/`max` were doing anyway, and it runs whatever the field is typed into.
-   */
-  const input = el('input', {
-    type: 'text',
-    inputmode: 'numeric',
-    pattern: '[0-9]*',
-    'aria-valuemin': String(min),
-    'aria-valuemax': String(max),
-  }) as HTMLInputElement;
-  input.value = String(value);
-  input.addEventListener('change', () => {
-    const typed = Number.parseInt(input.value.replace(/[^0-9]/g, ''), 10);
-    const v = Number.isFinite(typed) ? Math.max(min, Math.min(max, typed)) : value;
-    input.value = String(v);
-    onChange(v);
-  });
-  return el('label', { class: 'field' }, el('span', {}, label), input);
-}
+/*
+ * This page no longer WRITES anything.
+ *
+ * It had a `patch()` that saved a setting and flashed a "Saved." bar, for the four sections
+ * that were copies of cabinet panes. Those are gone -- one home per setting -- so the page is
+ * a way in, a version number, an update check and two pieces of prose. Nothing to save means
+ * nothing to confirm, and the flash bar went with it.
+ */
 
 /** Last answer from the update check, so opening the page does not trigger a request. */
 let lastUpdate: UpdateInfo | null = null;
 let checking = false;
 
 function updateRow(): HTMLElement {
-  const status = el('span', { class: 'note' });
+  // `upd-status` so a harness can find exactly this line rather than guessing at a
+  // paragraph that happens to contain the word "version" -- which is what the first version of
+  // spikes/firefox-pages.mjs did, and it passed while pointing at the privacy note.
+  const status = el('span', { class: 'note upd-status' });
   // Given the house button class: as a bare <button> it rendered as the operating system's own
   // grey box in the middle of the page, which was merely out of place in the light theme and
   // plainly broken once there was a dark one.
@@ -220,32 +146,54 @@ function updateRow(): HTMLElement {
     } else status.textContent = t('updatesCurrent');
   };
 
+  const failed = (error: string): UpdateInfo => ({
+    current: VERSION,
+    latest: null,
+    newer: false,
+    url: RELEASES_PAGE,
+    checkedAt: Date.now(),
+    error,
+  });
+
   button.addEventListener('click', () => {
     if (checking) return;
     checking = true;
     paint();
-    // fromClick: true is what lets the background request the host permission -- Firefox only
-    // grants one from a user gesture, and the click is that gesture.
-    void browser.runtime
-      .sendMessage({ t: 'update/check', fromClick: true })
-      .then((reply: unknown) => {
-        const r = reply as { ok?: boolean; data?: UpdateInfo };
-        lastUpdate = r?.ok ? (r.data ?? null) : null;
-      })
-      .catch(() => {
-        lastUpdate = {
-          current: VERSION,
-          latest: null,
-          newer: false,
-          url: RELEASES_PAGE,
-          checkedAt: Date.now(),
-          error: 'failed',
-        };
-      })
-      .finally(() => {
+    void (async () => {
+      try {
+        /*
+         * The permission is asked for HERE, in the click handler.
+         *
+         * It used to be asked for in the background, one message later, with a `fromClick`
+         * flag that was believed to carry the gesture across. It does not: user activation
+         * does not travel with a message, and Firefox's response to a request without it is
+         * a promise that never settles -- so the background never answered and this button
+         * sat on "Checking..." for good. That was the reported bug.
+         */
+        const granted = await browser.permissions
+          .request({ origins: [API_ORIGIN] })
+          .catch(() => false);
+        if (!granted) {
+          lastUpdate = failed('no-permission');
+          return;
+        }
+        /*
+         * And a deadline, because a button that can wait forever is the wrong shape whatever
+         * is on the other end. Fifteen seconds is far longer than one API call and far
+         * shorter than a person's patience.
+         */
+        const reply = (await Promise.race([
+          browser.runtime.sendMessage({ t: 'update/check' }),
+          new Promise((resolve) => setTimeout(() => resolve({ ok: false }), 15_000)),
+        ])) as { ok?: boolean; data?: UpdateInfo };
+        lastUpdate = reply?.ok ? (reply.data ?? null) : failed('failed');
+      } catch {
+        lastUpdate = failed('failed');
+      } finally {
         checking = false;
         paint();
-      });
+      }
+    })();
   });
 
   paint();
@@ -272,161 +220,33 @@ function render(): void {
   const main = el('main');
   document.body.append(main);
 
-  // -------------------------------------------------------------- general
+  /*
+   * A SIGNPOST, not a second settings screen.
+   *
+   * This page used to carry its own copies of Where notes appear, Closing a tab, Keeping and
+   * deleting, Backup and Language -- every one of them also in the cabinet, and not laid out
+   * the same way, so the two disagreed about what the settings even were. Reported as
+   * "those items in the settings do not work well", which is exactly what two screens for one
+   * set of switches feels like from the outside.
+   *
+   * So: one home per setting, and it is the cabinet. What stays here is what belongs to a page
+   * Firefox opens from about:addons -- a way in, the version, an update check, and the two
+   * pieces of prose that are documentation rather than settings.
+   */
+  const openCabinet = el('button', { class: 'btn primary' }, t('optOpenCabinet'));
+  openCabinet.addEventListener('click', () => {
+    void browser.tabs.create({ url: browser.runtime.getURL('ui/manager.html') });
+  });
   main.append(
     el(
       'section',
       {},
-      el('h2', {}, t('optWhereNotes')),
+      el('h2', {}, t('optSettingsLive')),
       el(
         'div',
         { class: 'inner' },
-        checkField(
-          'Show notes on sites I have not set a rule for',
-          current.defaultEnabled,
-          (v) => void patch({ defaultEnabled: v }),
-        ),
-        el(
-          'p',
-          { class: 'note' },
-          `Per-site rules: ${Object.keys(current.siteRules).length || 'none'}. ` +
-            'Set them from the popup on the site itself, where you can see what you are changing.',
-        ),
-        selectField(
-          t('optLanguage'),
-          current.locale,
-          [
-            ['', t('optFollowBrowser')],
-            ['en', 'English'],
-            ['fa', 'فارسی'],
-          ],
-          (v) => {
-            void patch({ locale: v as Settings['locale'] }).then(() => {
-              setLang(current.locale);
-              void browser.storage.local
-                .get('lastUpdateCheck')
-                .then((got: Record<string, unknown>) => {
-                  const cached = got.lastUpdateCheck as UpdateInfo | undefined;
-                  if (cached) {
-                    lastUpdate = cached;
-                    render();
-                  }
-                })
-                .catch(() => undefined);
-
-              render();
-            });
-          },
-        ),
-        selectField(
-          'Motion',
-          current.motion,
-          [
-            ['auto', 'Follow my system setting'],
-            ['full', 'Full paper physics'],
-            ['reduced', 'Reduced'],
-            ['off', 'None'],
-          ],
-          (v) => void patch({ motion: v as Settings['motion'] }),
-        ),
-      ),
-    ),
-  );
-
-  // ---------------------------------------------------- the close warning
-  main.append(
-    el(
-      'section',
-      {},
-      el('h2', {}, t('optCloseWarning')),
-      el(
-        'div',
-        { class: 'inner' },
-        selectField(
-          'When to warn',
-          current.guard.mode,
-          [
-            ['unsaved', t('guardModeUnsaved')],
-            ['hasNotes', t('guardModeHasNotes')],
-            ['never', t('guardModeNever')],
-          ],
-          (v) => void patch({ guard: { ...current.guard, mode: v as GuardMode } }),
-        ),
-        numberField(
-          'Watch at most this many tabs at once',
-          current.guard.maxArmedTabs,
-          0,
-          12,
-          (v) => void patch({ guard: { ...current.guard, maxArmedTabs: v } }),
-        ),
-        // The honest part. This is the whole reason this section has prose in it.
-        el('p', { class: 'note' }, t('guardBestEffort')),
-        el(
-          'p',
-          { class: 'note' },
-          'Specifically: no browser lets an extension cancel a tab close. All this can do is ' +
-            'ask Firefox to show its own "Leave page?" dialog, and Firefox only allows that on a ' +
-            'page you have interacted with. It will not appear on a tab Firefox has unloaded, or ' +
-            'when a tab is closed by another extension.',
-        ),
-        el(
-          'p',
-          { class: 'note' },
-          'The limit above exists because closing a window with a dozen annotated tabs would ' +
-            'otherwise ask you a dozen times, focusing each tab in turn.',
-        ),
-      ),
-    ),
-  );
-
-  // ------------------------------------------------------------- keeping
-  main.append(
-    el(
-      'section',
-      {},
-      el('h2', {}, t('optKeeping')),
-      el(
-        'div',
-        { class: 'inner' },
-        numberField(
-          'Days a deleted note stays in the trash',
-          current.retention.trashDays,
-          1,
-          365,
-          (v) => void patch({ retention: { ...current.retention, trashDays: v } }),
-        ),
-        /*
-         * "Revisions kept per note" used to be here and has been taken out.
-         *
-         * `addRevision` and `shouldSnapshot` are written and tested in `bg/db/notes.ts`, and
-         * **nothing calls either of them** -- no revision has ever been stored, so the number
-         * governed nothing. The field stays in `Settings` so the day version history lands it
-         * has somewhere to read from; the control goes, because a control that writes to
-         * storage and changes nothing makes a promise the app does not keep.
-         */
-        checkField(
-          'Let old notes be deleted automatically once their time is up',
-          current.retention.autoDelete,
-          (v) => void patch({ retention: { ...current.retention, autoDelete: v } }),
-        ),
-        el(
-          'p',
-          { class: 'note' },
-          'Off by default. With it off, nothing is ever destroyed unless you empty the trash ' +
-            'yourself — the trash simply grows, which is cheap.',
-        ),
-        checkField(
-          'Keep notes made in private windows',
-          current.persistPrivateNotes,
-          (v) => void patch({ persistPrivateNotes: v }),
-        ),
-        el(
-          'p',
-          { class: 'note' },
-          current.persistPrivateNotes
-            ? 'Notes made in a private window are written to the database like any other.'
-            : 'Notes made in a private window live in memory only and are gone when the last private window closes.',
-        ),
+        el('p', { class: 'note' }, t('optSettingsLiveNote')),
+        el('div', { class: 'row' }, openCabinet),
       ),
     ),
   );
@@ -442,59 +262,15 @@ function render(): void {
         { class: 'inner' },
         el('p', { class: 'note' }, `Installed: ${VERSION}`),
         updateRow(),
-        checkField(
-          t('updatesDaily'),
-          current.autoCheckUpdates,
-          (v) => void patch({ autoCheckUpdates: v }),
-        ),
         el(
           'p',
           { class: 'note' },
-          'This is the only network request the extension can make, it is off unless you turn ' +
+          'The daily check is switched on in the cabinet, under Backup. ' +
+            'This is the only network request the extension can make, it is off unless you turn ' +
             'it on, and it asks for permission the first time. It sends no cookies, no ' +
             'referrer and nothing about you — it reads the release list and compares one ' +
             'version number. It cannot install anything: Firefox only updates an add-on that ' +
             'has been signed, so the button hands you the download page.',
-        ),
-      ),
-    ),
-  );
-
-  // -------------------------------------------------------------- backup
-  /*
-   * Scheduled backup is NOT offered, and the two controls that used to be here are gone.
-   *
-   * They were a switch and an interval for something that does not exist: there is no alarm
-   * that writes a backup, and the `downloads` permission an unattended write would need was
-   * removed from the manifest precisely because nothing used it. The help text even promised
-   * that "Firefox will ask the first time" -- it could not have, the permission is not
-   * declared, not even optionally.
-   *
-   * So this section now says what is true. Manual export works, needs no permission at all,
-   * and is one click away in the cabinet.
-   */
-  main.append(
-    el(
-      'section',
-      {},
-      el('h2', {}, t('optBackup')),
-      el(
-        'div',
-        { class: 'inner' },
-        el(
-          'p',
-          { class: 'note' },
-          'Export ZIP in the cabinet writes every note, its position, its style and its ' +
-            'images to one archive, and needs no permission at all — the bytes are already ' +
-            'here, so Firefox is simply handed a file to save.',
-        ),
-        el(
-          'p',
-          { class: 'note' },
-          'There is no scheduled backup yet. Writing one unattended needs permission to your ' +
-            'downloads folder, which this extension deliberately does not ask for while ' +
-            'nothing uses it, so there is nothing to switch on here rather than a switch that ' +
-            'does nothing.',
         ),
       ),
     ),

@@ -164,6 +164,15 @@
   "optTitle": {
     "message": "Settings"
   },
+  "optSettingsLive": {
+    "message": "Settings live in the cabinet"
+  },
+  "optSettingsLiveNote": {
+    "message": "Every setting is in one place, and this is not it. The cabinet holds where notes appear, how they look, what happens when a tab closes, how long the trash is kept, backup, the language, and the whole keyboard reference. This page is what Firefox opens from its add-ons list, so it keeps the way in, the version, and the two notes below about what your notes survive and what leaves your machine — which is nothing."
+  },
+  "optOpenCabinet": {
+    "message": "Open the cabinet"
+  },
   "optWhereNotes": {
     "message": "Where notes appear"
   },

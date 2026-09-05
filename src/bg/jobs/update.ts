@@ -79,8 +79,6 @@ function hasApiPermission(): Promise<boolean> {
 
 export interface CheckOptions {
   current: string;
-  /** Only a click can request a permission, so an alarm-driven check passes false. */
-  mayRequestPermission: boolean;
   fetchImpl?: typeof fetch;
 }
 
@@ -99,11 +97,22 @@ export async function checkForUpdate(opts: CheckOptions): Promise<UpdateInfo> {
     checkedAt: Date.now(),
   };
 
-  let granted = await hasApiPermission();
-  if (!granted && opts.mayRequestPermission) {
-    granted = await browser.permissions.request({ origins: [API_ORIGIN] }).catch(() => false);
-  }
-  if (!granted) return { ...base, error: 'no-permission' };
+  /*
+   * ASKS, never requests. This is the bug that made the button stick.
+   *
+   * `permissions.request()` needs user activation, and activation does NOT travel across a
+   * message: the click happens in the options page, and by the time the background runs there
+   * is no gesture to spend. Firefox's answer to that is not a rejection -- the promise simply
+   * never settles. So the background never replied, and the button sat on "Checking..."
+   * forever, which is exactly how it was reported.
+   *
+   * The permission is therefore requested by the PAGE, inside its own click handler, before
+   * this is ever called. Both other places that ask for a permission -- the popup, for host
+   * access, and the Backup switch, for downloads -- already did it that way and say so.
+   * `mayRequestPermission` is gone rather than defaulted to false, so the mistake cannot be
+   * made again by passing the wrong flag.
+   */
+  if (!(await hasApiPermission())) return { ...base, error: 'no-permission' };
 
   try {
     const doFetch = opts.fetchImpl ?? fetch;

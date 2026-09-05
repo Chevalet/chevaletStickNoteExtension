@@ -54,6 +54,7 @@ await writeFile(
 const written = JSON.parse(await readFile(join(TEST_OUT, 'manifest.json'), 'utf8'));
 written.browser_specific_settings.gecko.id = 'chevalet-note-test@chevalet.dev';
 written.name = 'Chevalet Note (test build)';
+if (process.env.CN_NO_API) written.host_permissions = ['*://127.0.0.1/*'];
 await writeFile(join(TEST_OUT, 'manifest.json'), `${JSON.stringify(written, null, 2)}\n`, 'utf8');
 
 process.stdout.write(

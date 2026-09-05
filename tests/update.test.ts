@@ -101,24 +101,48 @@ describe('checkForUpdate', () => {
     return stub;
   };
 
-  it('reports no-permission rather than asking from a non-click context', async () => {
+  it('NEVER asks for the permission itself, however it was called', async () => {
+    /*
+     * The bug that made the button stick on "Checking...". This function used to call
+     * `permissions.request()` when the caller passed a flag saying the check came from a
+     * click -- on the belief that the flag carried the user gesture across the message from
+     * the options page. It does not: activation does not travel with a message, and Firefox
+     * answers a request without it by never settling the promise. So the background never
+     * replied.
+     *
+     * There is no flag any more. The page asks, in its own click handler, before sending.
+     */
     const stub = withPermission(false);
-    const out = await checkForUpdate({ current: '0.0.1', mayRequestPermission: false });
+    const out = await checkForUpdate({ current: '0.0.1' });
     expect(out.error).toBe('no-permission');
     expect(out.newer).toBe(false);
     expect(stub.permissions.request).not.toHaveBeenCalled();
   });
 
-  it('asks for the permission when a click allows it', async () => {
+  it('checks once the page has been granted the permission', async () => {
+    withPermission(true);
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ tag_name: 'v0.0.5' }),
+    })) as unknown as typeof fetch;
+    const out = await checkForUpdate({ current: '0.0.1', fetchImpl });
+    expect(out.latest).toBe('0.0.5');
+    expect(out.newer).toBe(true);
+  });
+
+  it('does not touch the network when it has not been granted', async () => {
+    // A grantable-but-ungranted permission is still ungranted here: the answer is to report
+    // it and let the page ask, not to reach for the network and fail.
     withPermission(false, true);
     const fetchImpl = vi.fn(async () => ({
       ok: true,
       status: 200,
       json: async () => ({ tag_name: 'v0.0.5' }),
     })) as unknown as typeof fetch;
-    const out = await checkForUpdate({ current: '0.0.1', mayRequestPermission: true, fetchImpl });
-    expect(out.latest).toBe('0.0.5');
-    expect(out.newer).toBe(true);
+    const out = await checkForUpdate({ current: '0.0.1', fetchImpl });
+    expect(out.error).toBe('no-permission');
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it('finds a newer version and always points at the releases page', async () => {
@@ -129,7 +153,7 @@ describe('checkForUpdate', () => {
       // A hostile payload cannot redirect the download anywhere.
       json: async () => ({ tag_name: '0.9.0', html_url: 'https://evil.test/malware.xpi' }),
     })) as unknown as typeof fetch;
-    const out = await checkForUpdate({ current: '0.0.1', mayRequestPermission: false, fetchImpl });
+    const out = await checkForUpdate({ current: '0.0.1', fetchImpl });
     expect(out.newer).toBe(true);
     expect(out.url).toBe(RELEASES_PAGE);
     expect(out.url).not.toContain('evil');
@@ -142,7 +166,7 @@ describe('checkForUpdate', () => {
       status: 200,
       json: async () => ({ tag_name: 'v0.0.2' }),
     })) as unknown as typeof fetch;
-    const out = await checkForUpdate({ current: '0.0.2', mayRequestPermission: false, fetchImpl });
+    const out = await checkForUpdate({ current: '0.0.2', fetchImpl });
     expect(out.newer).toBe(false);
     expect(out.error).toBeUndefined();
   });
@@ -154,7 +178,7 @@ describe('checkForUpdate', () => {
       status: 200,
       json: async () => ({ tag_name: '0.0.1' }),
     })) as unknown as typeof fetch;
-    await checkForUpdate({ current: '0.0.1', mayRequestPermission: false, fetchImpl });
+    await checkForUpdate({ current: '0.0.1', fetchImpl });
     const [url, init] = (fetchImpl as unknown as { mock: { calls: unknown[][] } }).mock
       .calls[0] as [string, RequestInit];
     expect(url).toBe(RELEASES_API);
@@ -181,7 +205,6 @@ describe('checkForUpdate', () => {
     withPermission(true);
     const out = await checkForUpdate({
       current: '0.0.1',
-      mayRequestPermission: false,
       fetchImpl: impl as unknown as typeof fetch,
     });
     expect(out.error).toBeTruthy();
