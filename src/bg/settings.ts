@@ -82,7 +82,13 @@ export interface Settings {
    * changed colour because the operating system went dark would be a different note.
    */
   theme: 'auto' | 'light' | 'dark';
-  /** Empty means "follow the browser". */
+  /**
+   * The language of the extension's own interface.
+   *
+   * `'en'` by DEFAULT, not `''`. Following the browser is a choice someone makes, not the
+   * starting state: an extension that comes up in a language you did not ask for is
+   * startling, even when it guesses right, and English is the language this is written in.
+   */
   locale: '' | 'en' | 'fa';
 }
 
@@ -98,7 +104,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   persistPrivateNotes: false,
   motion: 'auto',
   theme: 'auto',
-  locale: '',
+  locale: 'en',
 });
 
 /**

@@ -20,6 +20,7 @@ import {
   spring,
   step,
 } from '~/cs/physics/spring.ts';
+import { t } from '~/shared/i18n-note.ts';
 import { ensureFont } from './fontload.ts';
 import {
   clearFormatting,
@@ -72,12 +73,12 @@ const PALETTE_IDS = PALETTES.map((p) => p.id);
 const TOOLBAR: ReadonlyArray<readonly [name: string, label: string, path: string]> = [
   [
     'pen',
-    'Draw (D)',
+    t('noteToolDraw'),
     'M3 17.3V21h3.7L17.6 10.1l-3.7-3.7L3 17.3zM20.7 7a1 1 0 0 0 0-1.4l-2.3-2.3a1 1 0 0 0-1.4 0l-1.8 1.8 3.7 3.7L20.7 7z',
   ],
   [
     'settings',
-    'Settings (S)',
+    t('noteToolSettings'),
     // Sliders rather than a cog: at 15px a cog's teeth turn into a grey blob, and this is now
     // the ONLY route to a note's own settings that does not need the keyboard. It was missing
     // from this list entirely -- `toggleSettings` has always looked for `.act-settings` and
@@ -87,16 +88,16 @@ const TOOLBAR: ReadonlyArray<readonly [name: string, label: string, path: string
   ],
   [
     'palette',
-    'Colour (C)',
+    t('noteToolColour'),
     'M12 3a9 9 0 1 0 0 18c.8 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1-.3-.3-.4-.6-.4-1 0-.8.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.4-4-8-9-8zm-5.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z',
   ],
   [
     'lock',
-    'Lock (L)',
+    t('noteToolLock'),
     'M17 9V7a5 5 0 0 0-10 0v2H5v12h14V9h-2zM9 7a3 3 0 0 1 6 0v2H9V7zm3 11a2 2 0 1 1 0-4 2 2 0 0 1 0 4z',
   ],
-  ['collapse', 'Collapse (M)', 'M5 11h14v2H5z'],
-  ['delete', 'Delete (Del)', 'M6 7h12l-1 14H7L6 7zm3-4h6l1 2h4v2H4V5h4l1-2z'],
+  ['collapse', t('noteToolCollapse'), 'M5 11h14v2H5z'],
+  ['delete', t('noteToolDelete'), 'M6 7h12l-1 14H7L6 7zm3-4h6l1 2h4v2H4V5h4l1-2z'],
 ] as const;
 
 const ICON_PEN =
@@ -346,14 +347,14 @@ export class NoteView implements Animatable {
     this.bodyEl.setAttribute('aria-multiline', 'true');
     this.bodyEl.tabIndex = -1;
     this.bodyEl.textContent = init.text;
-    this.bodyEl.dataset.placeholder = 'Type. Markdown works.';
+    this.bodyEl.dataset.placeholder = t('noteTypeHere');
     this.applyEditable();
 
     // Rendered markdown lives in its own element. The source stays the single truth; the
     // preview is always a pure function of it, so there is never a "which one is right"
     // question when the two could disagree.
     this.previewEl = div('preview');
-    this.previewEl.dataset.placeholder = 'Click to write. Markdown works.';
+    this.previewEl.dataset.placeholder = t('notePlaceholder');
 
     const grips = div('grips');
     for (const g of ['se', 's', 'e'] as const) {
@@ -1292,8 +1293,8 @@ export class NoteView implements Animatable {
     size.step = '1';
     size.value = '7';
     size.className = 'ink-size';
-    size.title = 'Thickness';
-    size.setAttribute('aria-label', 'Stroke thickness');
+    size.title = t('noteThickness');
+    size.setAttribute('aria-label', t('noteStrokeThickness'));
     size.addEventListener('input', (e) => {
       e.stopPropagation();
       this.ink?.setOptions({ size: Number(size.value) });
@@ -1303,8 +1304,8 @@ export class NoteView implements Animatable {
     const clear = document.createElement('button');
     clear.type = 'button';
     clear.className = 'ink-tool ink-clear';
-    clear.title = 'Erase everything';
-    clear.setAttribute('aria-label', 'Erase everything');
+    clear.title = t('noteEraseAll');
+    clear.setAttribute('aria-label', t('noteEraseAll'));
     clear.append(icon(ICON_CLEAR));
     clear.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1313,8 +1314,8 @@ export class NoteView implements Animatable {
     });
 
     bar.append(
-      tool('pen', 'Pen (P)', ICON_PEN),
-      tool('eraser', 'Eraser (E)', ICON_ERASER),
+      tool('pen', t('noteToolPen'), ICON_PEN),
+      tool('eraser', t('noteToolEraser'), ICON_ERASER),
       size,
       clear,
     );

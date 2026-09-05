@@ -1,3 +1,5 @@
+import { t } from '~/shared/i18n.ts';
+
 /**
  * One palette for all three of the extension's own pages: the cabinet, the options page and
  * the popup.
@@ -244,20 +246,23 @@ export const THEME_ORDER: readonly ThemeChoice[] = ['auto', 'dark', 'light'] as 
 /**
  * What the button says it is on.
  *
+ * Functions, not strings: a constant would be evaluated at module load, before the language is
+ * known, and would then keep saying "Auto" in a Persian interface for the life of the page.
+ *
  * The glyph carries the state and the word repeats it, because an icon alone leaves people
  * guessing which of three states they are looking at -- and with `auto` there is genuinely no
  * icon that means "the same as your system".
  */
-export const THEME_LABEL: Record<ThemeChoice, string> = {
-  auto: '◐ Auto',
-  dark: '● Dark',
-  light: '○ Light',
+export const THEME_LABEL: Record<ThemeChoice, () => string> = {
+  auto: () => t('themeAuto'),
+  dark: () => t('themeDark'),
+  light: () => t('themeLight'),
 };
 
-export const THEME_TITLE: Record<ThemeChoice, string> = {
-  auto: 'Colours follow your browser. Click for dark.',
-  dark: 'Dark, whatever your browser says. Click for light.',
-  light: 'Light, whatever your browser says. Click to follow your browser.',
+export const THEME_TITLE: Record<ThemeChoice, () => string> = {
+  auto: () => t('themeAutoTitle'),
+  dark: () => t('themeDarkTitle'),
+  light: () => t('themeLightTitle'),
 };
 
 /** Cycle auto -> dark -> light -> auto. Dark comes first because that is what people want. */

@@ -150,7 +150,12 @@ async function applyRevisionPolicy(): Promise<void> {
 /** Push the current settings to every tab that has a renderer in it. */
 async function broadcastSettings(): Promise<void> {
   const s = await settings();
-  const payload = { t: 'defaults/changed', style: s.noteDefaults, motion: resolveMotion(s) };
+  const payload = {
+    t: 'defaults/changed',
+    style: s.noteDefaults,
+    motion: resolveMotion(s),
+    locale: s.locale,
+  };
   for (const tabId of tabRuntime.keys()) void tell(tabId, payload as never);
 }
 
@@ -624,6 +629,7 @@ async function hello(
     notes: [],
     noteDefaults: {},
     motion: 'full',
+    locale: 'en',
   };
   if (!ctx) return okReply(quiet);
 
@@ -650,6 +656,7 @@ async function hello(
     notes: records.map(toWire),
     noteDefaults: s.noteDefaults,
     motion: resolveMotion(s),
+    locale: s.locale,
   });
 }
 

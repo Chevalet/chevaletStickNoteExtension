@@ -1,4 +1,151 @@
 {
+  "noteEraseAll": {
+    "message": "پاک کردن همه"
+  },
+  "noteName": {
+    "message": "نام"
+  },
+  "noteNamePlaceholder": {
+    "message": "بی‌نام"
+  },
+  "notePlaceholder": {
+    "message": "برای نوشتن کلیک کن. Markdown کار می‌کند."
+  },
+  "noteSettingsTitle": {
+    "message": "تنظیمات نوت"
+  },
+  "noteStrokeThickness": {
+    "message": "ضخامت خط"
+  },
+  "noteThickness": {
+    "message": "ضخامت"
+  },
+  "noteToolCollapse": {
+    "message": "جمع کردن (M)"
+  },
+  "noteToolColour": {
+    "message": "رنگ (C)"
+  },
+  "noteToolDelete": {
+    "message": "حذف (Del)"
+  },
+  "noteToolDraw": {
+    "message": "نقاشی (D)"
+  },
+  "noteToolEraser": {
+    "message": "پاک‌کن (E)"
+  },
+  "noteToolLock": {
+    "message": "قفل (L)"
+  },
+  "noteToolPen": {
+    "message": "قلم (P)"
+  },
+  "noteToolSettings": {
+    "message": "تنظیمات (S)"
+  },
+  "noteTypeHere": {
+    "message": "بنویس. Markdown کار می‌کند."
+  },
+  "setAccent": {
+    "message": "تأکید"
+  },
+  "setAlign": {
+    "message": "تراز"
+  },
+  "setCentre": {
+    "message": "میانه"
+  },
+  "setDefaultHint": {
+    "message": "هر نوت تازه مثل همین شروع می‌شود"
+  },
+  "setDirAuto": {
+    "message": "خودکار (هر پاراگراف)"
+  },
+  "setDirLtr": {
+    "message": "چپ به راست"
+  },
+  "setDirRtl": {
+    "message": "راست به چپ"
+  },
+  "setDirection": {
+    "message": "جهت"
+  },
+  "setEnd": {
+    "message": "انتها"
+  },
+  "setFont": {
+    "message": "فونت"
+  },
+  "setFullPhysics": {
+    "message": "فیزیک کامل کاغذ"
+  },
+  "setGrain": {
+    "message": "دانه"
+  },
+  "setInk": {
+    "message": "جوهر"
+  },
+  "setLineHeight": {
+    "message": "ارتفاع خط"
+  },
+  "setMaterial": {
+    "message": "جنس"
+  },
+  "setMotion": {
+    "message": "حرکت"
+  },
+  "setNone": {
+    "message": "بدون"
+  },
+  "setOff": {
+    "message": "خاموش"
+  },
+  "setOneCorner": {
+    "message": "یک گوشه"
+  },
+  "setOpacity": {
+    "message": "شفافیت"
+  },
+  "setPalette": {
+    "message": "پالت"
+  },
+  "setPaper": {
+    "message": "کاغذ"
+  },
+  "setReduced": {
+    "message": "کم"
+  },
+  "setResetNote": {
+    "message": "بازنشانی این نوت"
+  },
+  "setSaveDefault": {
+    "message": "ذخیره به‌عنوان پیش‌فرض من"
+  },
+  "setShadow": {
+    "message": "سایه"
+  },
+  "setSize": {
+    "message": "اندازه"
+  },
+  "setStart": {
+    "message": "ابتدا"
+  },
+  "setTape": {
+    "message": "چسب"
+  },
+  "setTornEdge": {
+    "message": "لبه‌ی پاره"
+  },
+  "setTwoCorners": {
+    "message": "دو گوشه"
+  },
+  "setType": {
+    "message": "نوشته"
+  },
+  "setCustomHint": {
+    "message": "سفارشی. کلیک کن تا دوباره از پیش‌فرض پیروی کند."
+  },
   "extName": {
     "message": "شوالیه‌نوت"
   },
@@ -80,86 +227,8 @@
   "noteEraser": {
     "message": "پاک‌کن"
   },
-  "noteThickness": {
-    "message": "ضخامت"
-  },
-  "noteEraseAll": {
-    "message": "پاک کردن همه"
-  },
   "noteDrawingHint": {
     "message": "در حال ترسیم — Esc برای خروج"
-  },
-  "notePlaceholder": {
-    "message": "برای نوشتن کلیک کن. Markdown کار می‌کند."
-  },
-  "setPaper": {
-    "message": "کاغذ"
-  },
-  "setType": {
-    "message": "نوشته"
-  },
-  "setMaterial": {
-    "message": "جنس"
-  },
-  "setPalette": {
-    "message": "پالت"
-  },
-  "setInk": {
-    "message": "جوهر"
-  },
-  "setAccent": {
-    "message": "تأکید"
-  },
-  "setFont": {
-    "message": "فونت"
-  },
-  "setSize": {
-    "message": "اندازه"
-  },
-  "setLineHeight": {
-    "message": "ارتفاع خط"
-  },
-  "setDirection": {
-    "message": "جهت"
-  },
-  "setDirAuto": {
-    "message": "خودکار (هر پاراگراف)"
-  },
-  "setDirLtr": {
-    "message": "چپ به راست"
-  },
-  "setDirRtl": {
-    "message": "راست به چپ"
-  },
-  "setAlign": {
-    "message": "تراز"
-  },
-  "setOpacity": {
-    "message": "شفافیت"
-  },
-  "setTornEdge": {
-    "message": "لبه‌ی پاره"
-  },
-  "setGrain": {
-    "message": "دانه"
-  },
-  "setTape": {
-    "message": "چسب"
-  },
-  "setShadow": {
-    "message": "سایه"
-  },
-  "setMotion": {
-    "message": "حرکت"
-  },
-  "setSaveDefault": {
-    "message": "ذخیره به‌عنوان پیش‌فرض من"
-  },
-  "setResetNote": {
-    "message": "بازنشانی این نوت"
-  },
-  "setCustomHint": {
-    "message": "سفارشی. کلیک کن تا دوباره از پیش‌فرض پیروی کند."
   },
   "optTitle": {
     "message": "تنظیمات"
@@ -201,7 +270,7 @@
     "message": "پیروی از مرورگر"
   },
   "mgrTitle": {
-    "message": "کمد"
+    "message": "کابینت"
   },
   "mgrSearch": {
     "message": "جستجو در همه‌ی نوت‌ها…"
@@ -216,7 +285,7 @@
     "message": "بازگشت به نوت‌ها"
   },
   "mgrCabinetView": {
-    "message": "کمد"
+    "message": "کابینت"
   },
   "mgrListView": {
     "message": "فهرست"
@@ -309,7 +378,7 @@
     "message": "نوت تازه"
   },
   "popOpenCabinet": {
-    "message": "باز کردن کمد"
+    "message": "باز کردن کابینت"
   },
   "popGrantSite": {
     "message": "اجازه در این سایت"
@@ -350,5 +419,593 @@
   },
   "durabilityLost": {
     "message": "با «Refresh Firefox» یا حذف اکستنشن از بین می‌روند — و بکاپ ZIP دقیقاً برای همین است."
+  },
+  "cabAllNotes": {
+    "message": "همهٔ نوت‌ها"
+  },
+  "cabTrash": {
+    "message": "سطل زباله"
+  },
+  "cabSettings": {
+    "message": "تنظیمات"
+  },
+  "cabBackToNotes": {
+    "message": "برگشت به نوت‌ها"
+  },
+  "cabCabinet": {
+    "message": "کابینت"
+  },
+  "cabList": {
+    "message": "فهرست"
+  },
+  "cabSearchPlaceholder": {
+    "message": "در همهٔ نوت‌ها بگرد…"
+  },
+  "cabSearchLabel": {
+    "message": "جست‌وجوی نوت‌ها"
+  },
+  "cabExport": {
+    "message": "خروجی…"
+  },
+  "cabImport": {
+    "message": "ورودی…"
+  },
+  "cabRename": {
+    "message": "تغییر نام…"
+  },
+  "cabHistory": {
+    "message": "تاریخچه…"
+  },
+  "cabRestore": {
+    "message": "بازگرداندن"
+  },
+  "cabMoveToTrash": {
+    "message": "انداختن در سطل"
+  },
+  "cabDeleteForever": {
+    "message": "حذف همیشگی"
+  },
+  "cabClear": {
+    "message": "پاک کردن"
+  },
+  "cabCancel": {
+    "message": "بی‌خیال"
+  },
+  "cabSave": {
+    "message": "ذخیره"
+  },
+  "cabUntitled": {
+    "message": "بی‌نام"
+  },
+  "cabNote": {
+    "message": "نوت"
+  },
+  "cabPage": {
+    "message": "صفحه"
+  },
+  "cabUpdated": {
+    "message": "آخرین تغییر"
+  },
+  "cabEmptyDrawer": {
+    "message": "این کشو خالی است"
+  },
+  "cabEmptyAll": {
+    "message": "یک نوت روی صفحه‌ای بچسبان؛ خودش همین‌جا بایگانی می‌شود."
+  },
+  "cabTrashNote": {
+    "message": "نوت‌های حذف‌شده ۳۰ روز اینجا می‌مانند."
+  },
+  "cabNoMatch": {
+    "message": "چیزی با آن پیدا نشد"
+  },
+  "cabNoMatchNote": {
+    "message": "کلمات کمتری بنویس، یا جست‌وجو را پاک کن."
+  },
+  "cabNameThis": {
+    "message": "برای این نوت اسم بگذار"
+  },
+  "cabCouldNotRename": {
+    "message": "تغییر نام نشد"
+  },
+  "cabNoteMayBeGone": {
+    "message": "شاید نوت حذف شده باشد."
+  },
+  "cabCouldNotRestore": {
+    "message": "بازگرداندن نشد"
+  },
+  "cabVersionGone": {
+    "message": "آن نسخه دیگر در پایگاه داده نیست."
+  },
+  "cabExportWhat": {
+    "message": "چه چیزی خروجی بگیرم:"
+  },
+  "cabExportZip": {
+    "message": "همه چیز: متن، مکان، رنگ، نقاشی و عکس. تنها فرمتی که می‌شود دوباره به همین افزونه برگرداند. همین را نگه دار."
+  },
+  "cabExportMd": {
+    "message": "یک فایل md، گروه‌بندی‌شده بر اساس صفحه. در هر ادیتوری باز می‌شود. مکان و رنگ و نقاشی را از دست می‌دهد."
+  },
+  "cabExportHtml": {
+    "message": "یک فایل که در هر مرورگری باز می‌شود، عکس‌ها داخل خودش، و هیچ چیز از اینترنت نمی‌گیرد. برای خواندن و چاپ خوب است."
+  },
+  "cabImportArchive": {
+    "message": "ورود آرشیو"
+  },
+  "cabImportKeepNewest": {
+    "message": "جدیدتر بماند"
+  },
+  "cabImportArchiveWins": {
+    "message": "آرشیو برنده"
+  },
+  "cabImportCopies": {
+    "message": "به‌صورت کپی"
+  },
+  "cabImported": {
+    "message": "وارد شد"
+  },
+  "cabImportedProblems": {
+    "message": "وارد شد، با اشکال"
+  },
+  "cabImportSettings": {
+    "message": "تنظیمات داخل این آرشیو هم برگردد و جای تنظیمات فعلی را بگیرد."
+  },
+  "cabImportNoSettings": {
+    "message": "این آرشیو تنظیماتی ندارد."
+  },
+  "cabSettingsRestored": {
+    "message": "تنظیمات برگردانده شد."
+  },
+  "cabHistoryOff": {
+    "message": "تاریخچهٔ نسخه‌ها در تنظیمات ← نگه‌داری خاموش است، پس چیزی نگه داشته نمی‌شود."
+  },
+  "cabCountNotes": {
+    "message": "$1 نوت"
+  },
+  "cabCountSites": {
+    "message": "$1 سایت"
+  },
+  "cabCountTrashed": {
+    "message": "$1 در سطل"
+  },
+  "cabCountSelected": {
+    "message": "$1 انتخاب‌شده"
+  },
+  "cabTrashCount": {
+    "message": "سطل زباله ($1)"
+  },
+  "cabNotesHere": {
+    "message": "$1 نوت"
+  },
+  "cabOneNoteHere": {
+    "message": "1 نوت"
+  },
+  "cabJustNow": {
+    "message": "همین حالا"
+  },
+  "cabMinsAgo": {
+    "message": "$1 دقیقه پیش"
+  },
+  "cabHoursAgo": {
+    "message": "$1 ساعت پیش"
+  },
+  "cabThemeLabel": {
+    "message": "تم رنگی: $1"
+  },
+  "themeAuto": {
+    "message": "◐ خودکار"
+  },
+  "themeDark": {
+    "message": "● تاریک"
+  },
+  "themeLight": {
+    "message": "○ روشن"
+  },
+  "themeAutoTitle": {
+    "message": "رنگ‌ها از مرورگر پیروی می‌کنند. برای تاریک کلیک کن."
+  },
+  "themeDarkTitle": {
+    "message": "تاریک، هرچه مرورگر بگوید. برای روشن کلیک کن."
+  },
+  "themeLightTitle": {
+    "message": "روشن، هرچه مرورگر بگوید. کلیک کن تا از مرورگر پیروی کند."
+  },
+  "setShowUndecided": {
+    "message": "روی سایتی که دربارهٔ آن تصمیم نگرفته‌ام نوت‌ها را نشان بده"
+  },
+  "setShowUndecidedNote": {
+    "message": "خاموش یعنی سایت دست‌نخورده می‌ماند تا از دکمهٔ نوار ابزار نوت‌ها را برایش روشن کنی."
+  },
+  "setKeepPrivate": {
+    "message": "نوت‌های ساخته‌شده در پنجرهٔ ناشناس را نگه دار"
+  },
+  "setKeepPrivateOn": {
+    "message": "مثل هر نوت دیگری در پایگاه داده نوشته می‌شوند."
+  },
+  "setKeepPrivateOff": {
+    "message": "فقط در حافظه می‌مانند و با بسته شدن آخرین پنجرهٔ ناشناس از بین می‌روند."
+  },
+  "setNoSiteRules": {
+    "message": "هنوز برای هیچ سایتی تصمیمی نگرفته‌ای."
+  },
+  "setForget": {
+    "message": "فراموش کن"
+  },
+  "setNotesOn": {
+    "message": "نوت‌ها روشن"
+  },
+  "setNotesOff": {
+    "message": "نوت‌ها خاموش"
+  },
+  "setDecidedSites": {
+    "message": "سایت‌هایی که تصمیمشان را گرفته‌ای ($1)"
+  },
+  "setWarnClosing": {
+    "message": "قبل از بستن تب هشدار بده"
+  },
+  "setNever": {
+    "message": "هیچ‌وقت"
+  },
+  "setUnsavedEdits": {
+    "message": "ویرایش ذخیره‌نشده"
+  },
+  "setAnyNotes": {
+    "message": "هر نوتی"
+  },
+  "setWarnClosingNote": {
+    "message": "اینکه آن پنجره واقعاً نشان داده شود تصمیم فایرفاکس است، و صفحه‌ای که با آن کاری نکرده‌ای ممکن است هیچ هشداری نگیرد. نوت‌هایت مدت‌ها قبل از اینکه این موضوع مهم شود در پایگاه داده نوشته شده‌اند، پس این را یک ادب بدان، نه یک تور نجات."
+  },
+  "setTabsWatched": {
+    "message": "چند تب هم‌زمان زیر نظر باشند"
+  },
+  "setTabsWatchedNote": {
+    "message": "بستن پنجره‌ای پر از تب‌های نوت‌دار نباید ده بار از تو بپرسد. جاها به تب‌هایی می‌رسد که تازه‌تر ویرایش شده‌اند."
+  },
+  "setTabs": {
+    "message": "تب"
+  },
+  "setThisApp": {
+    "message": "خودِ برنامه"
+  },
+  "setColours": {
+    "message": "رنگ‌ها"
+  },
+  "setFollowBrowser": {
+    "message": "پیروی از مرورگر"
+  },
+  "setDark": {
+    "message": "تاریک"
+  },
+  "setLight": {
+    "message": "روشن"
+  },
+  "setColoursNote": {
+    "message": "کابینت، پاپ‌آپ و همین صفحه. نوت‌ها رنگ کاغذ خودشان را نگه می‌دارند — استیکی‌نوتی که چون سیستم تاریک شده تاریک شود، نوت دیگری است. یک کلید میان‌بر برای این کار پایین کابینت هست."
+  },
+  "setMovement": {
+    "message": "حرکت"
+  },
+  "setFollowSystem": {
+    "message": "پیروی از سیستم"
+  },
+  "setFull": {
+    "message": "کامل"
+  },
+  "setMovementNote": {
+    "message": "کاغذ وقتی می‌کشی‌اش چقدر کج شود، تاب بخورد و عقب بماند. پیروی از سیستم به «کاهش حرکت» در تنظیمات دسترس‌پذیری‌ات احترام می‌گذارد. این یک سقف است: نوتی که خودش حرکت کمتری انتخاب کرده، همان را نگه می‌دارد."
+  },
+  "setNewNoteLooks": {
+    "message": "نوت تازه چه شکلی باشد"
+  },
+  "setNewNoteLooksNote": {
+    "message": "هر نوتی را می‌شود جداگانه عوض کرد — روی نوت کلید S را بزن، یا از دکمهٔ لغزنده‌ها در سرش استفاده کن — و نوت هر چیزی را که خودش عوض کرده نگه می‌دارد، حتی وقتی این پیش‌فرض‌ها را تغییر دهی."
+  },
+  "setTypeNote": {
+    "message": "شش تای این‌ها همراه افزونه می‌آیند و فقط وقتی نوتی از آن‌ها استفاده کند بارگذاری می‌شوند، پس روی هر دستگاهی یک شکل‌اند. دو گزینهٔ System از هر چیزی که کامپیوترت دارد استفاده می‌کنند."
+  },
+  "setTextSize": {
+    "message": "اندازهٔ متن"
+  },
+  "setTextSizeNote": {
+    "message": "همان بازه‌ای که یک نوت به‌تنهایی می‌دهد، پس پیش‌فرض هرگز اندازه‌ای نمی‌شود که نوت نتواند باشد."
+  },
+  "setAutomatic": {
+    "message": "خودکار"
+  },
+  "setRtl": {
+    "message": "راست به چپ"
+  },
+  "setLtr": {
+    "message": "چپ به راست"
+  },
+  "setDirectionNote": {
+    "message": "خودکار می‌گذارد هر بند خودش تصمیم بگیرد، پس فارسی و انگلیسی می‌توانند در یک نوت کنار هم باشند."
+  },
+  "setTornEdgesNote": {
+    "message": "صفر یک مستطیل تمیز می‌دهد."
+  },
+  "setOneStrip": {
+    "message": "یک تکه"
+  },
+  "setTwoStrips": {
+    "message": "دو تکه"
+  },
+  "setHard": {
+    "message": "سخت"
+  },
+  "setSoft": {
+    "message": "نرم"
+  },
+  "setTabWhere": {
+    "message": "کجا"
+  },
+  "setTabClosing": {
+    "message": "بستن"
+  },
+  "setTabLook": {
+    "message": "ظاهر"
+  },
+  "setTabKeeping": {
+    "message": "نگه‌داری"
+  },
+  "setTabBackup": {
+    "message": "بکاپ"
+  },
+  "setTabKeys": {
+    "message": "کلیدها"
+  },
+  "setTitleWhere": {
+    "message": "نوت‌ها کجا ظاهر می‌شوند"
+  },
+  "setTitleClosing": {
+    "message": "بستن یک تب"
+  },
+  "setTitleLook": {
+    "message": "ظاهر"
+  },
+  "setTitleKeeping": {
+    "message": "نگه‌داری و حذف"
+  },
+  "setTitleBackup": {
+    "message": "بکاپ و زبان"
+  },
+  "setTitleKeys": {
+    "message": "صفحه‌کلید"
+  },
+  "setAutoDelete": {
+    "message": "بگذار نوت‌های قدیمی خودکار حذف شوند"
+  },
+  "setAutoDeleteOff": {
+    "message": "خاموش است، پس تا خودت سطل را خالی نکنی چیزی از بین نمی‌رود. سطل فقط بزرگ می‌شود، که هزینه‌اش تقریباً هیچ است."
+  },
+  "setAutoDeleteOn": {
+    "message": "نوت‌های داخل سطل وقتی وقتشان تمام شود از بین می‌روند. جاروکشی روزی چهار بار اجرا می‌شود، و نوتی را که نتواند تاریخ‌گذاری کند حذف نمی‌کند."
+  },
+  "setKeepTrashedFor": {
+    "message": "نوت‌های سطل را چند وقت نگه دار"
+  },
+  "setDays": {
+    "message": "روز"
+  },
+  "setKeepTrashedNote": {
+    "message": "از روزی که نوت به سطل رفته شمرده می‌شود، و تمام روز آخرش را نگه می‌دارد. تا کلید بالا خاموش است کاری نمی‌کند."
+  },
+  "setVersionHistory": {
+    "message": "تاریخچهٔ نسخه‌ها"
+  },
+  "setVersionsPerNote": {
+    "message": "چند نسخهٔ قبلی برای هر نوت نگه داشته شود"
+  },
+  "setVersions": {
+    "message": "نسخه"
+  },
+  "setVersionsZero": {
+    "message": "صفر، پس چیزی نگه داشته نمی‌شود و دکمهٔ تاریخچه چیزی برای نشان دادن ندارد. undo داخل صفحه هنوز کار می‌کند؛ فقط از بستن تب جان سالم نمی‌برد."
+  },
+  "setVersionsSome": {
+    "message": "در کابینت یک نوت را انتخاب کن و تاریخچه را بزن تا بخوانی‌شان، یا یکی را برگردانی. نسخه وقتی نگه داشته می‌شود که ویرایش بیش از سی ثانیه بعد از ویرایش قبلی باشد، یا طول متن را چند صد کاراکتر عوض کند — نه با هر کلید، وگرنه فهرست خواندنی نمی‌شد. قدیمی‌ترها بعد از این عدد کنار گذاشته می‌شوند."
+  },
+  "setExportNote": {
+    "message": "«خروجی…» در نوار بالا همین حالا کار می‌کند و هیچ مجوزی نمی‌خواهد. همهٔ نوت‌ها، مکان، استایل و عکس‌هایشان را در یک آرشیو دارد که هرجا بخواهی نگه می‌داری."
+  },
+  "setAutomatically": {
+    "message": "خودکار"
+  },
+  "setSaveAuto": {
+    "message": "خودکار یک بکاپ ذخیره کن"
+  },
+  "setHowOften": {
+    "message": "هر چند وقت"
+  },
+  "setBackupNow": {
+    "message": "همین حالا بکاپ بگیر"
+  },
+  "setRunOneNow": {
+    "message": "یکی را همین حالا اجرا کن"
+  },
+  "setWorking": {
+    "message": "در حال کار…"
+  },
+  "setNeverRun": {
+    "message": "هیچ‌وقت اجرا نشده."
+  },
+  "setItFailed": {
+    "message": "شکست خورد."
+  },
+  "setNothingToBackUp": {
+    "message": "چیزی برای بکاپ نیست."
+  },
+  "setNoAnswer": {
+    "message": "پس‌زمینه جواب نداد."
+  },
+  "setDownloadsGone": {
+    "message": "فایرفاکس مجوز ذخیرهٔ فایل را پس گرفته، پس این نمی‌تواند اجرا شود. خاموش و روشنش کن تا دوباره درخواست شود."
+  },
+  "setLanguage": {
+    "message": "زبان"
+  },
+  "setLanguageNote": {
+    "message": "تمام رابط کاربری — کابینت، تنظیمات، پاپ‌آپ و پنل خود نوت. نوت‌ها هرچه در آن‌ها نوشته‌ای را به همان زبانی که نوشته‌ای نگه می‌دارند."
+  },
+  "setCheckDaily": {
+    "message": "روزی یک بار نسخهٔ جدید را بررسی کن"
+  },
+  "setCheckDailyNote": {
+    "message": "تنها درخواست شبکه‌ای که این افزونه می‌تواند بزند. تا روشنش نکنی خاموش است، و بار اول اجازه می‌گیرد. نه کوکی، نه referrer، هیچ چیزی دربارهٔ تو — فهرست انتشارها را می‌خواند و یک شمارهٔ نسخه را مقایسه می‌کند."
+  },
+  "keyOnSelected": {
+    "message": "روی نوتِ انتخاب‌شده"
+  },
+  "keyWhileWriting": {
+    "message": "وقتی می‌نویسی"
+  },
+  "keyAnywhereNote": {
+    "message": "هرجا در یک نوت"
+  },
+  "keyOnAnyPage": {
+    "message": "روی هر صفحه"
+  },
+  "keyInFirefox": {
+    "message": "هرجا در فایرفاکس — قابل تغییر"
+  },
+  "keyOther": {
+    "message": "سایر"
+  },
+  "keyNoteSettings": {
+    "message": "تنظیمات این نوت — رنگ، قلم، اندازه، جهت، کاغذ"
+  },
+  "keyNextColour": {
+    "message": "رنگ بعدی"
+  },
+  "keyDraw": {
+    "message": "نقاشی"
+  },
+  "keyPenEraser": {
+    "message": "قلم / پاک‌کن"
+  },
+  "keyUndoStroke": {
+    "message": "برگرداندن آخرین حرکت قلم"
+  },
+  "keyLock": {
+    "message": "قفل کردن نوت"
+  },
+  "keyCollapse": {
+    "message": "جمع کردنش"
+  },
+  "keyStartWriting": {
+    "message": "شروع نوشتن"
+  },
+  "keySendToTrash": {
+    "message": "انداختنش در سطل"
+  },
+  "keyNudge": {
+    "message": "تکان دادنش — Shift ده برابر، Ctrl بیست‌وپنج برابر"
+  },
+  "keyResize": {
+    "message": "تغییر اندازه"
+  },
+  "keyLeaveDrawing": {
+    "message": "خروج از نقاشی"
+  },
+  "keyBold": {
+    "message": "ضخیم"
+  },
+  "keyItalic": {
+    "message": "کج"
+  },
+  "keyStrike": {
+    "message": "خط‌خورده"
+  },
+  "keyCode": {
+    "message": "کد"
+  },
+  "keyLink": {
+    "message": "ساختن لینک"
+  },
+  "keyQuote": {
+    "message": "نقل‌قول"
+  },
+  "keyBullets": {
+    "message": "فهرست نقطه‌ای"
+  },
+  "keyNumbers": {
+    "message": "فهرست شماره‌دار"
+  },
+  "keyTasks": {
+    "message": "فهرست کارها"
+  },
+  "keyTickTask": {
+    "message": "تیک زدن یا برداشتن کارِ این خط"
+  },
+  "keyHeading": {
+    "message": "تیتر — دوباره برای کوچک‌تر، دوباره برای هیچ"
+  },
+  "keyInsertDate": {
+    "message": "درج تاریخ امروز"
+  },
+  "keyClearFormat": {
+    "message": "پاک کردن قالب‌بندی"
+  },
+  "keyPaste": {
+    "message": "چسباندن متن، یا یک عکس"
+  },
+  "keyFinishWriting": {
+    "message": "تمام کردن نوشتن و انتخاب خودِ نوت"
+  },
+  "keyUndoAll": {
+    "message": "برگرداندن — تایپ، رنگ، جابه‌جایی، تغییر اندازه، نقاشی، حذف، به ترتیب"
+  },
+  "keyRedo": {
+    "message": "انجام دوباره — Ctrl + Shift + Z هم همین کار را می‌کند"
+  },
+  "keyAltDouble": {
+    "message": "ساختن نوت جایی که کلیک کردی"
+  },
+  "keyRightClick": {
+    "message": "افزودن نوت اینجا، یا روی متن انتخاب‌شده"
+  },
+  "keyNewNoteMiddle": {
+    "message": "چسباندن یک نوت وسط صفحه"
+  },
+  "keyToggleTab": {
+    "message": "خاموش یا روشن کردن نوت‌ها برای این تب"
+  },
+  "keyFocusNext": {
+    "message": "رفتن به نوت بعدی در صفحه"
+  },
+  "keyOpenCabinet": {
+    "message": "باز کردن کابینت"
+  },
+  "keyOpenFirefoxShortcuts": {
+    "message": "باز کردن تنظیمات کلیدهای فایرفاکس"
+  },
+  "keyFirefoxOwns": {
+    "message": "خودِ فایرفاکس این کلیدها را نگه می‌دارد و فقط خودش می‌تواند عوضشان کند: about:addons ← چرخ‌دنده بالا سمت راست ← Manage Extension Shortcuts. هرچه آنجا تنطیم کنی همان چیزی است که این فهرست نشان می‌دهد."
+  },
+  "keyCannotOpen": {
+    "message": "فایرفاکس اجازه نمی‌دهد افزونه آن صفحه را باز کند. خودت about:addons را در نوار آدرس بنویس، بعد از چرخ‌دنده بالا سمت راست ← Manage Extension Shortcuts."
+  },
+  "keySelectedExplain": {
+    "message": "گرفتنِ سرِ نوت آن را انتخاب می‌کند، و کلیدهای تک‌حرفی در همین حالت کار می‌کنند. کلیک روی متنش تو را در ویرایشگر می‌گذارد، جایی که ترکیب‌های Ctrl کار می‌کنند و هر کلید ساده فقط یک حرف است. Escape تو را از متن به نوت برمی‌گرداند."
+  },
+  "keyNoCtrlU": {
+    "message": "کلید Ctrl+U وجود ندارد: markdown خط زیر ندارد، پس چیزی نیست که نوت بتواند نشانش دهد. Ctrl+Shift+M و Ctrl+Shift+K هم دست‌نخورده مانده‌اند — آن‌ها مالِ خود فایرفاکس‌اند، برای حالت طراحی واکنش‌گرا و کنسول."
+  },
+  "keyUnbound": {
+    "message": "تعیین نشده"
+  },
+  "setBackupNotNote": {
+    "message": "این چه چیزی نیست: نمی‌تواند پوشه را انتخاب کند — مرورگر تصمیم می‌گیرد — وقتی فایرفاکس بسته است اجرا نمی‌شود، و فایلی روی همان دیسک بکاپ خارج از محل نیست. از Refresh Firefox و حذف افزونه جان سالم می‌برد. از خراب شدن دیسک نه."
+  },
+  "keyArrows": {
+    "message": "کلیدهای جهت"
+  },
+  "keyAltArrows": {
+    "message": "Alt + کلیدهای جهت"
+  },
+  "keyAltDoubleClick": {
+    "message": "Alt + دوبار کلیک"
+  },
+  "keyRightClickCap": {
+    "message": "کلیک راست"
   }
 }

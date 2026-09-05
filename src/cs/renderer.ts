@@ -14,6 +14,7 @@ import {
   PROTOCOL_V,
   type Reply,
 } from '~/bg/msg/protocol.ts';
+import { setLang } from '~/shared/i18n-note.ts';
 import type { NoteId } from '~/shared/types.ts';
 import {
   type Anchor,
@@ -37,6 +38,15 @@ declare const __DEV__: boolean;
 let host: Host | null = null;
 const loop = new Loop();
 const views = new Map<NoteId, NoteView>();
+/**
+ * The wire record each mounted note was built from.
+ *
+ * Kept so a language change can rebuild a note exactly as it was. The alternative is asking
+ * the background for the notes again, which would lose an edit made in the last 250 ms.
+ */
+const lastWire = new Map<NoteId, NoteWire>();
+/** Which language the mounted notes were built in. */
+let shownLocale: '' | 'en' | 'fa' = '';
 let topZ = 10;
 let enabled = false;
 /**
@@ -275,6 +285,7 @@ async function flushAll(): Promise<void> {
 function mountNote(wire: NoteWire): NoteView {
   const layer = mount().docLayer;
   revs.set(wire.id, wire.rev);
+  lastWire.set(wire.id, wire);
   const at = placeFor(wire);
   const view = new NoteView(
     {
@@ -511,6 +522,8 @@ async function boot(): Promise<void> {
   enabled = hello.enabled;
   noteDefaults = resolveStyle(hello.noteDefaults ?? {});
   motionCap = hello.motion ?? 'full';
+  // Before any note is mounted: its toolbar tooltips and its settings panel are built once.
+  setLang(hello.locale ?? '');
 
   if (!enabled) {
     // Stay resident but inert: no host element, no observers, no listeners on the page.
@@ -617,9 +630,28 @@ browser.runtime.onMessage.addListener((msg: unknown) => {
   if (type === 'defaults/changed') {
     // Re-resolve every mounted note. A note keeps its own overrides and only the fields it
     // never set follow the new default, which is the whole point of storing both sparsely.
-    const m = msg as { style: Record<string, unknown>; motion?: typeof motionCap };
+    const m = msg as {
+      style: Record<string, unknown>;
+      motion?: typeof motionCap;
+      locale?: '' | 'en' | 'fa';
+    };
     noteDefaults = resolveStyle(m.style);
     motionCap = m.motion ?? motionCap;
+    /*
+     * A language change rebuilds the notes, because every tooltip and every label in a note's
+     * panel was decided when it was built. Rare enough to be worth the simplicity: a person
+     * changes the language once.
+     */
+    if (m.locale !== undefined && m.locale !== shownLocale) {
+      shownLocale = m.locale;
+      setLang(m.locale);
+      for (const [id, view] of [...views]) {
+        const wire = lastWire.get(id);
+        view.destroy();
+        views.delete(id);
+        if (wire) mountNote(wire);
+      }
+    }
     for (const view of views.values()) view.setDefaults(noteDefaults);
     return Promise.resolve({ ok: true });
   }

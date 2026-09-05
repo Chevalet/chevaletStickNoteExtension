@@ -9,6 +9,7 @@
  * the content-script bundle, so it stays dependency-free.
  */
 
+import { isRtl, t } from '~/shared/i18n-note.ts';
 import { DEFAULT_STYLE, FONTS, type NoteStyle, PALETTES } from './theme.ts';
 
 export interface SettingsPanelHost {
@@ -41,8 +42,16 @@ export class SettingsPanel {
     this.host = host;
     this.el = document.createElement('div');
     this.el.className = 'settings';
+    /*
+     * The panel follows the INTERFACE language, not the note's own direction.
+     *
+     * A note set to right-to-left because its text is Persian still has an English panel if
+     * that is the language chosen, and a Persian interface mirrors the panel even on a
+     * left-to-right note. The two are different questions and were briefly the same one.
+     */
+    this.el.dir = isRtl() ? 'rtl' : 'ltr';
     this.el.setAttribute('role', 'dialog');
-    this.el.setAttribute('aria-label', 'Note settings');
+    this.el.setAttribute('aria-label', t('noteSettingsTitle'));
     this.build();
     // Escape closes, and the panel never lets a key escape into the page.
     this.el.addEventListener('keydown', (e) => {
@@ -71,85 +80,87 @@ export class SettingsPanel {
        * rather than how it looks -- and because someone opening this panel to name a note
        * should not have to read past eight colour controls to find the box.
        */
-      this.section('Name', [this.nameRow()]),
+      this.section(t('noteName'), [this.nameRow()]),
 
-      this.section('Paper', [
+      this.section(t('setPaper'), [
         this.swatches(),
-        this.color('paper', 'Paper', s.paper ?? '#ffe94a'),
-        this.color('ink', 'Ink', s.ink ?? '#14110e'),
-        this.color('accent', 'Accent', s.accent ?? '#ff2e63'),
+        this.color('paper', t('setPaper'), s.paper ?? '#ffe94a'),
+        this.color('ink', t('setInk'), s.ink ?? '#14110e'),
+        this.color('accent', t('setAccent'), s.accent ?? '#ff2e63'),
       ]),
 
-      this.section('Type', [
+      this.section(t('setType'), [
         this.select(
           'fontFamily',
-          'Font',
+          t('setFont'),
           FONTS.map((f) => [f.id, f.label] as const),
           s.fontFamily,
         ),
-        this.range('fontSize', 'Size', 11, 28, 1, s.fontSize, (v) => `${v}px`),
-        this.range('lineHeight', 'Line height', 1.1, 2.2, 0.05, s.lineHeight, (v) => v.toFixed(2)),
+        this.range('fontSize', t('setSize'), 11, 28, 1, s.fontSize, (v) => `${v}px`),
+        this.range('lineHeight', t('setLineHeight'), 1.1, 2.2, 0.05, s.lineHeight, (v) =>
+          v.toFixed(2),
+        ),
         this.select(
           'dir',
-          'Direction',
+          t('setDirection'),
           [
-            ['auto', 'Auto (per paragraph)'],
-            ['ltr', 'Left to right'],
-            ['rtl', 'Right to left'],
+            ['auto', t('setDirAuto')],
+            ['ltr', t('setDirLtr')],
+            ['rtl', t('setDirRtl')],
           ],
           s.dir,
         ),
         this.select(
           'align',
-          'Align',
+          t('setAlign'),
           [
-            ['start', 'Start'],
-            ['center', 'Centre'],
-            ['end', 'End'],
+            ['start', t('setStart')],
+            ['center', t('setCentre')],
+            ['end', t('setEnd')],
           ],
           s.align,
         ),
       ]),
 
-      this.section('Material', [
+      this.section(t('setMaterial'), [
         this.range(
           'opacity',
-          'Opacity',
+          t('setOpacity'),
           0.25,
           1,
           0.05,
           s.opacity,
           (v) => `${Math.round(v * 100)}%`,
         ),
-        this.range('tornEdges', 'Torn edge', 0, 6, 0.2, s.tornEdges, (v) => v.toFixed(1)),
-        this.range('grain', 'Grain', 0, 0.6, 0.02, s.grain, (v) => v.toFixed(2)),
+        this.range('tornEdges', t('setTornEdge'), 0, 6, 0.2, s.tornEdges, (v) => v.toFixed(1)),
+        this.range('grain', t('setGrain'), 0, 0.6, 0.02, s.grain, (v) => v.toFixed(2)),
         this.select(
           'tape',
-          'Tape',
+          t('setTape'),
           [
-            ['none', 'None'],
-            ['one', 'One corner'],
-            ['two', 'Two corners'],
+            ['none', t('setNone')],
+            ['one', t('setOneCorner')],
+            ['two', t('setTwoCorners')],
           ],
           s.tape,
         ),
         this.select(
           'shadow',
-          'Shadow',
+          t('setShadow'),
           [
             ['hard', 'Hard'],
             ['soft', 'Soft'],
-            ['none', 'None'],
+            ['none', t('setNone')],
           ],
           s.shadow,
         ),
         this.select(
           'physics',
-          'Motion',
+          t('setMotion'),
           [
-            ['full', 'Full paper physics'],
-            ['reduced', 'Reduced'],
-            ['off', 'Off'],
+            ['full', t('setFullPhysics')],
+            ['reduced', t('setReduced')],
+            ['off', t('setOff')],
           ],
           s.physics,
         ),
@@ -172,14 +183,14 @@ export class SettingsPanel {
     wrap.className = 'set-row';
     const label = document.createElement('span');
     label.className = 'set-label';
-    label.textContent = 'Name';
+    label.textContent = t('noteName');
 
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'set-name';
     input.maxLength = 120;
     input.value = this.host.name();
-    input.placeholder = 'Untitled';
+    input.placeholder = t('noteNamePlaceholder');
     input.autocomplete = 'off';
     input.spellcheck = false;
     // The panel lives inside the note, whose keydown handler treats single letters as
@@ -251,7 +262,7 @@ export class SettingsPanel {
       });
       wrap.append(b);
     }
-    return this.row('palette', 'Palette', wrap);
+    return this.row('palette', t('setPalette'), wrap);
   }
 
   private color(key: 'paper' | 'ink' | 'accent', label: string, value: string): HTMLElement {
@@ -322,8 +333,8 @@ export class SettingsPanel {
     const save = document.createElement('button');
     save.type = 'button';
     save.className = 'set-btn primary';
-    save.textContent = 'Save as my default';
-    save.title = 'Every new note starts like this one';
+    save.textContent = t('setSaveDefault');
+    save.title = t('setDefaultHint');
     save.addEventListener('click', () => {
       this.host.saveAsDefault();
       this.syncControls();
@@ -332,7 +343,7 @@ export class SettingsPanel {
     const reset = document.createElement('button');
     reset.type = 'button';
     reset.className = 'set-btn';
-    reset.textContent = 'Reset this note';
+    reset.textContent = t('setResetNote');
     reset.addEventListener('click', () => {
       for (const key of Object.keys(DEFAULT_STYLE) as Field[]) this.host.reset(key);
       this.syncControls();

@@ -56,6 +56,7 @@ import { lastImport } from '~/bg/jobs/import.ts';
 import { DEFAULT_SETTINGS, loadSettings, type Settings, saveSettings } from '~/bg/settings.ts';
 import { DEFAULT_STYLE, PALETTES } from '~/cs/note/theme.ts';
 import { FONTS, fontById, fontStack } from '~/shared/fonts.ts';
+import { t } from '~/shared/i18n.ts';
 import { applyTheme, asThemeChoice, type ThemeChoice } from '../chrome-theme.ts';
 
 type Patch = Partial<Settings>;
@@ -64,14 +65,23 @@ let current: Settings = DEFAULT_SETTINGS;
 let active = 0;
 let onChanged: (() => void) | null = null;
 
-const SECTIONS = [
-  { key: 'where', tab: 'Where', title: 'Where notes appear' },
-  { key: 'closing', tab: 'Closing', title: 'Closing a tab' },
-  { key: 'look', tab: 'Look', title: 'Appearance' },
-  { key: 'keeping', tab: 'Keeping', title: 'Keeping and deleting' },
-  { key: 'backup', tab: 'Backup', title: 'Backup and language' },
-  { key: 'keys', tab: 'Keys', title: 'Keyboard' },
-] as const;
+/**
+ * The panes, named when they are DRAWN.
+ *
+ * A function, not a constant. As a constant the six `t()` calls ran at module load -- before
+ * the language had been read out of storage -- so the tabs said WHERE CLOSING LOOK for the
+ * life of the page however Persian the rest of it was. Seen in a screenshot; the same shape
+ * of mistake as the theme button's labels, two files over.
+ */
+const sections = () =>
+  [
+    { key: 'where', tab: t('setTabWhere'), title: t('setTitleWhere') },
+    { key: 'closing', tab: t('setTabClosing'), title: t('setTitleClosing') },
+    { key: 'look', tab: t('setTabLook'), title: t('setTitleLook') },
+    { key: 'keeping', tab: t('setTabKeeping'), title: t('setTitleKeeping') },
+    { key: 'backup', tab: t('setTabBackup'), title: t('setTitleBackup') },
+    { key: 'keys', tab: t('setTabKeys'), title: t('setTitleKeys') },
+  ] as const;
 
 // --------------------------------------------------------------------- atoms
 
@@ -270,27 +280,25 @@ function sectionWhere(): HTMLElement {
     'div',
     { class: 'ssec-body' },
     row(
-      'Show notes on a site I have not decided about',
+      t('setShowUndecided'),
       toggle(current.defaultEnabled, (v) => void write({ defaultEnabled: v })),
-      'Off means a site stays clean until you turn notes on for it from the toolbar button.',
+      t('setShowUndecidedNote'),
     ),
     row(
-      'Keep notes made in private windows',
+      t('setKeepPrivate'),
       toggle(current.persistPrivateNotes, (v) => void write({ persistPrivateNotes: v })),
-      current.persistPrivateNotes
-        ? 'They are written to the database like any other note.'
-        : 'They live in memory only and are gone when the last private window closes.',
+      current.persistPrivateNotes ? t('setKeepPrivateOn') : t('setKeepPrivateOff'),
     ),
   );
 
   if (rules.length === 0) {
-    body.append(h('p', { class: 'ssec-empty' }, 'No per-site decisions yet.'));
+    body.append(h('p', { class: 'ssec-empty' }, t('setNoSiteRules')));
     return body;
   }
 
   const list = h('div', { class: 'rules' });
   for (const [origin, rule] of rules) {
-    const drop = h('button', { type: 'button', class: 'rule-drop' }, 'Forget');
+    const drop = h('button', { type: 'button', class: 'rule-drop' }, t('setForget'));
     drop.addEventListener('click', () => {
       const next = { ...current.siteRules };
       delete next[origin];
@@ -302,7 +310,7 @@ function sectionWhere(): HTMLElement {
         { class: 'rule' },
         h('span', { class: `rule-dot is-${rule}` }),
         h('span', { class: 'rule-origin' }, origin),
-        h('span', { class: 'rule-state' }, rule === 'on' ? 'notes on' : 'notes off'),
+        h('span', { class: 'rule-state' }, rule === 'on' ? t('setNotesOn') : t('setNotesOff')),
         drop,
       ),
     );
@@ -319,31 +327,28 @@ function sectionClosing(): HTMLElement {
     'div',
     { class: 'ssec-body' },
     row(
-      'Warn before closing a tab',
+      t('setWarnClosing'),
       choice(
         current.guard.mode,
         [
-          ['never', 'Never'],
-          ['unsaved', 'Unsaved edits'],
-          ['hasNotes', 'Any notes'],
+          ['never', t('setNever')],
+          ['unsaved', t('setUnsavedEdits')],
+          ['hasNotes', t('setAnyNotes')],
         ] as const,
         (v) => void write({ guard: { ...current.guard, mode: v } }),
       ),
-      'Firefox decides whether to actually show the dialog, and a page you have not interacted ' +
-        'with may get none. Your notes are written to the database long before this could ' +
-        'matter, so treat it as a courtesy rather than a safety net.',
+      t('setWarnClosingNote'),
     ),
     row(
-      'Tabs watched at once',
+      t('setTabsWatched'),
       number(
         current.guard.maxArmedTabs,
         0,
         10,
-        'tabs',
+        t('setTabs'),
         (v) => void write({ guard: { ...current.guard, maxArmedTabs: v } }),
       ),
-      'Closing a window full of annotated tabs must not ask you ten times over. The most ' +
-        'recently edited tabs get the slots.',
+      t('setTabsWatchedNote'),
     ),
   );
 }
@@ -353,15 +358,15 @@ function sectionLook(): HTMLElement {
     'div',
     { class: 'ssec-body' },
 
-    h('h4', { class: 'ssec-sub' }, 'This app'),
+    h('h4', { class: 'ssec-sub' }, t('setThisApp')),
     row(
-      'Colours',
+      t('setColours'),
       choice(
         asThemeChoice(current.theme),
         [
-          ['auto', 'Follow the browser'],
-          ['dark', 'Dark'],
-          ['light', 'Light'],
+          ['auto', t('setFollowBrowser')],
+          ['dark', t('setDark')],
+          ['light', t('setLight')],
         ] as const,
         (v) => {
           // Applied here as well as written, so the page changes under the click rather than
@@ -370,41 +375,31 @@ function sectionLook(): HTMLElement {
           void write({ theme: v as ThemeChoice });
         },
       ),
-      'The cabinet, the popup and this page. Notes keep their own paper colour — a sticky ' +
-        'note that went dark because your system did would be a different note. There is a ' +
-        'shortcut for this at the bottom of the cabinet.',
+      t('setColoursNote'),
     ),
     row(
-      'Movement',
+      t('setMovement'),
       choice(
         current.motion,
         [
-          ['auto', 'Follow the system'],
-          ['full', 'Full'],
-          ['reduced', 'Reduced'],
-          ['off', 'Off'],
+          ['auto', t('setFollowSystem')],
+          ['full', t('setFull')],
+          ['reduced', t('setReduced')],
+          ['off', t('setOff')],
         ] as const,
         (v) => void write({ motion: v }),
       ),
-      'How much the paper tilts, swings and lags as you drag it. Following the system respects ' +
-        '"reduce motion" in your accessibility settings. This is a ceiling: a note set to less ' +
-        'movement of its own accord keeps it.',
+      t('setMovementNote'),
     ),
 
-    h('h4', { class: 'ssec-sub' }, 'How a new note looks'),
-    h(
-      'p',
-      { class: 'ssec-note' },
-      'Any note can still be changed on its own — press S on a note, or use the sliders button ' +
-        'in its header — and a note keeps whatever it changed even when you alter the defaults ' +
-        'here.',
-    ),
+    h('h4', { class: 'ssec-sub' }, t('setNewNoteLooks')),
+    h('p', { class: 'ssec-note' }, t('setNewNoteLooksNote')),
     row(
-      'Paper',
+      t('setPaper'),
       palettePicker(def('palette'), (id) => void write(defaultsPatch('palette', id))),
     ),
     row(
-      'Type',
+      t('setType'),
       choice(
         def('fontFamily'),
         FONTS.map((f) => [f.id, f.label] as const),
@@ -413,12 +408,10 @@ function sectionLook(): HTMLElement {
         // page, so a plain url() in `fontFaceCss` is all it takes.
         (v) => fontStack(fontById(v)),
       ),
-      'Six of these are bundled with the extension and load only when a note uses one, so ' +
-        'they look the same on every machine. The two System entries use whatever your ' +
-        'computer has.',
+      t('setTypeNote'),
     ),
     row(
-      'Text size',
+      t('setTextSize'),
       slider(
         def('fontSize'),
         11,
@@ -427,10 +420,10 @@ function sectionLook(): HTMLElement {
         (v) => `${v}px`,
         (v) => void write(defaultsPatch('fontSize', v)),
       ),
-      'The same range a single note offers, so a default can never be a size a note could not be.',
+      t('setTextSizeNote'),
     ),
     row(
-      'Line height',
+      t('setLineHeight'),
       slider(
         def('lineHeight'),
         1.1,
@@ -441,20 +434,20 @@ function sectionLook(): HTMLElement {
       ),
     ),
     row(
-      'Direction',
+      t('setDirection'),
       choice(
         def('dir'),
         [
-          ['auto', 'Automatic'],
-          ['rtl', 'Right to left'],
-          ['ltr', 'Left to right'],
+          ['auto', t('setAutomatic')],
+          ['rtl', t('setRtl')],
+          ['ltr', t('setLtr')],
         ] as const,
         (v) => void write(defaultsPatch('dir', v)),
       ),
-      'Automatic lets each paragraph decide for itself, so Persian and English can share a note.',
+      t('setDirectionNote'),
     ),
     row(
-      'Torn edges',
+      t('setTornEdge'),
       slider(
         def('tornEdges'),
         0,
@@ -463,10 +456,10 @@ function sectionLook(): HTMLElement {
         (v) => (v === 0 ? 'clean cut' : v.toFixed(1)),
         (v) => void write(defaultsPatch('tornEdges', v)),
       ),
-      'Zero gives a clean rectangle.',
+      t('setTornEdgesNote'),
     ),
     row(
-      'Paper grain',
+      t('setGrain'),
       slider(
         def('grain'),
         0,
@@ -477,25 +470,25 @@ function sectionLook(): HTMLElement {
       ),
     ),
     row(
-      'Tape',
+      t('setTape'),
       choice(
         def('tape'),
         [
-          ['none', 'None'],
-          ['one', 'One strip'],
-          ['two', 'Two strips'],
+          ['none', t('setNone')],
+          ['one', t('setOneStrip')],
+          ['two', t('setTwoStrips')],
         ] as const,
         (v) => void write(defaultsPatch('tape', v)),
       ),
     ),
     row(
-      'Shadow',
+      t('setShadow'),
       choice(
         def('shadow'),
         [
-          ['hard', 'Hard'],
-          ['soft', 'Soft'],
-          ['none', 'None'],
+          ['hard', t('setHard')],
+          ['soft', t('setSoft')],
+          ['none', t('setNone')],
         ] as const,
         (v) => void write(defaultsPatch('shadow', v)),
       ),
@@ -508,47 +501,36 @@ function sectionKeeping(): HTMLElement {
     'div',
     { class: 'ssec-body' },
     row(
-      'Let old notes be deleted automatically',
+      t('setAutoDelete'),
       toggle(
         current.retention.autoDelete,
         (v) => void write({ retention: { ...current.retention, autoDelete: v } }).then(repaint),
       ),
-      current.retention.autoDelete
-        ? 'Trashed notes are destroyed once their time is up. The sweep runs four times a day, ' +
-            'and a trashed note carrying no deletion date is never destroyed.'
-        : 'Off, so nothing is ever destroyed unless you empty the trash yourself. The trash ' +
-            'simply grows, which costs almost nothing.',
+      current.retention.autoDelete ? t('setAutoDeleteOn') : t('setAutoDeleteOff'),
     ),
     row(
-      'Keep trashed notes for',
+      t('setKeepTrashedFor'),
       number(
         current.retention.trashDays,
         1,
         3650,
-        'days',
+        t('setDays'),
         (v) => void write({ retention: { ...current.retention, trashDays: v } }),
       ),
-      'Counted from the day a note went into the trash, and it keeps the whole of its last ' +
-        'day. Does nothing while the switch above is off.',
+      t('setKeepTrashedNote'),
     ),
-    h('p', { class: 'ssec-sub' }, 'Version history'),
+    h('p', { class: 'ssec-sub' }, t('setVersionHistory')),
     row(
-      'Earlier versions kept per note',
+      t('setVersionsPerNote'),
       number(
         current.retention.revisionsPerNote,
         0,
         200,
-        'versions',
+        t('setVersions'),
         (v) =>
           void write({ retention: { ...current.retention, revisionsPerNote: v } }).then(repaint),
       ),
-      current.retention.revisionsPerNote === 0
-        ? 'Zero, so nothing is kept and the History button will have nothing to show. Undo in ' +
-            'a page still works; it just does not survive closing the tab.'
-        : 'Select one note in the cabinet and press History to read them, or put one back. A ' +
-            'version is kept when an edit is more than thirty seconds after the last one, or ' +
-            'changes the length by a couple of hundred characters — not on every keystroke, or ' +
-            'the list would be unreadable. The oldest are dropped past this number.',
+      current.retention.revisionsPerNote === 0 ? t('setVersionsZero') : t('setVersionsSome'),
     ),
   );
 }
@@ -570,7 +552,7 @@ async function backupRows(): Promise<HTMLElement> {
 
   box.append(
     row(
-      'Save a backup automatically',
+      t('setSaveAuto'),
       toggle(current.backup.enabled && granted, (v) => {
         void (async () => {
           if (v) {
@@ -596,11 +578,10 @@ async function backupRows(): Promise<HTMLElement> {
         ? 'A ZIP into your Downloads folder, on a timer. It asks Firefox for permission to ' +
             'save files the first time you switch it on, and nothing else in the extension ' +
             'uses that permission.'
-        : 'Firefox has withdrawn permission to save files, so this cannot run. Switch it off ' +
-            'and on again to ask for it back.',
+        : t('setDownloadsGone'),
     ),
     row(
-      'How often',
+      t('setHowOften'),
       number(
         current.backup.everyHours,
         MIN_HOURS,
@@ -614,7 +595,7 @@ async function backupRows(): Promise<HTMLElement> {
     ),
   );
 
-  const now = h('button', { type: 'button', class: 'btn' }, 'Back up now');
+  const now = h('button', { type: 'button', class: 'btn' }, t('setBackupNow'));
   const said = h('span', { class: 'srow-note' });
   // Hidden until there is something to say. An always-present empty row draws a dashed rule
   // across the sheet for nothing, which is how a settings page starts to look unfinished.
@@ -627,16 +608,16 @@ async function backupRows(): Promise<HTMLElement> {
   now.addEventListener('click', () => {
     void (async () => {
       now.disabled = true;
-      say('Working…');
+      say(t('setWorking'));
       const reply = (await browser.runtime.sendMessage({ t: 'backup/run' }).catch(() => null)) as {
         ok?: boolean;
         data?: BackupState;
       } | null;
       now.disabled = false;
       const state = reply?.data;
-      if (!state) say('The background did not answer.');
-      else if (!state.ok) say(state.error ?? 'It failed.');
-      else if (state.notes === 0) say('Nothing to back up.');
+      if (!state) say(t('setNoAnswer'));
+      else if (!state.ok) say(state.error ?? t('setItFailed'));
+      else if (state.notes === 0) say(t('setNothingToBackUp'));
       else {
         say(
           `Saved ${state.notes} note${state.notes === 1 ? '' : 's'} to ${backupFilename(state.slot)}.`,
@@ -647,7 +628,7 @@ async function backupRows(): Promise<HTMLElement> {
 
   box.append(
     row(
-      'Run one now',
+      t('setRunOneNow'),
       h('div', { class: 'sbtn-row' }, now),
       // Deliberately the same code path as the alarm: a manual backup that works while the
       // scheduled one is broken is the most misleading state this feature could be in.
@@ -657,36 +638,18 @@ async function backupRows(): Promise<HTMLElement> {
               ? `${last.notes} note${last.notes === 1 ? '' : 's'}, ${Math.round(last.bytes / 1024)} kB, into ${backupFilename(last.slot)}`
               : (last.error ?? 'failed')
           }.`
-        : 'It has never run.',
+        : t('setNeverRun'),
     ),
   );
   box.append(saidRow);
 
-  box.append(
-    h(
-      'p',
-      { class: 'ssec-note' },
-      'What this is not: it cannot choose the folder — the browser decides that — it cannot ' +
-        'run while Firefox is closed, and a file on the same disk is not an off-site backup. ' +
-        'It survives Refresh Firefox and uninstalling the extension. It does not survive the ' +
-        'disk failing.',
-    ),
-  );
+  box.append(h('p', { class: 'ssec-note' }, t('setBackupNotNote')));
 
   return box;
 }
 
 function sectionBackup(): HTMLElement {
-  const box = h(
-    'div',
-    { class: 'ssec-body' },
-    h(
-      'p',
-      { class: 'ssec-note' },
-      'Export… in the bar above works now and needs no permission at all. It contains every ' +
-        'note, its position, its style and its images, as one archive you can keep anywhere.',
-    ),
-  );
+  const box = h('div', { class: 'ssec-body' }, h('p', { class: 'ssec-note' }, t('setExportNote')));
   /*
    * What the last import did, if there has been one.
    *
@@ -718,34 +681,31 @@ function sectionBackup(): HTMLElement {
       );
     })
     .catch(() => undefined);
-  box.append(h('p', { class: 'ssec-sub' }, 'Automatically'));
+  box.append(h('p', { class: 'ssec-sub' }, t('setAutomatically')));
   // The permission check and the last-run line are async; the section itself is not, so the
   // rows are appended when they arrive rather than making every section async for one of them.
   const slot = h('div');
   box.append(slot);
   void backupRows().then((rows) => slot.replaceWith(rows));
-  box.append(h('p', { class: 'ssec-sub' }, 'Other'));
+  box.append(h('p', { class: 'ssec-sub' }, t('keyOther')));
   box.append(
     row(
-      'Check for a new version once a day',
+      t('setCheckDaily'),
       toggle(current.autoCheckUpdates, (v) => void write({ autoCheckUpdates: v })),
-      'The only network request this extension can make. Off unless you turn it on, and it ' +
-        'asks permission the first time. No cookies, no referrer, nothing about you — it reads ' +
-        'the release list and compares one version number.',
+      t('setCheckDailyNote'),
     ),
     row(
-      'Language',
+      t('setLanguage'),
       choice(
         current.locale,
         [
-          ['', 'Follow the browser'],
+          ['', t('setFollowBrowser')],
           ['en', 'English'],
           ['fa', 'فارسی'],
         ] as const,
         (v) => void write({ locale: v }).then(() => repaint()),
       ),
-      'Covers the popup and the options page. This page and the notes themselves are English ' +
-        'only for now — the translation exists, the cabinet has not been wired to it yet.',
+      t('setLanguageNote'),
     ),
   );
   return box;
@@ -780,27 +740,21 @@ async function keyRows(): Promise<HTMLElement> {
   const body = h(
     'div',
     { class: 'ssec-body' },
-    h(
-      'p',
-      { class: 'ssec-note' },
-      'Grabbing a note’s header selects the note, which is the state the single-key shortcuts ' +
-        'work in. Clicking its text puts you in the editor, where the Ctrl chords apply and ' +
-        'every plain key is just a letter. Escape takes you from the text back to the note.',
-    ),
+    h('p', { class: 'ssec-note' }, t('keySelectedExplain')),
   );
 
   // What Firefox has actually bound, not what the manifest asked for.
   const described: Record<string, string> = {
-    'new-note': 'Stick a note in the middle of the page',
-    'toggle-tab': 'Turn notes off, or back on, for this tab',
-    'cycle-notes': 'Move focus to the next note on the page',
-    'open-manager': 'Open the cabinet',
+    'new-note': t('keyNewNoteMiddle'),
+    'toggle-tab': t('keyToggleTab'),
+    'cycle-notes': t('keyFocusNext'),
+    'open-manager': t('keyOpenCabinet'),
   };
   const browserRows: Array<[string, string]> = [];
   try {
     for (const c of await browser.commands.getAll()) {
       const what = described[c.name ?? ''] ?? c.description ?? c.name ?? '';
-      browserRows.push([c.shortcut ? c.shortcut : 'not set', what]);
+      browserRows.push([c.shortcut ? c.shortcut : t('keyUnbound'), what]);
     }
   } catch {
     // Falling back to the manifest's own suggestions is better than an empty section.
@@ -808,19 +762,13 @@ async function keyRows(): Promise<HTMLElement> {
       ['Alt+Shift+A', described['new-note'] as string],
       ['Alt+Shift+S', described['toggle-tab'] as string],
       ['Alt+Shift+K', described['cycle-notes'] as string],
-      ['not set', described['open-manager'] as string],
+      [t('keyUnbound'), described['open-manager'] as string],
     );
   }
-  body.append(table('Anywhere in Firefox — rebindable', browserRows));
+  body.append(table(t('keyInFirefox'), browserRows));
 
-  const hint = h(
-    'p',
-    { class: 'ssec-note' },
-    'Firefox keeps these bindings itself, and only Firefox can change them: about:addons → the ' +
-      'gear at the top right → Manage Extension Shortcuts. Whatever you set there is what this ' +
-      'list shows.',
-  );
-  const open = h('button', { type: 'button', class: 'btn' }, 'Open Firefox’s shortcut settings');
+  const hint = h('p', { class: 'ssec-note' }, t('keyFirefoxOwns'));
+  const open = h('button', { type: 'button', class: 'btn' }, t('keyOpenFirefoxShortcuts'));
   open.addEventListener('click', () => {
     void (async () => {
       try {
@@ -830,66 +778,57 @@ async function keyRows(): Promise<HTMLElement> {
         await browser.tabs.create({ url: 'about:addons' });
       } catch {
         hint.classList.add('warn');
-        hint.textContent =
-          'Firefox will not let an extension open that page. Copy about:addons into the ' +
-          'address bar yourself, then use the gear at the top right → Manage Extension ' +
-          'Shortcuts.';
+        hint.textContent = t('keyCannotOpen');
       }
     })();
   });
   body.append(h('div', { class: 'keyact' }, open), hint);
 
   body.append(
-    table('On a selected note', [
-      ['S', 'This note’s settings — colour, type, size, direction, paper'],
-      ['C', 'Next colour'],
-      ['D', 'Draw'],
-      ['P / E', 'Pen / eraser'],
-      ['Z', 'Undo the last brush stroke'],
-      ['L', 'Lock the note'],
-      ['M', 'Collapse it'],
-      ['Enter / F2', 'Start writing'],
-      ['Delete', 'Send it to the trash'],
-      ['Arrows', 'Nudge it — Shift ×10, Ctrl ×25'],
-      ['Alt + arrows', 'Resize it'],
-      ['Escape', 'Leave drawing'],
+    table(t('keyOnSelected'), [
+      ['S', t('keyNoteSettings')],
+      ['C', t('keyNextColour')],
+      ['D', t('keyDraw')],
+      ['P / E', t('keyPenEraser')],
+      ['Z', t('keyUndoStroke')],
+      ['L', t('keyLock')],
+      ['M', t('keyCollapse')],
+      ['Enter / F2', t('keyStartWriting')],
+      ['Delete', t('keySendToTrash')],
+      [t('keyArrows'), t('keyNudge')],
+      [t('keyAltArrows'), t('keyResize')],
+      ['Escape', t('keyLeaveDrawing')],
     ]),
 
-    table('While writing', [
-      ['Ctrl + B', 'Bold'],
-      ['Ctrl + I', 'Italic'],
-      ['Ctrl + Shift + X', 'Strikethrough'],
-      ['Ctrl + E', 'Code'],
-      ['Ctrl + K', 'Make a link'],
-      ['Ctrl + Shift + .', 'Quote'],
-      ['Ctrl + Shift + 8', 'Bullet list'],
-      ['Ctrl + Shift + 7', 'Numbered list'],
-      ['Ctrl + Shift + 9', 'Task list'],
-      ['Ctrl + Shift + Enter', 'Tick or untick the task on this line'],
-      ['Ctrl + Shift + 1', 'Heading — again for a smaller one, again for none'],
-      ['Ctrl + Shift + D', 'Insert today’s date'],
-      ['Ctrl + Space', 'Clear formatting'],
-      ['Ctrl + V', 'Paste text, or an image'],
-      ['Ctrl + Enter', 'Finish writing and select the note itself'],
+    table(t('keyWhileWriting'), [
+      ['Ctrl + B', t('keyBold')],
+      ['Ctrl + I', t('keyItalic')],
+      ['Ctrl + Shift + X', t('keyStrike')],
+      ['Ctrl + E', t('keyCode')],
+      ['Ctrl + K', t('keyLink')],
+      ['Ctrl + Shift + .', t('keyQuote')],
+      ['Ctrl + Shift + 8', t('keyBullets')],
+      ['Ctrl + Shift + 7', t('keyNumbers')],
+      ['Ctrl + Shift + 9', t('keyTasks')],
+      ['Ctrl + Shift + Enter', t('keyTickTask')],
+      ['Ctrl + Shift + 1', t('keyHeading')],
+      ['Ctrl + Shift + D', t('keyInsertDate')],
+      ['Ctrl + Space', t('keyClearFormat')],
+      ['Ctrl + V', t('keyPaste')],
+      ['Ctrl + Enter', t('keyFinishWriting')],
     ]),
 
-    table('Anywhere in a note', [
-      ['Ctrl + Z', 'Undo — typing, colour, moving, resizing, drawing, deleting, in order'],
-      ['Ctrl + Y', 'Redo — Ctrl + Shift + Z as well'],
+    table(t('keyAnywhereNote'), [
+      ['Ctrl + Z', t('keyUndoAll')],
+      ['Ctrl + Y', t('keyRedo')],
     ]),
 
-    table('On any page', [
-      ['Alt + double-click', 'Make a note where you clicked'],
-      ['Right-click', 'Add a note here, or on the selected text'],
+    table(t('keyOnAnyPage'), [
+      [t('keyAltDoubleClick'), t('keyAltDouble')],
+      [t('keyRightClickCap'), t('keyRightClick')],
     ]),
 
-    h(
-      'p',
-      { class: 'ssec-note' },
-      'There is no Ctrl+U: markdown has no underline, so there is nothing for it to produce ' +
-        'that a note could render. Ctrl+Shift+M and Ctrl+Shift+K are left alone as well — ' +
-        'those are Firefox’s own, for responsive design mode and the console.',
-    ),
+    h('p', { class: 'ssec-note' }, t('keyNoCtrlU')),
   );
 
   return body;
@@ -934,11 +873,12 @@ function repaint(): void {
 }
 
 function build(): HTMLElement {
-  const section = SECTIONS[active] ?? SECTIONS[0];
+  const all = sections();
+  const section = all[active] ?? all[0];
   if (!section) throw new Error('no sections');
 
   const tabs = h('div', { class: 'stabs', role: 'tablist' });
-  SECTIONS.forEach((s, i) => {
+  all.forEach((s, i) => {
     const b = h(
       'button',
       { type: 'button', role: 'tab', class: 'stab', 'aria-selected': String(i === active) },

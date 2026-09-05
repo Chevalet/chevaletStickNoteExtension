@@ -188,6 +188,8 @@ export type BgToCs =
       t: 'defaults/changed';
       style: Record<string, unknown>;
       motion: 'full' | 'reduced' | 'off';
+      /** The interface language. Notes keep their own text; this is the chrome around it. */
+      locale: '' | 'en' | 'fa';
     };
 
 // --------------------------------------------------------------------------- replies
@@ -232,4 +234,12 @@ export interface HelloReply {
    * that asked for less movement keeps it.
    */
   motion: 'full' | 'reduced' | 'off';
+  /**
+   * The interface language, for the note's own toolbar and settings panel.
+   *
+   * Sent rather than read from storage by the content script: the content script has no
+   * `storage` permission of its own to spend, and this is one more field on a reply it is
+   * already waiting for. `''` means follow the browser.
+   */
+  locale: '' | 'en' | 'fa';
 }

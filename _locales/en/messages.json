@@ -1,4 +1,151 @@
 {
+  "noteEraseAll": {
+    "message": "Erase everything"
+  },
+  "noteName": {
+    "message": "Name"
+  },
+  "noteNamePlaceholder": {
+    "message": "Untitled"
+  },
+  "notePlaceholder": {
+    "message": "Click to write. Markdown works."
+  },
+  "noteSettingsTitle": {
+    "message": "Note settings"
+  },
+  "noteStrokeThickness": {
+    "message": "Stroke thickness"
+  },
+  "noteThickness": {
+    "message": "Thickness"
+  },
+  "noteToolCollapse": {
+    "message": "Collapse (M)"
+  },
+  "noteToolColour": {
+    "message": "Colour (C)"
+  },
+  "noteToolDelete": {
+    "message": "Delete (Del)"
+  },
+  "noteToolDraw": {
+    "message": "Draw (D)"
+  },
+  "noteToolEraser": {
+    "message": "Eraser (E)"
+  },
+  "noteToolLock": {
+    "message": "Lock (L)"
+  },
+  "noteToolPen": {
+    "message": "Pen (P)"
+  },
+  "noteToolSettings": {
+    "message": "Settings (S)"
+  },
+  "noteTypeHere": {
+    "message": "Type. Markdown works."
+  },
+  "setAccent": {
+    "message": "Accent"
+  },
+  "setAlign": {
+    "message": "Align"
+  },
+  "setCentre": {
+    "message": "Centre"
+  },
+  "setDefaultHint": {
+    "message": "Every new note starts like this one"
+  },
+  "setDirAuto": {
+    "message": "Auto (per paragraph)"
+  },
+  "setDirLtr": {
+    "message": "Left to right"
+  },
+  "setDirRtl": {
+    "message": "Right to left"
+  },
+  "setDirection": {
+    "message": "Direction"
+  },
+  "setEnd": {
+    "message": "End"
+  },
+  "setFont": {
+    "message": "Font"
+  },
+  "setFullPhysics": {
+    "message": "Full paper physics"
+  },
+  "setGrain": {
+    "message": "Grain"
+  },
+  "setInk": {
+    "message": "Ink"
+  },
+  "setLineHeight": {
+    "message": "Line height"
+  },
+  "setMaterial": {
+    "message": "Material"
+  },
+  "setMotion": {
+    "message": "Motion"
+  },
+  "setNone": {
+    "message": "None"
+  },
+  "setOff": {
+    "message": "Off"
+  },
+  "setOneCorner": {
+    "message": "One corner"
+  },
+  "setOpacity": {
+    "message": "Opacity"
+  },
+  "setPalette": {
+    "message": "Palette"
+  },
+  "setPaper": {
+    "message": "Paper"
+  },
+  "setReduced": {
+    "message": "Reduced"
+  },
+  "setResetNote": {
+    "message": "Reset this note"
+  },
+  "setSaveDefault": {
+    "message": "Save as my default"
+  },
+  "setShadow": {
+    "message": "Shadow"
+  },
+  "setSize": {
+    "message": "Size"
+  },
+  "setStart": {
+    "message": "Start"
+  },
+  "setTape": {
+    "message": "Tape"
+  },
+  "setTornEdge": {
+    "message": "Torn edge"
+  },
+  "setTwoCorners": {
+    "message": "Two corners"
+  },
+  "setType": {
+    "message": "Type"
+  },
+  "setCustomHint": {
+    "message": "Custom. Click to follow the default again."
+  },
   "extName": {
     "message": "Chevalet Note"
   },
@@ -80,86 +227,8 @@
   "noteEraser": {
     "message": "Eraser"
   },
-  "noteThickness": {
-    "message": "Thickness"
-  },
-  "noteEraseAll": {
-    "message": "Erase everything"
-  },
   "noteDrawingHint": {
     "message": "drawing — Esc to stop"
-  },
-  "notePlaceholder": {
-    "message": "Click to write. Markdown works."
-  },
-  "setPaper": {
-    "message": "Paper"
-  },
-  "setType": {
-    "message": "Type"
-  },
-  "setMaterial": {
-    "message": "Material"
-  },
-  "setPalette": {
-    "message": "Palette"
-  },
-  "setInk": {
-    "message": "Ink"
-  },
-  "setAccent": {
-    "message": "Accent"
-  },
-  "setFont": {
-    "message": "Font"
-  },
-  "setSize": {
-    "message": "Size"
-  },
-  "setLineHeight": {
-    "message": "Line height"
-  },
-  "setDirection": {
-    "message": "Direction"
-  },
-  "setDirAuto": {
-    "message": "Auto (per paragraph)"
-  },
-  "setDirLtr": {
-    "message": "Left to right"
-  },
-  "setDirRtl": {
-    "message": "Right to left"
-  },
-  "setAlign": {
-    "message": "Align"
-  },
-  "setOpacity": {
-    "message": "Opacity"
-  },
-  "setTornEdge": {
-    "message": "Torn edge"
-  },
-  "setGrain": {
-    "message": "Grain"
-  },
-  "setTape": {
-    "message": "Tape"
-  },
-  "setShadow": {
-    "message": "Shadow"
-  },
-  "setMotion": {
-    "message": "Motion"
-  },
-  "setSaveDefault": {
-    "message": "Save as my default"
-  },
-  "setResetNote": {
-    "message": "Reset this note"
-  },
-  "setCustomHint": {
-    "message": "Custom. Click to follow the default again."
   },
   "optTitle": {
     "message": "Settings"
@@ -350,5 +419,593 @@
   },
   "durabilityLost": {
     "message": "They are lost by \"Refresh Firefox\" or by uninstalling the extension — which is what the ZIP backup is for."
+  },
+  "cabAllNotes": {
+    "message": "All notes"
+  },
+  "cabTrash": {
+    "message": "Trash"
+  },
+  "cabSettings": {
+    "message": "Settings"
+  },
+  "cabBackToNotes": {
+    "message": "Back to notes"
+  },
+  "cabCabinet": {
+    "message": "Cabinet"
+  },
+  "cabList": {
+    "message": "List"
+  },
+  "cabSearchPlaceholder": {
+    "message": "Search every note…"
+  },
+  "cabSearchLabel": {
+    "message": "Search notes"
+  },
+  "cabExport": {
+    "message": "Export…"
+  },
+  "cabImport": {
+    "message": "Import…"
+  },
+  "cabRename": {
+    "message": "Rename…"
+  },
+  "cabHistory": {
+    "message": "History…"
+  },
+  "cabRestore": {
+    "message": "Restore"
+  },
+  "cabMoveToTrash": {
+    "message": "Move to trash"
+  },
+  "cabDeleteForever": {
+    "message": "Delete forever"
+  },
+  "cabClear": {
+    "message": "Clear"
+  },
+  "cabCancel": {
+    "message": "Cancel"
+  },
+  "cabSave": {
+    "message": "Save"
+  },
+  "cabUntitled": {
+    "message": "Untitled"
+  },
+  "cabNote": {
+    "message": "Note"
+  },
+  "cabPage": {
+    "message": "Page"
+  },
+  "cabUpdated": {
+    "message": "Updated"
+  },
+  "cabEmptyDrawer": {
+    "message": "This drawer is empty"
+  },
+  "cabEmptyAll": {
+    "message": "Stick a note on a page and it files itself here."
+  },
+  "cabTrashNote": {
+    "message": "Deleted notes wait here for 30 days."
+  },
+  "cabNoMatch": {
+    "message": "Nothing matches that"
+  },
+  "cabNoMatchNote": {
+    "message": "Try fewer words, or clear the search."
+  },
+  "cabNameThis": {
+    "message": "Name this note"
+  },
+  "cabCouldNotRename": {
+    "message": "Could not rename"
+  },
+  "cabNoteMayBeGone": {
+    "message": "The note may have been deleted."
+  },
+  "cabCouldNotRestore": {
+    "message": "Could not restore"
+  },
+  "cabVersionGone": {
+    "message": "That version is no longer in the database."
+  },
+  "cabExportWhat": {
+    "message": "What to export:"
+  },
+  "cabExportZip": {
+    "message": "Everything: text, positions, colours, drawings and images. The only one that can be imported back into this extension. Keep this one."
+  },
+  "cabExportMd": {
+    "message": "One .md file, grouped by page. Opens in any editor. Loses positions, colours and drawings."
+  },
+  "cabExportHtml": {
+    "message": "One file that opens in any browser, with the images inside it and nothing fetched from the internet. Good for reading and printing."
+  },
+  "cabImportArchive": {
+    "message": "Import archive"
+  },
+  "cabImportKeepNewest": {
+    "message": "Keep newest"
+  },
+  "cabImportArchiveWins": {
+    "message": "Archive wins"
+  },
+  "cabImportCopies": {
+    "message": "Import as copies"
+  },
+  "cabImported": {
+    "message": "Imported"
+  },
+  "cabImportedProblems": {
+    "message": "Imported, with problems"
+  },
+  "cabImportSettings": {
+    "message": "Also restore the settings in this archive, replacing yours."
+  },
+  "cabImportNoSettings": {
+    "message": "This archive carries no settings."
+  },
+  "cabSettingsRestored": {
+    "message": "Settings restored."
+  },
+  "cabHistoryOff": {
+    "message": "Version history is switched off in Settings → Keeping, so nothing is being kept."
+  },
+  "cabCountNotes": {
+    "message": "$1 notes"
+  },
+  "cabCountSites": {
+    "message": "$1 sites"
+  },
+  "cabCountTrashed": {
+    "message": "$1 in trash"
+  },
+  "cabCountSelected": {
+    "message": "$1 selected"
+  },
+  "cabTrashCount": {
+    "message": "Trash ($1)"
+  },
+  "cabNotesHere": {
+    "message": "$1 notes"
+  },
+  "cabOneNoteHere": {
+    "message": "1 note"
+  },
+  "cabJustNow": {
+    "message": "just now"
+  },
+  "cabMinsAgo": {
+    "message": "$1m ago"
+  },
+  "cabHoursAgo": {
+    "message": "$1h ago"
+  },
+  "cabThemeLabel": {
+    "message": "Colour theme: $1"
+  },
+  "themeAuto": {
+    "message": "◐ Auto"
+  },
+  "themeDark": {
+    "message": "● Dark"
+  },
+  "themeLight": {
+    "message": "○ Light"
+  },
+  "themeAutoTitle": {
+    "message": "Colours follow your browser. Click for dark."
+  },
+  "themeDarkTitle": {
+    "message": "Dark, whatever your browser says. Click for light."
+  },
+  "themeLightTitle": {
+    "message": "Light, whatever your browser says. Click to follow your browser."
+  },
+  "setShowUndecided": {
+    "message": "Show notes on a site I have not decided about"
+  },
+  "setShowUndecidedNote": {
+    "message": "Off means a site stays clean until you turn notes on for it from the toolbar button."
+  },
+  "setKeepPrivate": {
+    "message": "Keep notes made in private windows"
+  },
+  "setKeepPrivateOn": {
+    "message": "They are written to the database like any other note."
+  },
+  "setKeepPrivateOff": {
+    "message": "They live in memory only and are gone when the last private window closes."
+  },
+  "setNoSiteRules": {
+    "message": "No per-site decisions yet."
+  },
+  "setForget": {
+    "message": "Forget"
+  },
+  "setNotesOn": {
+    "message": "notes on"
+  },
+  "setNotesOff": {
+    "message": "notes off"
+  },
+  "setDecidedSites": {
+    "message": "Sites you have decided about ($1)"
+  },
+  "setWarnClosing": {
+    "message": "Warn before closing a tab"
+  },
+  "setNever": {
+    "message": "Never"
+  },
+  "setUnsavedEdits": {
+    "message": "Unsaved edits"
+  },
+  "setAnyNotes": {
+    "message": "Any notes"
+  },
+  "setWarnClosingNote": {
+    "message": "Firefox decides whether to actually show the dialog, and a page you have not interacted with may get none. Your notes are written to the database long before this could matter, so treat it as a courtesy rather than a safety net."
+  },
+  "setTabsWatched": {
+    "message": "Tabs watched at once"
+  },
+  "setTabsWatchedNote": {
+    "message": "Closing a window full of annotated tabs must not ask you ten times over. The most recently edited tabs get the slots."
+  },
+  "setTabs": {
+    "message": "tabs"
+  },
+  "setThisApp": {
+    "message": "This app"
+  },
+  "setColours": {
+    "message": "Colours"
+  },
+  "setFollowBrowser": {
+    "message": "Follow the browser"
+  },
+  "setDark": {
+    "message": "Dark"
+  },
+  "setLight": {
+    "message": "Light"
+  },
+  "setColoursNote": {
+    "message": "The cabinet, the popup and this page. Notes keep their own paper colour — a sticky note that went dark because your system did would be a different note. There is a shortcut for this at the bottom of the cabinet."
+  },
+  "setMovement": {
+    "message": "Movement"
+  },
+  "setFollowSystem": {
+    "message": "Follow the system"
+  },
+  "setFull": {
+    "message": "Full"
+  },
+  "setMovementNote": {
+    "message": "How much the paper tilts, swings and lags as you drag it. Following the system respects \"reduce motion\" in your accessibility settings. This is a ceiling: a note set to less movement of its own accord keeps it."
+  },
+  "setNewNoteLooks": {
+    "message": "How a new note looks"
+  },
+  "setNewNoteLooksNote": {
+    "message": "Any note can still be changed on its own — press S on a note, or use the sliders button in its header — and a note keeps whatever it changed even when you alter the defaults here."
+  },
+  "setTypeNote": {
+    "message": "Six of these are bundled with the extension and load only when a note uses one, so they look the same on every machine. The two System entries use whatever your computer has."
+  },
+  "setTextSize": {
+    "message": "Text size"
+  },
+  "setTextSizeNote": {
+    "message": "The same range a single note offers, so a default can never be a size a note could not be."
+  },
+  "setAutomatic": {
+    "message": "Automatic"
+  },
+  "setRtl": {
+    "message": "Right to left"
+  },
+  "setLtr": {
+    "message": "Left to right"
+  },
+  "setDirectionNote": {
+    "message": "Automatic lets each paragraph decide for itself, so Persian and English can share a note."
+  },
+  "setTornEdgesNote": {
+    "message": "Zero gives a clean rectangle."
+  },
+  "setOneStrip": {
+    "message": "One strip"
+  },
+  "setTwoStrips": {
+    "message": "Two strips"
+  },
+  "setHard": {
+    "message": "Hard"
+  },
+  "setSoft": {
+    "message": "Soft"
+  },
+  "setTabWhere": {
+    "message": "Where"
+  },
+  "setTabClosing": {
+    "message": "Closing"
+  },
+  "setTabLook": {
+    "message": "Look"
+  },
+  "setTabKeeping": {
+    "message": "Keeping"
+  },
+  "setTabBackup": {
+    "message": "Backup"
+  },
+  "setTabKeys": {
+    "message": "Keys"
+  },
+  "setTitleWhere": {
+    "message": "Where notes appear"
+  },
+  "setTitleClosing": {
+    "message": "Closing a tab"
+  },
+  "setTitleLook": {
+    "message": "Appearance"
+  },
+  "setTitleKeeping": {
+    "message": "Keeping and deleting"
+  },
+  "setTitleBackup": {
+    "message": "Backup and language"
+  },
+  "setTitleKeys": {
+    "message": "Keyboard"
+  },
+  "setAutoDelete": {
+    "message": "Let old notes be deleted automatically"
+  },
+  "setAutoDeleteOff": {
+    "message": "Off, so nothing is ever destroyed unless you empty the trash yourself. The trash simply grows, which costs almost nothing."
+  },
+  "setAutoDeleteOn": {
+    "message": "Trashed notes are destroyed once their time is up. The sweep runs four times a day, and a trashed note carrying no deletion date is never destroyed."
+  },
+  "setKeepTrashedFor": {
+    "message": "Keep trashed notes for"
+  },
+  "setDays": {
+    "message": "days"
+  },
+  "setKeepTrashedNote": {
+    "message": "Counted from the day a note went into the trash, and it keeps the whole of its last day. Does nothing while the switch above is off."
+  },
+  "setVersionHistory": {
+    "message": "Version history"
+  },
+  "setVersionsPerNote": {
+    "message": "Earlier versions kept per note"
+  },
+  "setVersions": {
+    "message": "versions"
+  },
+  "setVersionsZero": {
+    "message": "Zero, so nothing is kept and the History button will have nothing to show. Undo in a page still works; it just does not survive closing the tab."
+  },
+  "setVersionsSome": {
+    "message": "Select one note in the cabinet and press History to read them, or put one back. A version is kept when an edit is more than thirty seconds after the last one, or changes the length by a couple of hundred characters — not on every keystroke, or the list would be unreadable. The oldest are dropped past this number."
+  },
+  "setExportNote": {
+    "message": "Export… in the bar above works now and needs no permission at all. It contains every note, its position, its style and its images, as one archive you can keep anywhere."
+  },
+  "setAutomatically": {
+    "message": "Automatically"
+  },
+  "setSaveAuto": {
+    "message": "Save a backup automatically"
+  },
+  "setHowOften": {
+    "message": "How often"
+  },
+  "setBackupNow": {
+    "message": "Back up now"
+  },
+  "setRunOneNow": {
+    "message": "Run one now"
+  },
+  "setWorking": {
+    "message": "Working…"
+  },
+  "setNeverRun": {
+    "message": "It has never run."
+  },
+  "setItFailed": {
+    "message": "It failed."
+  },
+  "setNothingToBackUp": {
+    "message": "Nothing to back up."
+  },
+  "setNoAnswer": {
+    "message": "The background did not answer."
+  },
+  "setDownloadsGone": {
+    "message": "Firefox has withdrawn permission to save files, so this cannot run. Switch it off and on again to ask for it back."
+  },
+  "setLanguage": {
+    "message": "Language"
+  },
+  "setLanguageNote": {
+    "message": "The whole interface — the cabinet, the settings, the popup and a note’s own panel. Notes keep whatever you typed in them, in whatever language you typed it."
+  },
+  "setCheckDaily": {
+    "message": "Check for a new version once a day"
+  },
+  "setCheckDailyNote": {
+    "message": "The only network request this extension can make. Off unless you turn it on, and it asks permission the first time. No cookies, no referrer, nothing about you — it reads the release list and compares one version number."
+  },
+  "keyOnSelected": {
+    "message": "On a selected note"
+  },
+  "keyWhileWriting": {
+    "message": "While writing"
+  },
+  "keyAnywhereNote": {
+    "message": "Anywhere in a note"
+  },
+  "keyOnAnyPage": {
+    "message": "On any page"
+  },
+  "keyInFirefox": {
+    "message": "Anywhere in Firefox — rebindable"
+  },
+  "keyOther": {
+    "message": "Other"
+  },
+  "keyNoteSettings": {
+    "message": "This note’s settings — colour, type, size, direction, paper"
+  },
+  "keyNextColour": {
+    "message": "Next colour"
+  },
+  "keyDraw": {
+    "message": "Draw"
+  },
+  "keyPenEraser": {
+    "message": "Pen / eraser"
+  },
+  "keyUndoStroke": {
+    "message": "Undo the last brush stroke"
+  },
+  "keyLock": {
+    "message": "Lock the note"
+  },
+  "keyCollapse": {
+    "message": "Collapse it"
+  },
+  "keyStartWriting": {
+    "message": "Start writing"
+  },
+  "keySendToTrash": {
+    "message": "Send it to the trash"
+  },
+  "keyNudge": {
+    "message": "Nudge it — Shift ×10, Ctrl ×25"
+  },
+  "keyResize": {
+    "message": "Resize it"
+  },
+  "keyLeaveDrawing": {
+    "message": "Leave drawing"
+  },
+  "keyBold": {
+    "message": "Bold"
+  },
+  "keyItalic": {
+    "message": "Italic"
+  },
+  "keyStrike": {
+    "message": "Strikethrough"
+  },
+  "keyCode": {
+    "message": "Code"
+  },
+  "keyLink": {
+    "message": "Make a link"
+  },
+  "keyQuote": {
+    "message": "Quote"
+  },
+  "keyBullets": {
+    "message": "Bullet list"
+  },
+  "keyNumbers": {
+    "message": "Numbered list"
+  },
+  "keyTasks": {
+    "message": "Task list"
+  },
+  "keyTickTask": {
+    "message": "Tick or untick the task on this line"
+  },
+  "keyHeading": {
+    "message": "Heading — again for a smaller one, again for none"
+  },
+  "keyInsertDate": {
+    "message": "Insert today’s date"
+  },
+  "keyClearFormat": {
+    "message": "Clear formatting"
+  },
+  "keyPaste": {
+    "message": "Paste text, or an image"
+  },
+  "keyFinishWriting": {
+    "message": "Finish writing and select the note itself"
+  },
+  "keyUndoAll": {
+    "message": "Undo — typing, colour, moving, resizing, drawing, deleting, in order"
+  },
+  "keyRedo": {
+    "message": "Redo — Ctrl + Shift + Z as well"
+  },
+  "keyAltDouble": {
+    "message": "Make a note where you clicked"
+  },
+  "keyRightClick": {
+    "message": "Add a note here, or on the selected text"
+  },
+  "keyNewNoteMiddle": {
+    "message": "Stick a note in the middle of the page"
+  },
+  "keyToggleTab": {
+    "message": "Turn notes off, or back on, for this tab"
+  },
+  "keyFocusNext": {
+    "message": "Move focus to the next note on the page"
+  },
+  "keyOpenCabinet": {
+    "message": "Open the cabinet"
+  },
+  "keyOpenFirefoxShortcuts": {
+    "message": "Open Firefox’s shortcut settings"
+  },
+  "keyFirefoxOwns": {
+    "message": "Firefox keeps these bindings itself, and only Firefox can change them: about:addons → the gear at the top right → Manage Extension Shortcuts. Whatever you set there is what this list shows."
+  },
+  "keyCannotOpen": {
+    "message": "Firefox will not let an extension open that page. Copy about:addons into the address bar yourself, then use the gear at the top right → Manage Extension Shortcuts."
+  },
+  "keySelectedExplain": {
+    "message": "Grabbing a note’s header selects the note, which is the state the single-key shortcuts work in. Clicking its text puts you in the editor, where the Ctrl chords apply and every plain key is just a letter. Escape takes you from the text back to the note."
+  },
+  "keyNoCtrlU": {
+    "message": "There is no Ctrl+U: markdown has no underline, so there is nothing for it to produce that a note could render. Ctrl+Shift+M and Ctrl+Shift+K are left alone as well — those are Firefox’s own, for responsive design mode and the console."
+  },
+  "keyUnbound": {
+    "message": "not set"
+  },
+  "setBackupNotNote": {
+    "message": "What this is not: it cannot choose the folder — the browser decides that — it cannot run while Firefox is closed, and a file on the same disk is not an off-site backup. It survives Refresh Firefox and uninstalling the extension. It does not survive the disk failing."
+  },
+  "keyArrows": {
+    "message": "Arrows"
+  },
+  "keyAltArrows": {
+    "message": "Alt + arrows"
+  },
+  "keyAltDoubleClick": {
+    "message": "Alt + double-click"
+  },
+  "keyRightClickCap": {
+    "message": "Right-click"
   }
 }

@@ -298,4 +298,18 @@ async function copyFontLicences(): Promise<void> {
 export const BUDGETS_GZ: Readonly<Record<string, number>> = {
   'cs/guard.js': 1_024,
   'cs/renderer.js': 36 * 1024,
+  /*
+   * The extension's own pages, which had no ceiling at all until 0.0.12.
+   *
+   * They matter far less than the content script -- nothing here is injected into anyone's
+   * page, and each is loaded when a person opens it -- so the numbers are generous and exist
+   * to catch a mistake rather than to shave bytes. The mistake they exist to catch is the one
+   * that had just happened in `cs/renderer.js`: a small import pulling in something enormous.
+   * The manager sits at 52 kB gz with MiniSearch, the whole catalogue and the settings pane in
+   * it; 64 gives room without hiding a doubling.
+   */
+  'ui/manager.js': 64 * 1024,
+  'ui/options.js': 24 * 1024,
+  'ui/popup.js': 24 * 1024,
+  'bg/main.js': 32 * 1024,
 };

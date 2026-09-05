@@ -25,6 +25,7 @@
     pnpm serve
     http://127.0.0.1:8731/spikes/cabinet/
     ?theme=dark      force the dark theme without touching your own settings
+    ?lang=fa         force the Persian interface, right to left
     ?seed=0          start empty, to see the empty states
 -->
 <style>
@@ -54,6 +55,9 @@
   <a href="?theme=auto">auto</a>
   <a href="?theme=dark">dark</a>
   <a href="?theme=light">light</a>
+  <b>lang</b>
+  <a href="?lang=en">en</a>
+  <a href="?lang=fa">fa</a>
   <b>|</b>
   <a href="?seed=0">empty</a>
   <a href="?seed=1">seeded</a>
@@ -196,12 +200,23 @@ window.browser = {
  * the setting exercises the same path a real click does, which is the point.
  */
 const forced = params.get('theme');
-if (forced === 'dark' || forced === 'light' || forced === 'auto') {
+const lang = params.get('lang');
+/*
+ * ONE read-modify-write for both, because two of them raced: `?lang=fa&theme=light` read the
+ * same stored object twice and the second write dropped the first, so the theme was silently
+ * ignored and a screenshot named fa-light came out dark.
+ */
+if (forced || lang !== null) {
   const KEY = 'settings.v1';
-  void area.get(KEY).then((got) => area.set({ [KEY]: { ...(got[KEY] || {}), theme: forced } }));
+  void area.get(KEY).then((got) => {
+    const next = { ...(got[KEY] || {}) };
+    if (forced === 'dark' || forced === 'light' || forced === 'auto') next.theme = forced;
+    if (lang === 'fa' || lang === 'en' || lang === '') next.locale = lang;
+    return area.set({ [KEY]: next });
+  });
   // ...and stamped now as well, so there is no flash of the other theme while storage is read.
   if (forced === 'auto') document.documentElement.removeAttribute('data-theme');
-  else document.documentElement.setAttribute('data-theme', forced);
+  else if (forced) document.documentElement.setAttribute('data-theme', forced);
 }
 
 document.getElementById('wipe').addEventListener('click', (e) => {

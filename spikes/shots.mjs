@@ -49,6 +49,16 @@ const BASE = process.env.CN_URL ?? 'http://127.0.0.1:8731/spikes/cabinet/';
 const OUT = 'spikes/shots';
 const ONLY = process.env.CN_ONLY ?? '';
 const THEMES = process.env.CN_THEME ? [process.env.CN_THEME] : ['light', 'dark'];
+/*
+ * CN_LANG=fa photographs the Persian interface, right to left.
+ *
+ * Worth a pass of its own rather than a doubling of the default set: what mirroring breaks is
+ * layout, not colour, so one theme in Persian shows more than two. Two mistakes were caught
+ * this way and neither was visible in English -- the settings tabs and the theme button both
+ * named themselves at module load, before the language had been read, so they stayed English
+ * on an otherwise Persian page.
+ */
+const LANGS = process.env.CN_LANG ? [process.env.CN_LANG] : [''];
 
 /**
  * Each shot: a page to open, and optionally a few clicks to get somewhere.
@@ -92,13 +102,15 @@ const driver = await new Builder().forBrowser('firefox').setFirefoxOptions(optio
 
 let taken = 0;
 try {
+  for (const lang of LANGS) {
   for (const theme of THEMES) {
     for (const shot of SHOTS) {
-      const name = `${shot.name}-${theme}`;
+      const name = `${shot.name}-${theme}${lang ? `-${lang}` : ''}`;
       if (ONLY && !name.includes(ONLY)) continue;
 
       const url = new URL(BASE);
       url.searchParams.set('theme', theme);
+      if (lang) url.searchParams.set('lang', lang);
       url.searchParams.set('page', shot.page);
       if (shot.seed) url.searchParams.set('seed', shot.seed);
 
@@ -141,6 +153,7 @@ try {
       console.log(`  ${OUT}/${name}.png`);
       taken++;
     }
+  }
   }
 } finally {
   await driver.quit();
