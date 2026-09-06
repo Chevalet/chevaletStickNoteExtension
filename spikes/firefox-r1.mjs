@@ -24,7 +24,16 @@
  *
  *   node spikes/firefox-r1.mjs
  *
- * ## THE RESULT: this harness cannot answer R1, and that is worth knowing
+ * ## R1 IS ANSWERED, and not by this file
+ *
+ * YES. A content script's `beforeunload` does prompt: Firefox 155 on Windows, a note with
+ * unsaved typing in it, Ctrl+W, and the "Leave page?" dialog appears. Confirmed by hand in
+ * September 2026, because no harness in this repository could do it -- see below for why.
+ *
+ * So the guard is real, `src/cs/guard.ts` now has its own tests, and the arming policy in
+ * `bg/guard/budget.ts` is deciding something that matters rather than something hypothetical.
+ *
+ * ## THE RESULT OF THIS HARNESS: it cannot answer R1, and that is worth knowing
  *
  * Both trials report no dialog -- INCLUDING the control, where the page arms its own
  * `beforeunload`, which certainly does prompt in a real browser. When the control fails, the

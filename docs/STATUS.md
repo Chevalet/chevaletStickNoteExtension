@@ -190,16 +190,27 @@ on one serving `font-src 'none'`. So it protected nothing and exposed something.
 - **Sync across machines.** Parked deliberately: no server, no account, nothing leaves the
   machine.
 
-## The one open question — spike R1
+## The question that is no longer open — spike R1
 
-**Does a content script's `beforeunload` actually prompt on tab close?** The close warning
-depends on it entirely, and it has still never been checked against a real Firefox.
+**Does a content script's `beforeunload` actually prompt on tab close? Yes.** Firefox 155 on
+Windows, by hand: a note with unsaved typing in it, Ctrl+W, and Firefox asks. That was the one
+open question from the plan onwards, and the whole close guard — the per-tab budget, the arming
+policy, the grace window — rested on it.
 
-It cannot be automated, and that is now measured rather than assumed. `firefox-r1.mjs` closes
-the tab; `firefox-unload.mjs` navigates instead. Between them they rule out four triggers and
-two prefs — including reading the profile back to prove `dom.disable_beforeunload=false` really
-landed, and removing the sticky-activation gate entirely. The positive control never fires:
-under Marionette the tab-modal unload prompt is not opened at all. Both files keep their
-controls and say so.
+It needed a person, and that is measured rather than assumed. `firefox-r1.mjs` closes the tab
+through WebDriver, which does not run unload prompts at all. `firefox-unload.mjs` navigates
+instead, across four triggers and two prefs, and Marionette never opens the tab-modal prompt
+either. Both keep their failing controls, so nobody spends another afternoon on the approach.
 
-It needs thirty seconds of a human. `docs/spikes.md` has the runbook.
+What followed from the answer: `src/cs/guard.ts` now has ten tests of its own. The dialog is
+Firefox's and no harness here can see it, but every decision the file makes alone is pinned —
+that the listener is attached and *removed* rather than left on, which is what keeps an
+annotated page eligible for the bfcache; that the handler both cancels the event and sets
+`returnValue`, because older Gecko honours only the second; that the bfcache disarms it; and
+that a malformed message disarms rather than arms, so a page with nothing to lose is never
+interrupted.
+
+The setting's own wording needed no change. *"Firefox decides whether to actually show the
+dialog, and a page you have not interacted with may get none... treat it as a courtesy rather
+than a safety net"* was written before the answer was known and is still exactly right: sticky
+activation is Firefox's condition, not ours, and your notes are saved either way.

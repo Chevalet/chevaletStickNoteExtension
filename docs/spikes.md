@@ -49,9 +49,20 @@ R5a. Do **not** press *Clear all results + log* between a restart test and readi
 
 ## R1 — Does a content-script `beforeunload` actually prompt on tab close?
 
-**Why it matters.** The whole close-confirmation feature rests on this one unverified
-behaviour, and it is the only mechanism that exists: `tabs.onRemoved` fires *after* the fact
-and there is no cancellable variant in any browser.
+> **ANSWERED: yes.** Firefox 155 on Windows, September 2026, by hand: a note with unsaved
+> typing in it, Ctrl+W, and the "Leave page?" dialog appears. So the close guard is real, the
+> kill criterion below was never triggered, and `strict_min_version` stays where it is.
+>
+> It took a person because no harness in this repository can reach that dialog — it is browser
+> chrome. `firefox-r1.mjs` and `firefox-unload.mjs` both keep their failing controls as the
+> record of that.
+>
+> `src/cs/guard.ts` has had its own tests since the day this was answered: ten of them, on
+> everything the file decides for itself. The dialog is Firefox's; the arming is ours.
+
+**Why it mattered.** The whole close-confirmation feature rests on this one behaviour, and it
+is the only mechanism that exists: `tabs.onRemoved` fires *after* the fact and there is no
+cancellable variant in any browser.
 
 **Kill criterion.** If isolated-world cancellation is ignored, `scripting.executeScript` with
 `world: "MAIN"` becomes mandatory. That keeps `strict_min_version` pinned at 128 and puts a
@@ -258,13 +269,14 @@ afternoon on the same approach.
 
 ---
 
-## R1, the thirty-second version — needs a human
+## R1, the thirty-second version — how it was answered
 
 `spikes/firefox-r1.mjs` cannot answer this and says so: WebDriver's Close Window command does
 not run unload prompts, so **both** trials report no dialog, including the control where the
 page arms its own `beforeunload`. A failed control means a useless measurement.
 
-So it has to be done by hand. With the extension installed:
+So it was done by hand, and this is the procedure that did it — kept because it is also how
+to re-check the answer on another platform, which nobody has:
 
 **The test**
 

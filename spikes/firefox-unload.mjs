@@ -1,3 +1,9 @@
+/*
+ * R1 IS ANSWERED, and not by this file either: yes, a content script's `beforeunload` prompts.
+ * Firefox 155 on Windows, a note with unsaved typing, Ctrl+W, dialog appears -- confirmed by
+ * hand, because nothing here could do it. What follows is the record of why not, kept with its
+ * failing control intact.
+ */
 /**
  * R1, answered as far as an automated harness can answer it: can a CONTENT SCRIPT arm
  * Firefox's unload prompt at all?
