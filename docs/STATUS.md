@@ -1,6 +1,22 @@
-# Status — v0.0.12, 5 September 2026
+# Status — v0.0.13, 6 September 2026
 
-**0.0.12 is the one to install.** Two reported bugs, a language, and the four dead scope kinds
+**0.0.13 is the one to install.**
+
+## What 0.0.13 changed
+
+- **"This section"** — the fourth place a note can show, and the last reachable scope kind. The
+  prefix is computed from the page you are looking at and shown in the label, because "this
+  section" means `/blog/` on one page and the whole host on another.
+- **A real bold** where the family has one: Handwriting and Grotesk join the two Persian faces.
+  Bangers and Permanent Marker have no bold to bundle, and a test enforces both directions.
+- **An edit in a tab reaches an open cabinet.** The other direction already worked.
+- **`cs/renderer.ts` has tests** — 17 of them. It is the module both of the 0.0.10 bugs lived
+  in and it had none.
+- **A third language is now cheap**: English is the source and every other language is optional
+  per string, so one can arrive half-finished and be useful. Three steps, written at the top of
+  `src/shared/i18n.ts`.
+
+## What 0.0.12 changed Two reported bugs, a language, and the four dead scope kinds
 turned into a feature. 0.0.11 is what fixed the note-losing bug below; this adds what was still
 missing around it.
 
@@ -71,7 +87,7 @@ The labels below mean what they say:
 - **Built** — compiles and lints; never exercised
 - **Firefox** — driven in a real Firefox through geckodriver, with real events
 
-736 tests · content script 36.5 kB gz of a 38.0 budget · fonts 327 kB · `web-ext lint` 0 errors
+736 tests · 31 real-Firefox checks · content script 36.5 kB gz of a 38.0 budget · fonts 327 kB · `web-ext lint` 0 errors
 / 0 warnings / 0 notices.
 
 ## Where it stands with the store
