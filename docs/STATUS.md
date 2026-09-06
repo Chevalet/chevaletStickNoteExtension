@@ -53,7 +53,7 @@ work, the product needs it more.
 
 | | What it answers |
 |---|---|
-| `tests/` — 697 checks | Everything that reduces to a number |
+| `tests/` — 736 checks | Everything that reduces to a number |
 | `spikes/firefox-extension.mjs` | **The real extension, over a real page.** Nine checks. `pnpm build:test` writes `dist-test/` — the shipped build plus one manifest line, so a driver has host access without a click in browser chrome |
 | `spikes/firefox-persist.mjs` | Type, reload, is it there? Restore the bug and it prints NO |
 | `spikes/firefox-pages.mjs` | **The extension's own pages**, driven: the options page, the cabinet, the popup. Thirteen checks, including editing a note the page made. Getting to a `moz-extension://` URL took three refusals from Marionette and its own `geckodriver --allow-system-access`; the UUID comes out of the profile |
@@ -71,7 +71,7 @@ The labels below mean what they say:
 - **Built** — compiles and lints; never exercised
 - **Firefox** — driven in a real Firefox through geckodriver, with real events
 
-697 tests · content script 36.2 kB gz of a 38.0 budget · fonts 263 kB · `web-ext lint` 0 errors
+736 tests · content script 36.5 kB gz of a 38.0 budget · fonts 327 kB · `web-ext lint` 0 errors
 / 0 warnings / 0 notices.
 
 ## Where it stands with the store
@@ -105,7 +105,7 @@ on one serving `font-src 'none'`. So it protected nothing and exposed something.
 | RTL/LTR in both the editor and the rendered view; per-block under `auto`; code stays LTR | Seen |
 | Freehand drawing, pen and eraser, surviving a reload | Seen |
 | Per-note styling: 8 palettes + custom colours, font, size, line height, direction, alignment, torn edges, grain, tape, shadow, physics | Seen |
-| **Six bundled typefaces**, 263 kB, loaded only when a note uses one and only once per page — including two Persian faces at two weights, so Persian does not depend on the operating system | Tested + **Firefox** |
+| **Six bundled typefaces**, 327 kB, loaded only when a note uses one and only once per page. Weight 700 wherever the family has one — both Persian faces, Caveat and Archivo — so bold is drawn rather than smeared; Bangers and Permanent Marker have no bold to bundle | Tested + **Firefox** |
 | Paper physics on drag — closed-form springs, compositor-only, 0% CPU at rest | Tested + Seen |
 | Text-selection anchoring with a scored fallback chain | Tested |
 | Manager: drawers per domain, search, multi-select, trash and restore | Seen |
@@ -159,8 +159,9 @@ on one serving `font-src 'none'`. So it protected nothing and exposed something.
 
 ## Not built
 
-- **A second language beyond Persian and English.** The catalogue has two columns; adding a
-  third is mechanical, and nobody has asked.
+- **A third language.** The shape is ready: `Entry` requires English and makes every other
+  language optional per string, so one can arrive half-finished and be useful from the first
+  string. Three steps, written at the top of `src/shared/i18n.ts`. Nobody has asked.
 - **One of the five scope kinds stays unreachable.** `tab` needs a concept most people do not
   have, so the picker offers the other four and a note carrying a tab scope reads "Somewhere
   else". `resolveDuplicate` guards a tab-key collision that therefore still cannot happen, and

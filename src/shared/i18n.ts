@@ -9,6 +9,19 @@
  * English is the default. "Follow the browser" is a choice a person makes, not the starting
  * state: a note-taking tool that comes up in a language you did not ask for is startling, and
  * the language lives in the cabinet under Backup.
+ *
+ * ## Adding a language
+ *
+ * Three steps, and no busywork:
+ *
+ *   1. Add it to `Lang` in `i18n-core.ts`.
+ *   2. Add the column to the entries you have translated. `Entry` requires English and makes
+ *      every other language optional, so a half-finished language works from the first string
+ *      -- `t()` falls back to English per key, and so does the `_locales` the build writes.
+ *   3. Offer it in the Language row of the cabinet's Backup pane, and in the popup.
+ *
+ * `tests/i18n.test.ts` asserts that PERSIAN stays complete, because it is. The optional shape
+ * is for a language arriving, not for one rotting.
  */
 
 import { type Entry, type Lang, makeT } from './i18n-core.ts';
@@ -595,15 +608,21 @@ export type MessageKey = keyof typeof CATALOGUE;
 /** Look up a message. See `i18n-core.ts` for the engine and `i18n-note.ts` for the split. */
 export const t = makeT(CATALOGUE);
 
-/** The shape `_locales/<lang>/messages.json` expects. Used by the build. */
+/**
+ * The shape `_locales/<lang>/messages.json` expects. Used by the build.
+ *
+ * Falls back to English for anything untranslated, which is the same rule `t()` follows -- and
+ * it has to, because a missing `message` here is not a gap in a sentence somewhere, it is the
+ * add-on's NAME coming out blank in about:addons. Firefox reads these files itself for the
+ * manifest's `__MSG_*__` placeholders and has nowhere else to look.
+ */
 export function toMessagesJson(
   target: Lang,
 ): Record<string, { message: string; description?: string }> {
   const out: Record<string, { message: string; description?: string }> = {};
   for (const [key, entry] of Object.entries(CATALOGUE) as Array<[string, Entry]>) {
-    out[key] = entry.note
-      ? { message: entry[target], description: entry.note }
-      : { message: entry[target] };
+    const message = entry[target] ?? entry.en;
+    out[key] = entry.note ? { message, description: entry.note } : { message };
   }
   return out;
 }

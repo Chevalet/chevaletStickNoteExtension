@@ -53,6 +53,24 @@ describe('the table', () => {
 });
 
 describe('faceFile', () => {
+  it('bundles a bold only where the family actually has one', () => {
+    /*
+     * Synthesised bold is the browser smearing the regular outlines. It is the ordinary answer
+     * for a display face drawn at one weight, and the wrong answer for a family that ships a
+     * real bold -- so this checks BOTH directions against what is in node_modules, rather than
+     * against a list someone typed.
+     */
+    for (const font of BUNDLED) {
+      const bundle = font.bundle;
+      if (!bundle) continue;
+      const weights = new Set((bundle.files ?? []).map((f) => f.weight));
+      const hasRealBold = existsSync(
+        join('node_modules', bundle.package, 'files', `${bundle.base}-latin-700-normal.woff2`),
+      );
+      expect(weights.has(700), `${font.label}: bold available=${hasRealBold}`).toBe(hasRealBold);
+    }
+  });
+
   it('names a file after the face, its subset and its weight', () => {
     const font = fontById('vazir');
     const files = font.bundle?.files ?? [];

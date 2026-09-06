@@ -24,14 +24,34 @@
  * language from the same stored setting.
  */
 
+/**
+ * The languages the interface can be in.
+ *
+ * English is the SOURCE and every other language is optional per string -- see `Entry`. Adding
+ * one is a line here, a column in the two catalogues for whatever has been translated so far,
+ * and nothing else: no placeholder strings, no English pasted in to satisfy a type.
+ */
 export type Lang = 'en' | 'fa';
 
-export interface Entry {
+/** A language other than the source. */
+export type Translated = Exclude<Lang, 'en'>;
+
+/**
+ * One string, in English, plus whatever translations exist.
+ *
+ * English is required and the rest are optional, which is the shape that makes a third
+ * language cheap: `t()` falls back to English for anything not yet translated, so a language
+ * can arrive half-done and be useful, and finishing it is a matter of filling gaps rather than
+ * a prerequisite for shipping it at all.
+ *
+ * Persian is complete today, and `tests/i18n.test.ts` asserts that it stays complete -- the
+ * fallback is what makes a NEW language possible, not a licence to let an existing one rot.
+ */
+export type Entry = {
   en: string;
-  fa: string;
   /** Shown to translators and to AMO reviewers. */
   note?: string;
-}
+} & Partial<Record<Translated, string>>;
 
 let lang: Lang = 'en';
 

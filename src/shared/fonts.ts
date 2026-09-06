@@ -67,8 +67,28 @@ const SYSTEM_SANS =
   'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Vazirmatn", sans-serif';
 const SYSTEM_HAND = '"Segoe Script", "Bradley Hand", "Comic Sans MS", cursive';
 
-/** Latin only, one weight: bold is synthesised, which is normal for a display face. */
+/**
+ * Latin, one weight, and that is all the family HAS.
+ *
+ * Bangers and Permanent Marker ship 400 alone -- they are display faces drawn at one weight,
+ * so `**bold**` in a note set in one of them is synthesised by the browser. That is the
+ * ordinary answer for a display face and there is nothing to bundle instead: checked in
+ * node_modules rather than assumed, and `tests/fonts.test.ts` checks it again on every run.
+ */
 const LATIN_400: readonly FontFile[] = [{ subset: 'latin', weight: 400 }] as const;
+
+/**
+ * Latin, both weights, for the two families that really have a bold.
+ *
+ * Caveat and Archivo do, so `**bold**` in a note set in Handwriting or Grotesk gets a drawn
+ * bold rather than a smeared one. 66 kB for the pair -- Caveat is 51 kB of it, handwriting
+ * being expensive in outlines -- and, like every face here, fetched only when a note actually
+ * uses it.
+ */
+const LATIN_400_700: readonly FontFile[] = [
+  { subset: 'latin', weight: 400 },
+  { subset: 'latin', weight: 700 },
+] as const;
 
 /**
  * Both scripts, both weights.
@@ -109,14 +129,14 @@ export const FONTS: readonly FontChoice[] = [
     id: 'hand',
     label: 'Handwriting',
     stack: 'cursive',
-    bundle: { package: '@fontsource/caveat', base: 'caveat', files: LATIN_400 },
+    bundle: { package: '@fontsource/caveat', base: 'caveat', files: LATIN_400_700 },
     scripts: ['latin'],
   },
   {
     id: 'grotesk',
     label: 'Grotesk',
     stack: 'sans-serif',
-    bundle: { package: '@fontsource/archivo', base: 'archivo', files: LATIN_400 },
+    bundle: { package: '@fontsource/archivo', base: 'archivo', files: LATIN_400_700 },
     scripts: ['latin'],
   },
   {

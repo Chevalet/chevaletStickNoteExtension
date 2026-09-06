@@ -29,18 +29,41 @@ import {
   t,
   toMessagesJson,
 } from '~/shared/i18n.ts';
+import { makeT } from '~/shared/i18n-core.ts';
 import { NOTE_CATALOGUE } from '~/shared/i18n-note.ts';
 
 const KEYS = Object.keys(CATALOGUE) as MessageKey[];
 
 describe('every entry', () => {
-  it('has a non-empty string in both languages', () => {
-    const bad: string[] = [];
-    for (const [key, entry] of Object.entries(CATALOGUE)) {
-      if (!entry.en?.trim()) bad.push(`${key}: no English`);
-      if (!entry.fa?.trim()) bad.push(`${key}: no Persian`);
-    }
+  it('has English, which is the source and is not optional', () => {
+    const bad = Object.entries(CATALOGUE)
+      .filter(([, e]) => !e.en?.trim())
+      .map(([k]) => k);
     expect(bad).toEqual([]);
+  });
+
+  it('has Persian, because Persian is finished', () => {
+    /*
+     * `Entry` makes translations OPTIONAL, so that a third language can arrive half-done and
+     * still be useful -- `t()` falls back to English per string. That is about a NEW language,
+     * not a licence to let a finished one rot, so this asserts Persian is still complete. A
+     * new key with no `fa` fails here, which is the moment to write it rather than a month
+     * later when someone notices one English label on a Persian page.
+     */
+    const missing = Object.entries(CATALOGUE)
+      .filter(([, e]) => !e.fa?.trim())
+      .map(([k]) => k);
+    expect(missing).toEqual([]);
+  });
+
+  it('falls back to English for a string a language has not translated yet', () => {
+    // The whole point of the optional shape. Asserted through `t()` rather than by reading the
+    // table, because the fallback is a property of the lookup.
+    const table = { onlyEnglish: { en: 'Only English' } } as const;
+    const tt = makeT(table);
+    setLang('fa');
+    expect(tt('onlyEnglish')).toBe('Only English');
+    setLang('en');
   });
 
   it('is actually translated, not the English copied across', () => {
@@ -110,10 +133,17 @@ describe('the note table', () => {
 
 describe('what the build writes into _locales', () => {
   it.each(['en', 'fa'] as Lang[])('%s has a message for every key', (lang) => {
+    /*
+     * Every key, non-empty, in every locale file -- never `undefined`. Firefox reads these
+     * itself for the manifest's `__MSG_*__` placeholders, so a gap is not a gap in a sentence:
+     * it is the add-on's name coming out blank in about:addons. The build falls back to
+     * English for anything untranslated, exactly as `t()` does.
+     */
     const json = toMessagesJson(lang);
     expect(Object.keys(json).length).toBe(KEYS.length);
     for (const key of KEYS) {
       expect(json[key]?.message, key).toBeTruthy();
+      expect(typeof json[key]?.message, key).toBe('string');
     }
   });
 

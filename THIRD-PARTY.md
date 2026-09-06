@@ -29,7 +29,7 @@ The `@fontsource/*` packages are development-only in the same sense -- no code f
 
 ## Fonts
 
-Six faces are bundled, 263 kB in twelve `.woff2` files. They are **not** in this repository:
+Six faces are bundled, 327 kB in fourteen `.woff2` files. They are **not** in this repository:
 they are `devDependencies` from [Fontsource](https://fontsource.org/), and
 `build.config.ts` copies the files it needs out of `node_modules` into
 `dist/assets/fonts/` at build time. So `pnpm-lock.yaml` carries an integrity hash for every
@@ -41,18 +41,23 @@ byte, and anyone -- including an AMO reviewer -- can verify where they came from
 | Vazirmatn | `@fontsource/vazirmatn` | OFL-1.1 | arabic + latin, 400 and 700 |
 | Estedad | `@fontsource/estedad` | OFL-1.1 | arabic + latin, 400 and 700 |
 | Bangers ("Display") | `@fontsource/bangers` | OFL-1.1 | latin 400 |
-| Caveat ("Handwriting") | `@fontsource/caveat` | OFL-1.1 | latin 400 |
-| Archivo ("Grotesk") | `@fontsource/archivo` | OFL-1.1 | latin 400 |
+| Caveat ("Handwriting") | `@fontsource/caveat` | OFL-1.1 | latin 400 and 700 |
+| Archivo ("Grotesk") | `@fontsource/archivo` | OFL-1.1 | latin 400 and 700 |
 | Permanent Marker | `@fontsource/permanent-marker` | Apache-2.0 | latin 400 |
 
 The licence text ships beside the fonts as `assets/fonts/<face>-LICENSE.txt`, because the OFL
 requires it to travel with the font -- clause 2 -- and Apache-2.0 says the same. The build
 throws if one is missing rather than shipping the bytes without permission.
 
-The two Persian faces get weight 700 as well as 400; the Latin display faces do not. Bold on
-Arabic script cannot be synthesised without smearing the joins between letters, which is the
-difference between bold text and damaged text. On a Latin display face, synthesised bold is
-ordinary.
+Weight 700 is bundled for every family that HAS one -- both Persian faces, Caveat and Archivo
+-- so `**bold**` in a note gets a drawn bold rather than one the browser smears out of the
+regular outlines. Bangers and Permanent Marker ship 400 alone: they are display faces drawn at
+a single weight, so there is nothing to bundle and synthesised bold is the ordinary answer.
+
+That is checked rather than asserted: `tests/fonts.test.ts` reads `node_modules` and requires
+700 to be bundled exactly where a 700 file exists, in both directions. For Arabic it matters
+most -- synthesising bold there smears the joins between letters, which is the difference
+between bold text and damaged text.
 
 Each face is fetched only when a note actually uses it, and only once per page. Getting one
 into a note is not the obvious `@font-face`, for two reasons that are measured rather than
