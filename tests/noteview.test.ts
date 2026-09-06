@@ -32,6 +32,7 @@ interface Spy {
   layer: HTMLElement;
   text: string[];
   names: string[];
+  scopes: string[];
   changes: number;
   styles: Array<Record<string, unknown>>;
 }
@@ -43,6 +44,7 @@ function spyHost(): Spy {
     layer,
     text: [],
     names: [],
+    scopes: [],
     changes: 0,
     styles: [],
     host: {
@@ -61,6 +63,7 @@ function spyHost(): Spy {
       raise: () => 5,
       onText: (_n, text) => out.text.push(text),
       onName: (_n, name) => out.names.push(name),
+      onScope: (_n, kind) => out.scopes.push(kind),
       onChange: () => {
         out.changes++;
       },
@@ -222,6 +225,96 @@ lines  `);
     m.view.setName('Same');
     m.view.setName('  Same  ');
     expect(m.spy.names).toEqual(['Same']);
+  });
+});
+
+describe('the settings panel', () => {
+  /**
+   * Opened, and read. The panel is built once when the gear is pressed, which is why three
+   * separate things in this project have been found saying the wrong words: they were decided
+   * at module load, before the language or the page was known.
+   */
+  function openPanel(text = 'x'): { m: ReturnType<typeof mount>; panel: HTMLElement } {
+    const m = mount(text);
+    m.view.toggleSettings(true);
+    const panel = m.view.el.querySelector('.settings') as HTMLElement;
+    if (!panel) throw new Error('the panel did not open');
+    return { m, panel };
+  }
+
+  const rowLabelled = (panel: HTMLElement, label: string): HTMLElement | null => {
+    for (const row of panel.querySelectorAll('.set-row')) {
+      if (row.querySelector('.set-label')?.textContent === label) return row as HTMLElement;
+    }
+    return null;
+  };
+
+  it('offers the four places a note can show', () => {
+    const { panel } = openPanel();
+    const row = rowLabelled(panel, 'Shows on');
+    expect(row, 'no "Shows on" row').not.toBeNull();
+    const options = [...(row?.querySelectorAll('option') ?? [])].map((o) => o.value);
+    expect(options).toEqual(['url', 'prefix', 'domain', 'global']);
+  });
+
+  it('names the section it would actually use, from the page it is on', () => {
+    /*
+     * The label is computed, because the answer depends on where you are standing: "This
+     * section" means `/blog/` on `/blog/what-is-defi` and the host itself at the top of a
+     * site. happy-dom's location is `http://localhost:3000/`, so this is the top-of-site case
+     * -- and the label has to be the host rather than a bare slash, which is not a section
+     * anybody pictures.
+     */
+    const { panel } = openPanel();
+    const row = rowLabelled(panel, 'Shows on');
+    const section = [...(row?.querySelectorAll('option') ?? [])].find((o) => o.value === 'prefix');
+    expect(section?.textContent).toBe(`This section (${location.host})`);
+  });
+
+  it('shows nothing selected for a scope the picker does not offer', () => {
+    // A `tab`-scoped note arrives as `other`. Opening the panel must not silently rewrite it
+    // to whichever option happens to be first.
+    const spy = spyHost();
+    const view = new NoteView(
+      { id: 'n_other', x: 0, y: 0, w: 240, h: 180, z: 1, text: 'x', scope: 'other' },
+      spy.host,
+    );
+    view.toggleSettings(true);
+    const sel = view.el.querySelector('.settings select') as HTMLSelectElement;
+    /*
+     * Asserted on the OPTIONS, not on `selectedIndex`.
+     *
+     * happy-dom does not reflect `option.selected = true` into the select's `selectedIndex`:
+     * it reports -1 while the option itself says it is selected. A real browser reports 0. So
+     * the assertion is about the two things this code actually sets -- which option comes
+     * first, and that it is the selected one -- rather than about the environment's
+     * bookkeeping. Chasing `selectedIndex` through three attempts is how this test got here.
+     */
+    const first = sel.options[0];
+    expect(first?.textContent).toBe('Somewhere else');
+    expect(first?.selected).toBe(true);
+    expect(first?.value).toBe('');
+    // And choosing it again does nothing: it describes where the note is, it is not an order.
+    sel.value = '';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(spy.scopes).toEqual([]);
+  });
+
+  it('tells the host which kind was picked, and nothing else', () => {
+    const { m, panel } = openPanel();
+    const sel = panel.querySelector('select') as HTMLSelectElement;
+    sel.value = 'domain';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(m.spy.scopes).toEqual(['domain']);
+    // Not a style change: where a note shows is not how it looks.
+    expect(m.spy.styles).toEqual([]);
+  });
+
+  it('has the name box above the colours, because a name is not an appearance', () => {
+    const { panel } = openPanel();
+    const labels = [...panel.querySelectorAll('.set-label')].map((e) => e.textContent);
+    expect(labels.indexOf('Name')).toBeLessThan(labels.indexOf('Palette'));
+    expect(labels.indexOf('Name')).toBeLessThan(labels.indexOf('Shows on'));
   });
 });
 

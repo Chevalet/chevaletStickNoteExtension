@@ -107,7 +107,7 @@ export type CsToBg =
    * already attached to, because a page handing over a scope would be a page reaching into
    * another page's notes -- the reason `sanitizePatch` has always dropped one.
    */
-  | { t: 'note/scope'; id: NoteId; kind: 'url' | 'domain' | 'global' };
+  | { t: 'note/scope'; id: NoteId; kind: 'url' | 'prefix' | 'domain' | 'global' };
 
 /** Sent by the options page and the cabinet, not by a content script. */
 export type UiToBg =
@@ -147,7 +147,7 @@ export type UiToBg =
    * would let a page put its notes onto another page's, which is exactly why `sanitizePatch`
    * drops a scope and always has.
    */
-  | { t: 'note/scope'; id: NoteId; kind: 'url' | 'domain' | 'global' };
+  | { t: 'note/scope'; id: NoteId; kind: 'url' | 'prefix' | 'domain' | 'global' };
 
 // --------------------------------------------------------------------------- bg -> cs
 

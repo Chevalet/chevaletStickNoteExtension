@@ -10,6 +10,7 @@
  */
 
 import { isRtl, t } from '~/shared/i18n-note.ts';
+import { sectionLabel } from '~/shared/section.ts';
 import { DEFAULT_STYLE, FONTS, type NoteStyle, PALETTES } from './theme.ts';
 
 export interface SettingsPanelHost {
@@ -20,9 +21,9 @@ export interface SettingsPanelHost {
   /** Rename it. '' clears the name. */
   rename(next: string): void;
   /** Where the note shows. */
-  scope(): 'url' | 'domain' | 'global' | 'other';
-  /** Move it. The background works out the scope from the note's own page. */
-  setScope(kind: 'url' | 'domain' | 'global'): void;
+  scope(): 'url' | 'prefix' | 'domain' | 'global' | 'other';
+  /** Move it. The background works out the scope from the page the note is on. */
+  setScope(kind: 'url' | 'prefix' | 'domain' | 'global'): void;
   /** The note's own overrides, so the panel can show what is customised. */
   overrides(): Partial<NoteStyle>;
   /** The user's defaults, for the "follows default" markers. */
@@ -241,8 +242,43 @@ export class SettingsPanel {
      */
     const sel = document.createElement('select');
     const current = this.host.scope();
+
+    /*
+     * A note carrying a kind the picker does not offer -- `tab` -- gets an entry of its own,
+     * first and SELECTED, and not disabled.
+     *
+     * Three attempts, each corrected by the same test:
+     *
+     *   1. Mark the four real options unselected and set `selectedIndex = -1`. Comes back as
+     *      0: a single-select with nothing marked adopts its first option, so opening the
+     *      panel would have silently claimed the note was scoped to this page.
+     *   2. Prepend a DISABLED placeholder. Comes back as the option AFTER it: the HTML
+     *      "ask for a reset" algorithm picks the first option that is not disabled, so a
+     *      disabled first entry is skipped rather than shown.
+     *   3. Enabled, first, and explicitly selected. Choosing it again does nothing, which is
+     *      right: it is a description of where the note already is, not an instruction.
+     *
+     * (happy-dom does not reflect `.selected` into `selectedIndex`, which is why the test
+     * asserts the options themselves. A real browser reports 0.)
+     */
+    if (current === 'other') {
+      const other = document.createElement('option');
+      other.value = '';
+      other.textContent = t('noteWhereOther');
+      other.selected = true;
+      sel.append(other);
+    }
+
+    /*
+     * The section option carries the prefix it will actually use, because the answer depends
+     * on where you are standing: "This section" on `/blog/what-is-defi` means `/blog/`, and on
+     * `/blog` it means the whole host. Computed from `location.href` with the same function the
+     * background uses on `sender.tab.url`, so the label cannot promise one thing while the
+     * click does another.
+     */
     for (const [kind, text] of [
       ['url', t('noteWhereUrl')],
+      ['prefix', t('noteWhereSection', sectionLabel(location.href))],
       ['domain', t('noteWhereDomain')],
       ['global', t('noteWhereGlobal')],
     ] as const) {
@@ -252,12 +288,12 @@ export class SettingsPanel {
       o.selected = current === kind;
       sel.append(o);
     }
-    // A note carrying `prefix` or `tab` -- kinds the picker does not offer -- shows nothing
-    // selected rather than being silently rewritten by the panel opening.
-    if (current === 'other') sel.selectedIndex = -1;
+
     sel.addEventListener('change', () => {
       const kind = sel.value;
-      if (kind === 'url' || kind === 'domain' || kind === 'global') this.host.setScope(kind);
+      if (kind === 'url' || kind === 'prefix' || kind === 'domain' || kind === 'global') {
+        this.host.setScope(kind);
+      }
     });
 
     wrap.append(label, sel);

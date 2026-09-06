@@ -151,7 +151,7 @@ export interface NoteInit {
   ink?: { strokes: InkStroke[]; w: number; h: number };
   name?: string;
   /** Where it shows. `other` is a scope kind the picker does not offer. */
-  scope?: 'url' | 'domain' | 'global' | 'other';
+  scope?: 'url' | 'prefix' | 'domain' | 'global' | 'other';
 }
 
 export interface NoteHost {
@@ -192,7 +192,7 @@ export interface NoteHost {
    * attached to -- a content script handing over a scope would be a page reaching into
    * another page's notes.
    */
-  onScope?(note: NoteView, kind: 'url' | 'domain' | 'global'): void;
+  onScope?(note: NoteView, kind: 'url' | 'prefix' | 'domain' | 'global'): void;
   onStyle?(note: NoteView, overrides: Partial<NoteStyle>): void;
   onSaveDefault?(note: NoteView, style: NoteStyle): void;
   /** Store a pasted or dropped image and return the id to reference it by. */
@@ -218,7 +218,7 @@ export class NoteView implements Animatable {
   private readonly previewEl: HTMLDivElement;
   private editing = false;
   private noteName: string;
-  private noteScope: 'url' | 'domain' | 'global' | 'other';
+  private noteScope: 'url' | 'prefix' | 'domain' | 'global' | 'other';
   private readonly nameEl: HTMLDivElement;
   private readonly grainEl: HTMLCanvasElement;
   private readonly paperPath: SVGPathElement;

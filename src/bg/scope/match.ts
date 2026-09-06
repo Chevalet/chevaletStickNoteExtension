@@ -10,6 +10,7 @@
  */
 
 import { stateKey } from '~/bg/db/schema.ts';
+import { sectionPrefix } from '~/shared/section.ts';
 import {
   DEFAULT_URL_MATCH,
   type NoteState,
@@ -187,9 +188,16 @@ function ensureSlash(prefix: string): string {
  * not have; both stay in the type, unoffered, and `resolveDuplicate` above says what that
  * means for it.
  */
-export function scopeFor(kind: 'url' | 'domain' | 'global', url: string): Scope | null {
+export function scopeFor(kind: 'url' | 'prefix' | 'domain' | 'global', url: string): Scope | null {
   if (kind === 'global') return { kind: 'global' };
   if (kind === 'url') return defaultScopeFor(url);
+  if (kind === 'prefix') {
+    const parsed = normalizeUrlFull(url);
+    if (!parsed) return null;
+    // `sectionPrefix` is in `shared/` because the note's own panel computes the same thing to
+    // write its label, and a label that disagrees with the click is worse than no label.
+    return { kind: 'prefix', origin: parsed.origin, pathPrefix: sectionPrefix(url) };
+  }
   const parsed = normalizeUrlFull(url);
   if (!parsed) return null;
   return {
@@ -202,11 +210,18 @@ export function scopeFor(kind: 'url' | 'domain' | 'global', url: string): Scope 
   };
 }
 
-/** Which of the three a stored scope is, for showing the current choice. */
-export function scopeKindOf(scope: Scope): 'url' | 'domain' | 'global' | 'other' {
-  if (scope.kind === 'url' || scope.kind === 'domain' || scope.kind === 'global') {
+/** Which of the four a stored scope is, for showing the current choice. */
+export function scopeKindOf(scope: Scope): 'url' | 'prefix' | 'domain' | 'global' | 'other' {
+  if (
+    scope.kind === 'url' ||
+    scope.kind === 'prefix' ||
+    scope.kind === 'domain' ||
+    scope.kind === 'global'
+  ) {
     return scope.kind;
   }
+  // `tab` only. It stays unoffered: nothing can create one, for the reason written above
+  // `resolveDuplicate`.
   return 'other';
 }
 

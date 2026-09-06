@@ -21,11 +21,19 @@ export { isRtl, type Lang, setLang } from './i18n-core.ts';
 export const NOTE_CATALOGUE = {
   noteWhere: { en: 'Shows on', fa: 'نمایش روی' },
   noteWhereUrl: { en: 'This page', fa: 'همین صفحه' },
+  noteWhereOther: { en: 'Somewhere else', fa: 'جای دیگر' },
+  noteWhereSection: { en: 'This section ($1)', fa: 'همین بخش ($1)' },
   noteWhereDomain: { en: 'This whole site', fa: 'کل این سایت' },
   noteWhereGlobal: { en: 'Every page', fa: 'همهٔ صفحه‌ها' },
   noteWhereNote: {
-    en: 'A note on the whole site appears on every page of it, at the same place on each.',
-    fa: 'نوتی که روی کل سایت باشد، در همهٔ صفحه‌های آن و در همان جای هر صفحه ظاهر می‌شود.',
+    en:
+      'A note on the whole site appears on every page of it, at the same place on each. A ' +
+      'section is every page whose address starts the same way — the part in brackets is ' +
+      'worked out from the page you are on.',
+    fa:
+      'نوتی که روی کل سایت باشد، در همهٔ صفحه‌های آن و در همان جای هر صفحه ظاهر می‌شود. یک ' +
+      'بخش یعنی همهٔ صفحه‌هایی که آدرسشان یک‌جور شروع می‌شود — چیزی که در پرانتز است از ' +
+      'صفحه‌ای که در آن هستی حساب می‌شود.',
   },
   noteEraseAll: { en: 'Erase everything', fa: 'پاک کردن همه' },
   noteName: { en: 'Name', fa: 'نام' },

@@ -595,18 +595,26 @@ async function onMessage(
 
     case 'note/scope': {
       const m = msg as { id: NoteId; kind?: unknown };
-      const kind = m.kind === 'domain' || m.kind === 'global' ? m.kind : 'url';
+      const kind =
+        m.kind === 'prefix' || m.kind === 'domain' || m.kind === 'global' ? m.kind : 'url';
       const record = await getNote(m.id);
       if (!record) return errReply('NOT_FOUND');
 
       /*
-       * The URL comes from the RECORD, never from the message.
+       * The URL never comes from the MESSAGE. It comes from the browser, or from the record.
        *
-       * `context.url` is what the page was when the note was made; the index key is the
-       * fallback for a note old enough to predate that field. Either way it is a URL this
-       * extension wrote down itself, so a page cannot use this to reach another page's notes.
+       * `sender.tab.url` first, and that is not a loophole: the browser fills it in, not the
+       * page, so a content script cannot name a URL it has no business naming. It is also the
+       * RIGHT url for "this section" -- the page the person is looking at, rather than the one
+       * the note happened to be made on. A note widened to the whole site and then narrowed to
+       * a section from a different page of that site should get the section it is being viewed
+       * in; anything else means the label in the panel promises one thing and the click does
+       * another.
+       *
+       * `context.url` is the fallback for the cabinet, which is not a tab, and the index key
+       * is the fallback for a note old enough to predate the context field.
        */
-      const url = record.context?.url ?? urlFromKey(record.ix_urlKeys[0] ?? '');
+      const url = sender.tab?.url ?? record.context?.url ?? urlFromKey(record.ix_urlKeys[0] ?? '');
       const scope = url ? scopeFor(kind, url) : null;
       if (!scope) return errReply('READONLY', 'this note has no page to scope it to');
 

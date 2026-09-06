@@ -5,6 +5,12 @@
   "noteWhereUrl": {
     "message": "This page"
   },
+  "noteWhereOther": {
+    "message": "Somewhere else"
+  },
+  "noteWhereSection": {
+    "message": "This section ($1)"
+  },
   "noteWhereDomain": {
     "message": "This whole site"
   },
@@ -12,7 +18,7 @@
     "message": "Every page"
   },
   "noteWhereNote": {
-    "message": "A note on the whole site appears on every page of it, at the same place on each."
+    "message": "A note on the whole site appears on every page of it, at the same place on each. A section is every page whose address starts the same way — the part in brackets is worked out from the page you are on."
   },
   "noteEraseAll": {
     "message": "Erase everything"

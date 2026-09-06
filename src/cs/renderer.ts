@@ -312,7 +312,10 @@ function mountNote(wire: NoteWire): NoteView {
        * three it is looking at.
        */
       scope:
-        wire.scope.kind === 'url' || wire.scope.kind === 'domain' || wire.scope.kind === 'global'
+        wire.scope.kind === 'url' ||
+        wire.scope.kind === 'prefix' ||
+        wire.scope.kind === 'domain' ||
+        wire.scope.kind === 'global'
           ? wire.scope.kind
           : 'other',
     },

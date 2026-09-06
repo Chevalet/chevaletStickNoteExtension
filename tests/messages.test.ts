@@ -385,6 +385,59 @@ describe('note/scope', () => {
     expect(home.ok && home.data.notes.map((n) => n.id)).toContain(note.id);
   });
 
+  it('scopes a note to a SECTION, from the page it is being viewed on', async () => {
+    /*
+     * The prefix is not in the message and not in the record: it is worked out from
+     * `sender.tab.url`, which the browser fills in. That is both safe -- a page cannot name a
+     * URL -- and correct, because "this section" means the section of the page you are looking
+     * at rather than the one the note was first made on.
+     */
+    stub.tabs.set(11, { id: 11, url: 'https://example.com/blog/what-is-defi' });
+    const note = await createOne();
+    const from11 = { tab: { id: 11, url: 'https://example.com/blog/what-is-defi' } };
+    const reply = (await send({ t: 'note/scope', id: note.id, kind: 'prefix' }, from11)) as Reply<{
+      kind: string;
+    }>;
+    expect(reply.ok && reply.data.kind).toBe('prefix');
+
+    // A sibling under /blog/ sees it.
+    const sibling = (await send(
+      { t: 'notes/forContext', url: 'https://example.com/blog/something-else' },
+      { tab: { id: 11, url: 'https://example.com/blog/something-else' } },
+    )) as Reply<{ notes: NoteWire[] }>;
+    expect(sibling.ok && sibling.data.notes.map((n) => n.id)).toContain(note.id);
+
+    // A page outside /blog/ does not -- including one whose path merely starts the same way.
+    for (const outside of ['https://example.com/about', 'https://example.com/blogroll/x']) {
+      const other = (await send(
+        { t: 'notes/forContext', url: outside },
+        { tab: { id: 11, url: outside } },
+      )) as Reply<{ notes: NoteWire[] }>;
+      expect(other.ok && other.data.notes, outside).toEqual([]);
+    }
+  });
+
+  it('takes the section from the tab, not from where the note was made', async () => {
+    // Made on /article, viewed on /blog/what-is-defi, scoped to "this section" from there:
+    // the section is /blog/, and /article is no longer covered.
+    const note = await createOne();
+    stub.tabs.set(12, { id: 12, url: 'https://example.com/blog/what-is-defi' });
+    await send(
+      { t: 'note/scope', id: note.id, kind: 'prefix' },
+      { tab: { id: 12, url: 'https://example.com/blog/what-is-defi' } },
+    );
+    const inBlog = (await send(
+      { t: 'notes/forContext', url: 'https://example.com/blog/another' },
+      { tab: { id: 12, url: 'https://example.com/blog/another' } },
+    )) as Reply<{ notes: NoteWire[] }>;
+    expect(inBlog.ok && inBlog.data.notes.map((n) => n.id)).toContain(note.id);
+
+    const whereItWasMade = (await send({ t: 'notes/forContext', url: PAGE }, from7)) as Reply<{
+      notes: NoteWire[];
+    }>;
+    expect(whereItWasMade.ok && whereItWasMade.data.notes).toEqual([]);
+  });
+
   it('puts a note on every page when asked', async () => {
     const note = await createOne();
     await send({ t: 'note/scope', id: note.id, kind: 'global' }, from7);

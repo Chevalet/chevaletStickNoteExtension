@@ -25,8 +25,10 @@ missing around it.
   reference, popup, options page, and a note's own toolbar and panel. `dir` on the root, so the
   page mirrors rather than just changing words. English is the default and following the browser
   is an explicit choice.
-- **Where a note shows.** `Scope` had five kinds and four were unreachable. Three are a feature
-  now — this page, this whole site, every page — in the note's own settings.
+- **Where a note shows.** `Scope` had five kinds and four were unreachable. Four are a feature
+  now — this page, this section, this whole site, every page — in the note's own settings. The
+  section is worked out from the page you are looking at and shown in the label, because "this
+  section" means `/blog/` on one page and the whole host on another.
 - **Hold Alt to read the page under a note**, and to click it. The stylesheet had the selector
   for this already, from a half-built setting removed earlier in the release.
 - **Edit a note's text from the cabinet**, which was the last thing it could not do.
@@ -159,10 +161,10 @@ on one serving `font-src 'none'`. So it protected nothing and exposed something.
 
 - **A second language beyond Persian and English.** The catalogue has two columns; adding a
   third is mechanical, and nobody has asked.
-- **Two of the five scope kinds stay unreachable.** `prefix` needs a path to cut at and `tab`
-  needs a concept most people do not have, so the picker offers the other three.
-  `resolveDuplicate` guards a tab-key collision that therefore still cannot happen, and says so
-  above itself.
+- **One of the five scope kinds stays unreachable.** `tab` needs a concept most people do not
+  have, so the picker offers the other four and a note carrying a tab scope reads "Somewhere
+  else". `resolveDuplicate` guards a tab-key collision that therefore still cannot happen, and
+  says so above itself.
 - **Live edits the other way.** The cabinet reaches an open tab -- renaming, restoring a
   version, editing the text. A note edited in a tab does not push into an open cabinet; the
   cabinet re-reads when you touch it.
