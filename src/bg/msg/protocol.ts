@@ -70,10 +70,17 @@ export type CsToBg =
   | { t: 'note/delete'; id: NoteId; soft: boolean }
   /** Undo of a delete. The note is in the trash, not gone, so this is a restore. */
   | { t: 'note/restore'; id: NoteId }
+  /*
+   * How the background learns that a tab has something to lose.
+   *
+   * This replaced an `editing/begin` / `editing/end` pair which was declared here from the
+   * first week and never sent by anything -- the third pair of dead members found in this
+   * file, after `scope/apply` and `toggle-ghost`. A boolean that is re-sent is also the better
+   * shape: a begin with a lost end would leave a tab armed for as long as it stayed open, and
+   * "is there an unsaved edit" is a state rather than two events.
+   */
   | { t: 'guard/state'; hasUnsaved: boolean; noteCount: number }
   | { t: 'tab/setEnabled'; enabled: boolean }
-  | { t: 'editing/begin' }
-  | { t: 'editing/end' }
   /** "Save as my default" in a note's settings panel. Sparse, and merged over what is stored. */
   | { t: 'settings/saveDefaults'; style: Record<string, unknown> }
   /**

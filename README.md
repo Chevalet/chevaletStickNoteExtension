@@ -45,13 +45,28 @@ offers to reattach — it is never silently misplaced and never deleted.
 **Your notes are not in the cache.** They live in the extension's own IndexedDB, which
 "Clear cookies and site data" does not touch, and `unlimitedStorage` keeps exempt from
 eviction. The two things that *would* lose them are Refresh Firefox and uninstalling the
-extension, and the answer to both is **Export ZIP** in the cabinet, which needs no permission
-at all and writes every note, its position, its style and its images to one archive.
+extension, and the answer to both is **Export** in the cabinet, which needs no permission at
+all and writes every note, its position, its style and its images to one archive — as a ZIP
+you can import back, or as Markdown or a single self-contained HTML page for reading elsewhere.
 
-There is **no scheduled backup**, and an earlier version of this paragraph said there was —
-"are covered by scheduled ZIP backups", for a feature that does not exist. Exporting is
-something you have to do. The README of a notes app should be honest about this, so:
-[see the durability table](#durability).
+There is also a **scheduled backup**: an alarm, a ZIP into your Downloads folder, a ring of
+three files. It asks Firefox for permission to save files only when you switch it on, and the
+`downloads` permission is optional for exactly that reason.
+
+*This paragraph has been wrong in both directions.* It once claimed scheduled backups that did
+not exist; then it was corrected to say there were none; then 0.0.11 built them and the
+correction went stale in its turn. Both versions were confidently phrased.
+
+The [durability table](#durability) below is hand-written too, and nothing generates it from
+the code — so it is worth reading with the same suspicion. What the table says is checked
+against `docs/STATUS.md` on every release, which is a person's habit rather than a mechanism,
+and the honest statement is that this file is documentation and only the tests are proof.
+
+**A note belongs somewhere, and you choose where.** This page, this section, this whole site,
+or every page — set in the note's own settings. "This section" is every page whose address
+starts the same way, worked out from the page you are on and shown in the option, so *This
+section (/blog/)* leaves nothing to guess. A note on the whole site appears on every page of
+it, in the same place.
 
 **It feels like paper.** Dragging a note runs a critically-damped spring on position and
 underdamped springs on rotation, tilt, skew and corner curl, driven by pointer velocity and by
@@ -81,13 +96,15 @@ disagrees with what you set.
 | unbound | Open the cabinet |
 
 **On a page** — `Alt`+double-click makes a note where you clicked. Right-click offers to add
-one, or to quote the text you have selected.
+one, or to quote the text you have selected. **Hold `Alt`** and the notes go translucent and
+stop taking the pointer, so you can read *and click* the page underneath — a link under a note
+is clickable while the key is held.
 
 **On a selected note** — grabbing the header, or the sliders button in it, selects the note.
 
 | | |
 |---|---|
-| `S` | This note's settings: colour, type, size, direction, paper |
+| `S` | This note's settings: its name, where it shows, colour, type, size, direction, paper |
 | `C` `D` `P` `E` | Next colour · draw · pen · eraser |
 | `Z` | Undo the last brush stroke |
 | `L` `M` | Lock · collapse |
@@ -134,7 +151,13 @@ does not depend on finding the right note first.
 
 Manual export and import is always available, needs no permission, and produces a single ZIP
 containing every note, its position and anchor, its images and ink, plus a human-readable
-Markdown mirror.
+Markdown mirror. Import reads it back: it checks the archive's checksum, shows you a merge plan
+before writing anything, and keeps the previous text of every note it overwrites as a version.
+
+**Scheduled backup** writes the same ZIP into your Downloads folder on an alarm, on a ring of
+three filenames. It cannot choose the folder — the browser decides that — it cannot run while
+Firefox is closed, and a file on the same disk is not an off-site backup. It survives Refresh
+Firefox and uninstalling the extension; it does not survive the disk failing.
 
 ## Privacy
 
@@ -184,8 +207,15 @@ Bundle budgets are enforced by the build and will fail it:
 | Bundle | Budget | Why |
 |---|---|---|
 | `cs/guard.js` | 1 kB gz | runs at `document_start` on every annotated page |
-| `cs/renderer.js` | 32 kB gz | parsed on every page load that has notes |
-| background | 80 kB min | an event page parses its whole bundle on **every wake** |
+| `cs/renderer.js` | 38 kB gz | parsed on every page load that has notes |
+| `ui/manager.js` | 64 kB gz | the cabinet, opened deliberately |
+| `ui/options.js`, `ui/popup.js` | 24 kB gz | small pages, generous ceilings |
+| `bg/main.js` | 32 kB gz | an event page parses its whole bundle on **every wake** |
+
+Every number has an argument behind it in `build.config.ts`, and raising one costs writing that
+argument down with a measurement. The renderer's has been raised six times and cut once — the
+i18n split took 11 kB out of it by moving the string catalogue behind a table a note actually
+uses.
 
 ### Layout
 
